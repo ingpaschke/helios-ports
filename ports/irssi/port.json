@@ -24,12 +24,18 @@
       "file": "04-unix-adaptation.patch",
       "description": "Supply glob compatibility and disable unsupported Unix process execution",
       "sha256": "9b2ccf13fa68bbac2b8342634b273d321dfd8f1b64c088b37c646c5e7efcfe0c"
+    },
+    {
+      "file": "05-ncurses.patch",
+      "sha256": "010734a1d79cbf822713713b468c9fc1ebb83591b334b179711d9102ac4be2c2",
+      "description": "Use ncurses terminfo with its public function declarations"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "e6d9f4e67df479c5c0f3b81544a96d601bd2aef91854e2bded74e77f25af9e56",
+  "patched_tree_sha256": "a85cff034afe2187688a419ea5b45baea9e3cff4d984c3e3318ee93389694561",
   "dependencies": [
-    "glib"
+    "glib",
+    "ncurses"
   ],
   "requires_compat": true,
   "host_tools": [
@@ -253,7 +259,6 @@
           "${src}/src/fe-text/module-formats.c",
           "${src}/src/fe-text/term-terminfo.c",
           "${src}/src/fe-text/terminfo-core.c",
-          "${src}/src/fe-text/tparm.c",
           "${src}/ktm-compat.c",
           "${src}/src/irc/irc.c"
         ],
@@ -267,6 +272,7 @@
         "compiler": "hcc",
         "includes": [
           "${source_dir}",
+          "${dep:ncurses}/stage/local/include/ncurses",
           "${compat}/include/helios-unix",
           "${src:glib}",
           "${src}",
@@ -288,6 +294,7 @@
           "irssi"
         ],
         "libraries": [
+          "${dep:ncurses}/stage/local/lib/ncurses.lib",
           "${compat}/lib/helios-unix.lib",
           "${sdk}/lib/bsd.lib",
           "${sdk}/lib/c.lib",

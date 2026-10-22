@@ -21,7 +21,9 @@ This build has no Perl, dynamic modules, or /EXEC. DCC remains plaintext.
 DNS runs in a separate Helios task through helios-unix.lib and hu-resolve.
 The UI receives a bounded message over a native Helios /fifo stream channel.
 
-Terminal support covers xterm, screen, ansi and vt100. Xterm is recommended.
+Terminal descriptions come from ncurses, using /helios/local/share/terminfo
+or the TERMINFO directory. ANSI, VT100 and xterm descriptions are built in.
+Xterm is recommended.
 The port reads Helios terminal dimensions directly, handles SIGWINCH and maps
 Helios CSI/SS3 cursor keys to their seven-bit terminal sequences. The console
 does not support every xterm display feature; use a Helios xterm for full UI.

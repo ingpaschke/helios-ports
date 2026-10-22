@@ -1,0 +1,29 @@
+Subject: Use ncurses terminfo with its public function declarations
+
+diff --git a/src/fe-text/terminfo-core.c b/src/fe-text/terminfo-core.c
+index 781041fd614370347b3afda327953e07ebdd46dd..b8b1424f7c8a30e0ec9effe60c19a7f32c081a35 100644
+--- a/src/fe-text/terminfo-core.c
++++ b/src/fe-text/terminfo-core.c
+@@ -14,14 +14,22 @@ inline static int term_putchar(int c)
+ 
+ /* Don't bother including curses.h because of these -
+    they might not even be defined there */
++#ifdef __HELIOS
++#define NCURSES_NOMACROS 1
++#include <curses.h>
++#include <term.h>
++#else
+ char *tparm();
+ int tputs();
++#endif
+ 
+ #ifdef HAVE_TERMINFO
++#ifndef __HELIOS
+ int setupterm();
+ char *tigetstr();
+ int tigetnum();
+ int tigetflag();
++#endif
+ #define term_getstr(x, buffer) tigetstr(x.ti_name)
+ #define term_getnum(x) tigetnum(x.ti_name);
+ #define term_getflag(x) tigetflag(x.ti_name);

@@ -29,7 +29,6 @@
 #define STDC_HEADERS 1
 #define USE_TERMINFO 1
 #define HAVE_TERMINFO 1
-#define NEED_TPARM 1
 #define PACKAGE "irssi"
 #define VERSION "0.8.10-helios"
 #define SYSCONFDIR "/helios/etc"
