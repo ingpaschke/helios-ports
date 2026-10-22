@@ -12,13 +12,15 @@
 #   SYSROOT  another Helios tree (include/, lib/): --sysroot=$(SYSROOT)
 #   HASMDIR  a directory with asm, if it is not beside clang
 #   OPT      optimisation level (default -Os)
-#   STACK, HEAP  initial stack and heap of the program in words; both grow
-#            at run time (the Helios `c` driver defaults are 5000)
+#   STACK, HEAP  stack and initial heap sizes in bytes. Ncurses needs
+#            more stack than the old minimal terminal adapter.
 
 CLANG  ?= /opt/llvm-t800/bin/clang
 OPT    ?= -Os
-STACK  ?= 5000
+STACK  ?= 32768
 HEAP   ?= 5000
+NCURSES ?= /helios/local
+COMPAT  ?= /helios
 
 ifneq ($(HASMDIR),)
 export PATH := $(HASMDIR):$(PATH)
@@ -26,7 +28,7 @@ endif
 
 B := build-helios
 CFLAGS := --target=t800-helios $(if $(SYSROOT),--sysroot=$(SYSROOT)) $(OPT) \
-	-DHELIOS_PORT -Isrc/helios -Isrc/helios/include
+	-DHELIOS_PORT -I$(NCURSES)/include/ncurses -Isrc/helios -Isrc/helios/include
 LDFLAGS := --target=t800-helios $(if $(SYSROOT),--sysroot=$(SYSROOT)) \
 	-Wl,-s$(STACK) -Wl,-h$(HEAP)
 
@@ -39,7 +41,7 @@ CURSES_SRC := ux_audio_none.c ux_blorb.c ux_init.c ux_input.c ux_pic.c \
 
 COMMON_OBJ := $(COMMON_SRC:%.c=$(B)/common/%.o) $(B)/helios/hcompat.o
 DUMB_OBJ := $(DUMB_SRC:%.c=$(B)/dumb/%.o)
-CURSES_OBJ := $(CURSES_SRC:%.c=$(B)/curses/%.o) $(B)/curses/hcurses.o
+CURSES_OBJ := $(CURSES_SRC:%.c=$(B)/curses/%.o)
 
 .PHONY: all dfrotz frotz clean
 all: dfrotz frotz
@@ -50,7 +52,7 @@ $(B)/dfrotz: $(COMMON_OBJ) $(DUMB_OBJ)
 	$(CLANG) $(LDFLAGS) $^ -o $@
 
 $(B)/frotz: $(COMMON_OBJ) $(CURSES_OBJ)
-	$(CLANG) $(LDFLAGS) $^ -lcurses -ltermcap -lbsd -o $@
+	$(CLANG) $(LDFLAGS) $^ -L$(NCURSES)/lib -lncurses -L$(COMPAT)/lib -lhelios-unix -lbsd -o $@
 
 # The sources include "defs.h" and "../common/defs.h": the Unix Makefile
 # generates them in src/common, here they are copied from src/helios.
@@ -76,9 +78,6 @@ $(B)/helios/hcompat.o: src/helios/hcompat.c
 	@mkdir -p $(dir $@)
 	$(CLANG) $(CFLAGS) -c $< -o $@
 
-$(B)/curses/hcurses.o: src/helios/hcurses.c
-	@mkdir -p $(dir $@)
-	$(CLANG) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(B) $(GEN)

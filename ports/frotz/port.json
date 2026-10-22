@@ -17,14 +17,21 @@
       "sha256": "5d0dbc54d4fc290a5a0e1b076c084adf481847fba3cb65277e20542b179b298c"
     },
     {
-      "file": "02-terminal.patch",
-      "description": "Provide the Helios terminal and curses adapter",
-      "sha256": "c381739d80e194b0124fbd154c96658ec39f7bbafc51c1be16da7dd98fb11860"
+      "file": "02-platform.patch",
+      "sha256": "82a351abb557e7e9e60f1cff4973f3fda46e11e34e402535726830f22f81dd03",
+      "description": "Use Helios paths and the native ncurses library"
+    },
+    {
+      "file": "03-status-line.patch",
+      "sha256": "940b993d7f75aa93271dc7c7e56d3e9397b1e794ccbda06f7f3b19f4ff9bc484",
+      "description": "Preserve the V1-V3 status line when resizing"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "4f4e1d9a26b79c31fcf1eef48932e47d88da407cb1092a67749c29646525367f",
-  "dependencies": [],
+  "patched_tree_sha256": "dae68e9055617165d4cf67803b61b123853c67faa28b331dbbe24e87e00cf609",
+  "dependencies": [
+    "ncurses"
+  ],
   "host_tools": [
     "make"
   ],
@@ -39,7 +46,9 @@
           "-j${jobs}",
           "CLANG=${clang}",
           "SYSROOT=${sdk}",
-          "HASMDIR=${asm_dir}"
+          "HASMDIR=${asm_dir}",
+          "NCURSES=${dep:ncurses}/stage/local",
+          "COMPAT=${compat}"
         ],
         "cwd": "${src}"
       }
@@ -74,5 +83,6 @@
     "outputs": [
       "${src}/doc/frotz.6"
     ]
-  }
+  },
+  "requires_compat": true
 }

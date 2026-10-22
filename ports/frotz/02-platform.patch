@@ -1,0 +1,101 @@
+Subject: Use Helios paths and the native ncurses library
+
+diff --git a/src/curses/ux_init.c b/src/curses/ux_init.c
+index f4a52ce6ba0856e27f5514e97179050608f31b83..dcaa5380c6b6b75009bd586567bbaf066e5cb082 100644
+--- a/src/curses/ux_init.c
++++ b/src/curses/ux_init.c
+@@ -224,7 +224,7 @@ void os_process_arguments (int argc, char *argv[])
+ 
+ 	zoptarg = NULL;
+ 
+-#if !defined(WIN32) && !defined(__HAIKU__)
++#if !defined(WIN32) && !defined(__HAIKU__) && !defined(HELIOS_PORT)
+ 	if ((getuid() == 0) || (geteuid() == 0)) {
+ 		printf("I won't run as root!\n");
+ 		os_quit(EXIT_FAILURE);
+@@ -238,8 +238,12 @@ void os_process_arguments (int argc, char *argv[])
+ #endif
+ 
+ 	if ((home = getenv(HOMEDIR)) == NULL) {
++#ifdef HELIOS_PORT
++		home = ".";
++#else
+ 		printf("Hard drive on fire!\n");
+ 		os_quit(EXIT_FAILURE);
++#endif
+ 	}
+ 
+ 
+@@ -301,6 +305,10 @@ void os_process_arguments (int argc, char *argv[])
+ 	p = strrchr(f_setup.story_name, '.');
+ 	if ( p != NULL )
+ 		*p = '\0';  /* extension removed */
++#ifdef HELIOS_PORT
++	/* Keep default save/script names usable on GEMDOS filesystems. */
++	if (strlen(f_setup.story_name) > 8) f_setup.story_name[8] = '\0';
++#endif
+ 
+ 	/* Create nice default file names */
+ 	f_setup.script_name = malloc((strlen(f_setup.story_name) + strlen(EXT_SCRIPT) + 1) * sizeof(char));
+@@ -482,8 +490,13 @@ void os_init_screen (void)
+ 	setlocale(LC_ALL, "");
+ #endif
+ 
+-	if (getenv("ESCDELAY") == NULL)
++	if (getenv("ESCDELAY") == NULL) {
++#ifdef HELIOS_PORT
++		set_escdelay(50);
++#else
+ 		setenv("ESCDELAY", "50", 1);
++#endif
++	}
+ 
+ 	if (initscr() == NULL) {    /* Set up curses */
+ 		os_fatal("Unable to initialize curses. Maybe your $TERM setting is bad.");
+@@ -498,7 +511,7 @@ void os_init_screen (void)
+ 	scrollok(stdscr, FALSE);	/* No scrolling unless explicitly asked for */
+ 
+ 	/* It's nice to know what terminal we have to work with. */
+-	u_setup.term = strdup(getenv("TERM"));
++	u_setup.term = getenv("TERM") ? strdup(getenv("TERM")) : NULL;
+ 
+ 	if (z_header.version == V3 && f_setup.tandy != 0)
+ 		z_header.config |= CONFIG_TANDY;
+@@ -701,6 +714,9 @@ FILE *os_path_open(const char *name, const char *mode)
+ 
+ 	if ( (p = getenv(PATH1) ) == NULL)
+ 		p = getenv(PATH2);
++#ifdef HELIOS_PORT
++	if (p == NULL) p = "/helios/local/games";
++#endif
+ 
+ 	if (p != NULL) {
+ 		fp = pathopen(name, p, mode);
+diff --git a/src/curses/ux_input.c b/src/curses/ux_input.c
+index 5c2e42200fa9add54a38ffc7aa9aec97342f9cd4..74185cac38f0140b918f4c45d191b2d5f324fa1e 100644
+--- a/src/curses/ux_input.c
++++ b/src/curses/ux_input.c
+@@ -31,7 +31,11 @@
+ 
+ #include <errno.h>
+ #include <sys/time.h>
++#ifdef HELIOS_PORT
++#include <sys/socket.h>
++#else
+ #include <sys/select.h>
++#endif
+ 
+ #include "ux_defines.h"
+ 
+@@ -206,9 +210,9 @@ static int unix_read_char(int extkeys)
+ 		 * while loop.
+ 		 */
+ 		if (t_left)
+-			sel = select(fd + 1, &rsel, NULL, NULL, t_left);
++			sel = select(fd + 1, (void *)&rsel, NULL, NULL, t_left);
+ 		else
+-			sel = select(fd + 1, &rsel, NULL, NULL, &maxwait);
++			sel = select(fd + 1, (void *)&rsel, NULL, NULL, &maxwait);
+ 
+ 		if (terminal_resized)
+ 			continue;
