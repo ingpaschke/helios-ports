@@ -1,0 +1,93 @@
+Subject: Place temporary files and editor resources in the Helios filesystem
+
+diff --git a/clients/textedit/textedit.c b/clients/textedit/textedit.c
+index 18f1ff6b879bcea2d5c9d11a3bca9e72f86be0b5..a0a742903f09daad3f4c4bb80197e8a30295a051 100644
+--- a/clients/textedit/textedit.c
++++ b/clients/textedit/textedit.c
+@@ -949,7 +949,7 @@ mysigproc(me, sig, when)
+ 	 * fails, give up.
+ 	 */
+ 	/* martin.buck@bigfoot.com */
+-	(void)sprintf(name_to_use, "/usr/tmp/textedit.%d", pid);
++	(void)sprintf(name_to_use, "/helios/tmp/textedit.%d", pid);
+ 	(void)fprintf(stderr, "failed!\nAttempting Store to %s ... ", name_to_use);
+ 	(void)fflush(stderr);
+ 	if (textsw_store_file(textsw, name_to_use, 0, 0) == 0)
+diff --git a/lib/libxview/sel/seln.c b/lib/libxview/sel/seln.c
+index 6ac5c9fbf354abc4b6f53f23837289e91596e4d7..137e84c4b0a26fa6ff0d95f44b8602b61ca951e5 100644
+--- a/lib/libxview/sel/seln.c
++++ b/lib/libxview/sel/seln.c
+@@ -144,7 +144,7 @@ selection_filename()
+ 
+     if ((name = getenv("SELECTION_FILE")) == NULL)
+ #ifdef XVIEW_USE_INSECURE_TMPFILES
+-	name = "/tmp/winselection";
++	name = "/helios/tmp/winselection";
+ #else
+ 	if (!homename[0]) {
+ 	    sprintf(homename, "%s/.winselection", xv_getlogindir());
+diff --git a/lib/libxview/textsw/txt_e_menu.c b/lib/libxview/textsw/txt_e_menu.c
+index f6240037a51be6c7f975e7fa25691ae90c7db3a9..5b64fe79cffd2d991793ebdcc899f018cba62a44 100644
+--- a/lib/libxview/textsw/txt_e_menu.c
++++ b/lib/libxview/textsw/txt_e_menu.c
+@@ -19,7 +19,7 @@ static char     sccsid[] = "@(#)txt_e_menu.c 20.50 93/06/28";
+  *  3. $(HOME)/.text_extras_menu{.<locale>} (home dir),
+  *  4. locale sensitive system default
+  *		("$OPENWINHOME/lib/locale/<locale>/XView/.text_extras_menu")
+- *  4. fall back to SunView1 ("/usr/lib/.text_extras_menu")
++ *  4. fall back to SunView1 ("/helios/local/openwin/lib/text_extras_menu")
+  *
+  * Always try locale specific name first, if not there, try without
+  * locale name.  In the #4, we will fall back to the "C" locale.
+diff --git a/lib/libxview/textsw/txt_file.c b/lib/libxview/textsw/txt_file.c
+index 7ca8857ebe103558437cd6277811e49e6a84d909..e343558c61f196777af7836fc828a5f446971f18 100644
+--- a/lib/libxview/textsw/txt_file.c
++++ b/lib/libxview/textsw/txt_file.c
+@@ -87,7 +87,7 @@ textsw_make_temp_name(in_here)
+ #ifdef XVIEW_USE_INSECURE_TMPFILES
+     /* martin.buck@bigfoot.com */
+     (void) SPRINTF(in_here, "%s/Text%d.%d",
+-		   "/tmp", getpid(), tmtn_counter++);
++		   "/helios/tmp", getpid(), tmtn_counter++);
+ #else
+     (void) SPRINTF(in_here, "%s/.Text%d.%d",
+ 		   xv_getlogindir(), getpid(), tmtn_counter++);
+diff --git a/lib/libxview/textsw/txt_selsvc.c b/lib/libxview/textsw/txt_selsvc.c
+index 9ffd18f783c0d7985ddc2895320fec2ac381754a..56a8857a3705a33bbf03c5002be6d598cfca21e2 100644
+--- a/lib/libxview/textsw/txt_selsvc.c
++++ b/lib/libxview/textsw/txt_selsvc.c
+@@ -30,7 +30,7 @@ static int textsw_should_ask_seln_svc(Textsw_folio textsw);
+ Pkg_private Es_status es_copy();
+ static Seln_result textsw_seln_yield();
+ 
+-static char           *shelf_name = "/tmp/textsw_shelf";
++static char           *shelf_name = "/helios/tmp/textsw_shelf";
+ 
+ #define	SAME_HOLDER(folio, holder)				\
+ 	seln_holder_same_client((Seln_holder *)holder,		\
+diff --git a/lib/libxview/ttysw/termsw.c b/lib/libxview/ttysw/termsw.c
+index 41c28dac8ec62768d5845543bef3249fe290f7c3..cadd2f8de263afd9bd68ce38c6b8aef6321f8289 100644
+--- a/lib/libxview/ttysw/termsw.c
++++ b/lib/libxview/ttysw/termsw.c
+@@ -256,7 +256,7 @@ termsw_folio_init_internal(parent, termsw_folio, avlist)
+ #endif
+ 
+     /* Generate a new temporary file name and open the file up. */
+-    (void) strcpy(tmpfile_name, "/tmp/tty.txt.XXXXXX");
++    (void) strcpy(tmpfile_name, "/helios/tmp/tty.txt.XXXXXX");
+     (void) mktemp(tmpfile_name);
+     if ((fd = open(tmpfile_name, O_CREAT | O_RDWR | O_EXCL, 0600)) < 0) {
+ 	return (XV_ERROR);
+diff --git a/lib/libxview/ttysw/ttyselect.c b/lib/libxview/ttysw/ttyselect.c
+index dbe7dc8afe66e5c3dd2f41b45229f465783fc0f2..8bfc16f16dcebe26a0f401ab2be745c3a68b6192 100644
+--- a/lib/libxview/ttysw/ttyselect.c
++++ b/lib/libxview/ttysw/ttyselect.c
+@@ -108,7 +108,7 @@ static struct timeval maxinterval = {0, 400000};	/* XXX - for now */
+ 
+ #ifdef XVIEW_USE_INSECURE_TMPFILES
+ /* martin.buck@bigfoot.com */
+-static char    *ttysel_filename = "/tmp/ttyselection";
++static char    *ttysel_filename = "/helios/tmp/ttyselection";
+ #else
+ static char    ttysel_filename[MAXNAMLEN];
+ #endif

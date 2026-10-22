@@ -1,0 +1,27 @@
+Subject: Read native terminal packets atomically instead of splitting their headers and payloads
+
+diff --git a/lib/libxview/ttysw/tty_main.c b/lib/libxview/ttysw/tty_main.c
+index 075bcda52b6f4427eb0f56ea7575c0a73862c69f..755efada9e5bc2b4622df91fe3ce51b3206da795 100644
+--- a/lib/libxview/ttysw/tty_main.c
++++ b/lib/libxview/ttysw/tty_main.c
+@@ -860,7 +860,11 @@ ttysw_pty_input(ttysw, pty)
+         XV_BCOPY(rest_of_char, mb_buf_p, rest_of_nchar);
+     iov[1].iov_base = (char *)mb_buf_p + rest_of_nchar; /* yuck */
+ #endif
++#ifdef helios
++    cc = xvh_terminal_packet(pty, &ucntl, iov[1].iov_base, iov[1].iov_len);
++#else
+     cc = readv(pty, iov, 2);
++#endif
+ #ifdef OW_I18N
+         mb_buf_p[cc - 1 + rest_of_nchar] = 0;
+         {
+@@ -937,7 +941,7 @@ ttysw_pty_input(ttysw, pty)
+             (void)tcgetattr(ttysw->ttysw_tty, &ttysw->termios);
+ #endif
+ 	    ttysw_getp(TTY_VIEW_HANDLE_FROM_TTY_FOLIO(ttysw));	/* jcb for nng */
+-#ifdef __linux__
++#if defined(__linux__) || defined(helios)
+ 	}
+ 	if (int_ucntl == 0)
+ #else

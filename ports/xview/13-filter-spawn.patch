@@ -1,0 +1,24 @@
+Subject: Launch editor filters with native channels and descriptor actions instead of shared vfork state
+
+diff --git a/lib/libxview/textsw/txt_filter.c b/lib/libxview/textsw/txt_filter.c
+index bc35776cd140df836a411f334b948cb542a716b7..af4fce50cf2238ef6682a8af47c156f09f45bb28 100644
+--- a/lib/libxview/textsw/txt_filter.c
++++ b/lib/libxview/textsw/txt_filter.c
+@@ -868,6 +868,9 @@ start_filter(filter_argv, filter_input, filter_output)
+     char           *filter_argv[];
+     int            *filter_input, *filter_output;
+ {
++#ifdef helios
++    return xvh_start_filter(filter_argv, filter_input, filter_output);
++#else
+     int             to_filter[2], from_filter[2], pid;
+ 
+     errno = 0;
+@@ -932,6 +935,7 @@ start_filter(filter_argv, filter_input, filter_output)
+     *filter_input = to_filter[OUTPUT];
+     *filter_output = from_filter[INPUT];
+     return (pid);
++#endif
+ }
+ 
+ /*

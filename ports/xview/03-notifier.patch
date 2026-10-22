@@ -1,0 +1,271 @@
+Subject: Use native readiness and channels without interposing on libc or requiring Unix system calls
+
+diff --git a/clients/textedit/textedit.c b/clients/textedit/textedit.c
+index 36d4ece6350a3d6eaef37453b71273f2219137be..18f1ff6b879bcea2d5c9d11a3bca9e72f86be0b5 100644
+--- a/clients/textedit/textedit.c
++++ b/clients/textedit/textedit.c
+@@ -824,10 +824,10 @@ textedit_main(argc, argv)
+ 	 * Setup signal handlers.
+ 	 */
+ 	(void)notify_set_signal_func(base_frame, mysigproc, SIGINT,  NOTIFY_ASYNC);
+-#if !defined(__linux__) || defined(SIGXCPU)
++#ifdef SIGXCPU
+ 	(void)notify_set_signal_func(base_frame, mysigproc, SIGXCPU, NOTIFY_ASYNC);
+ #endif
+-#if !defined(__linux__) || defined(SIGBUS)
++#ifdef SIGBUS
+ 	(void)notify_set_signal_func(base_frame, mysigproc, SIGBUS,  NOTIFY_ASYNC);
+ #endif
+ 	(void)notify_set_signal_func(base_frame, mysigproc, SIGHUP,  NOTIFY_ASYNC);
+diff --git a/lib/libxview/notify/ndet_auto.c b/lib/libxview/notify/ndet_auto.c
+index a1320fecc426ec2bae5e9461c75b74ada4f5f3ce..1bc1e5009ac5e51a94d645b164b4f4161d183d80 100644
+--- a/lib/libxview/notify/ndet_auto.c
++++ b/lib/libxview/notify/ndet_auto.c
+@@ -73,7 +73,7 @@ ndet_auto_sig_send(client, condition, context)
+ 		/* Auto sig is async */);
+     /* Sweep all conditions & send notifications (recursive enumeration) */
+     switch (condition->data.signal) {
+-#ifndef __linux__
++#if defined(SIGIO) && !defined(__linux__)
+ /* In linux SIGIO == SIGURG */
+       case SIGIO:
+ #endif
+@@ -89,9 +89,11 @@ ndet_auto_sig_send(client, condition, context)
+ 		FD_ZERO(&ibits);
+ 		FD_ZERO(&obits);
+ 		FD_ZERO(&ebits);
++#ifdef SIGIO
+ 		if (condition->data.signal == SIGIO)
+ 		    ibits = obits = ndet_fasync_mask;
+ 		else
++#endif
+ 		    ebits = ndet_fasync_mask;
+ 		/* Do a select to see who needs service */
+ 		nfds = notify_select(FD_SETSIZE,
+@@ -151,7 +153,7 @@ ndet_auto_sig_send(client, condition, context)
+ 
+ 	    enum_send->wait3 = &wd;
+ 	    /* Look for as many children as have changed state */
+-#if !defined(SVR4) && !defined(__linux__)
++#if !defined(SVR4) && !defined(__linux__) && !defined(helios)
+ 	    while ((wd.pid = wait3(&wd.status, WNOHANG | WUNTRACED,
+ 				   &wd.rusage)) > 0)
+ #else
+@@ -170,9 +172,11 @@ ndet_auto_sig_send(client, condition, context)
+       case SIGALRM:
+ 	ndet_update_real_itimer();
+ 	break;
++#ifdef SIGVTALRM
+       case SIGVTALRM:
+ 	ndet_update_virtual_itimer();
+ 	break;
++#endif
+       default:
+ 	ntfy_fatal_error(XV_MSG("Nclient unprepared to handle signal"));
+ 	break;
+diff --git a/lib/libxview/notify/ndet_fcntl.c b/lib/libxview/notify/ndet_fcntl.c
+index 078c80c2f65ed057c26fdbe6d71facdfe0379932..1182d901178f48f2d4c0e4409cebcd97529698f7 100644
+--- a/lib/libxview/notify/ndet_fcntl.c
++++ b/lib/libxview/notify/ndet_fcntl.c
+@@ -27,7 +27,7 @@ static char     sccsid[] = "@(#)ndet_fcntl.c 20.13 93/06/28 Copyr 1985 Sun Micro
+ #endif
+ 
+ int
+-#ifndef __linux__
++#if !defined(__linux__) && !defined(helios)
+ #ifdef SVR4
+ xv_fcntl(fd, cmd, arg)
+ #else
+@@ -46,7 +46,8 @@ fcntl(int fd, int cmd, ...) {
+     int             arg;
+ 
+     va_start(args, cmd);
+-    arg = va_arg(args, int);
++    arg = (cmd == F_GETFD || cmd == F_GETFL || cmd == F_GETOWN) ?
++        0 : va_arg(args, int);
+     va_end(args);
+ #endif /* __linux__ */
+ 
+@@ -87,7 +88,7 @@ fcntl(int fd, int cmd, ...) {
+ #endif
+ 	else
+ 	    FD_CLR(fd, &ndet_fndelay_mask);
+-#if !defined(__linux__) || defined(FASYNC)
++#ifdef FASYNC
+ 	if (arg & FASYNC)
+ 	    FD_SET(fd, &ndet_fndelay_mask);
+ 	else
+@@ -95,8 +96,10 @@ fcntl(int fd, int cmd, ...) {
+ #endif
+ 	/* Make sure that are catching async related signals now */
+ 	if (ntfy_fd_anyset(&ndet_fasync_mask)) {
++#ifdef SIGIO
+ 	    ndet_enable_sig(SIGIO);
+-#ifndef __linux__
++#endif
++#if !defined(__linux__) && !defined(helios)
+ 	    ndet_enable_sig(SIGURG);
+ #endif
+ 	}
+diff --git a/lib/libxview/notify/ndet_loop.c b/lib/libxview/notify/ndet_loop.c
+index 753f4912910441374b9d8d76db824f34e5d1480f..6258ec1bb1476513da40827683771e2e28ec6fc9 100644
+--- a/lib/libxview/notify/ndet_loop.c
++++ b/lib/libxview/notify/ndet_loop.c
+@@ -19,14 +19,14 @@ static char     sccsid[] = "@(#)ndet_loop.c 20.36 93/06/28 Copyr 1985 Sun Micro"
+ #include <xview_private/ndet.h>
+ #include <xview_private/nint.h>
+ #include <xview_private/ndis.h>	/* For ndis_dispatch */
+-#ifndef __linux__
++#if !defined(__linux__) && !defined(helios)
+ #ifndef SVR4
+ #include <syscall.h>
+ #else /* SVR4 */
+ #include <sys/syscall.h>
+ #include <sys/poll.h>
+ #endif /* SVR4 */
+-#else /* __linux__ */
++#elif defined(__linux__)
+ #include "linux_select.h"
+ #endif
+ #include <fcntl.h>
+@@ -146,9 +146,13 @@ notify_start()
+     ndet_flags |= NDET_STARTED;
+ 
+     if( !pipe_started ) {
++        if (pipe(pipefds) < 0) {
++            ndet_flags &= ~NDET_STARTED;
++            return NOTIFY_INTERNAL_ERROR;
++        }
++        fcntl(pipefds[0], F_SETFL, O_NDELAY);
++        fcntl(pipefds[1], F_SETFL, O_NDELAY);
+         pipe_started = TRUE;
+-        if( !pipe( pipefds )) {}
+-        fcntl( pipefds[0], F_SETFL, O_NDELAY);
+     }
+ 
+     /* Always go around the loop at least once */
+@@ -232,6 +236,10 @@ notify_start()
+ 	     * will return with an EINTR when a signal arrives while IN
+ 	     * select, not ON THE WAY into select).
+ 	     */
++#ifdef helios
++	    nfds = notify_select(FD_SETSIZE, &ibits, &obits, &ebits,
++		(sigisempty(&ndet_sigs_received)) ? timer : &ndet_polling_tv);
++#else
+ #ifndef SVR4
+ #ifndef __linux__
+ 	    nfds = syscall(SYS_select,
+@@ -245,6 +253,7 @@ notify_start()
+ 	    nfds = notify_select(FD_SETSIZE, &ibits, &obits, &ebits,
+ 		(sigisempty(&ndet_sigs_received)) ? timer : &ndet_polling_tv);
+ #endif /* SVR4 */
++#endif /* helios */
+ 	    errno_remember = errno;
+ 	    /* See if select returned unconventionally */
+ 	    if (nfds == -1) {
+@@ -413,7 +422,9 @@ ndet_fig_fd_change()
+     FD_ZERO(&ndet_ibits);
+     FD_ZERO(&ndet_obits);
+     FD_ZERO(&ndet_ebits);
++#ifdef SIGIO
+     sigdelset( &ndet_sigs_auto, SIGIO );
++#endif
+ #ifndef __linux__
+     sigdelset( &ndet_sigs_auto, SIGURG );
+ #endif
+@@ -425,7 +436,9 @@ ndet_fig_fd_change()
+     (void) ntfy_new_enum_conditions(ntfy_cndtbl[(int) NTFY_EXCEPTION],
+ 				    ndet_fd_change, NTFY_ENUM_DATA_NULL);
+     /* Toggle notifier auto signal catching if situation changed */
++#ifdef SIGIO
+     ndet_toggle_auto(&sigs_tmp, SIGIO);
++#endif
+ #ifndef __linux__
+     ndet_toggle_auto(&sigs_tmp, SIGURG);
+ #endif
+@@ -441,16 +454,20 @@ ndet_fd_change(client, condition, context)
+ 
+     switch (condition->type) {
+       case NTFY_INPUT:
++#ifdef SIGIO
+ 	if (FD_ISSET(condition->data.fd, &ndet_fasync_mask))
+ 	    sigaddset( &ndet_sigs_auto, SIGIO );
+ 	else
++#endif
+ 	    /* ndet_ibits |= bit; */
+ 	    FD_SET(condition->data.fd, &ndet_ibits);
+ 	break;
+       case NTFY_OUTPUT:
++#ifdef SIGIO
+ 	if (FD_ISSET(condition->data.fd, &ndet_fasync_mask))
+ 	    sigaddset( &ndet_sigs_auto, SIGIO );
+ 	else
++#endif
+ 	    /* ndet_obits |= bit; */
+ 	    FD_SET(condition->data.fd, &ndet_obits);
+ 	break;
+@@ -508,6 +525,7 @@ ndet_wait3_change(client, condition, context)
+ pkg_private void
+ ndet_update_virtual_itimer()
+ {
++#ifndef helios
+     struct timeval  ndet_virtual_min();
+     struct itimerval current_itimer;
+     NDET_ENUM_ITIMER enum_itimer;
+@@ -534,6 +552,9 @@ ndet_update_virtual_itimer()
+     (void) ntfy_new_enum_conditions(ntfy_cndtbl[(int) NTFY_VIRTUAL_ITIMER],
+ 				    ndet_virtual_set_tv_update,
+ 				    (NTFY_ENUM_DATA) & enum_itimer.min_tv);
++#else
++    ndet_flags &= ~(NDET_VIRTUAL_CHANGE | NDET_VIRTUAL_POLL);
++#endif
+ }
+ 
+ /*
+diff --git a/lib/libxview/notify/ndetitimer.c b/lib/libxview/notify/ndetitimer.c
+index 4a24b307c40824bbbb2543a502588246c66f96aa..f6030d940274e87488098596d5a27a0b17b2d7c3 100644
+--- a/lib/libxview/notify/ndetitimer.c
++++ b/lib/libxview/notify/ndetitimer.c
+@@ -43,9 +43,11 @@ ndet_check_which(which, type_ptr)
+       case ITIMER_REAL:
+ 	type = NTFY_REAL_ITIMER;
+ 	break;
++#ifndef helios
+       case ITIMER_VIRTUAL:
+ 	type = NTFY_VIRTUAL_ITIMER;
+ 	break;
++#endif
+       default:
+ 	ntfy_set_errno(NOTIFY_BAD_ITIMER);
+ 	return (-1);
+diff --git a/lib/libxview/notify/ndis_d_pri.c b/lib/libxview/notify/ndis_d_pri.c
+index 56f3d2af4e3325a4a0ebd2ad12838beb619581d8..827ee7f1ae59d59673e9feb1deec86586c69bc33 100644
+--- a/lib/libxview/notify/ndis_d_pri.c
++++ b/lib/libxview/notify/ndis_d_pri.c
+@@ -47,10 +47,12 @@ ndis_default_prioritizer(nclient, nfd, ibits_ptr, obits_ptr, ebits_ptr,
+ 	    (void) notify_itimer(nclient, ITIMER_REAL);
+ 	    sigdelset( auto_sigbits_ptr, SIGALRM );
+ 	}
++#ifdef SIGVTALRM
+ 	if (sigismember( auto_sigbits_ptr, SIGVTALRM )) {
+ 	    (void) notify_itimer(nclient, ITIMER_VIRTUAL);
+ 	    sigdelset( auto_sigbits_ptr, SIGVTALRM );
+ 	}
++#endif
+ 	/* Send child process change */
+ 	if (sigismember( auto_sigbits_ptr, SIGCHLD )) {
+ 	    (void) notify_wait3(nclient);
+diff --git a/lib/libxview/notify/ndisdispch.c b/lib/libxview/notify/ndisdispch.c
+index b1273859b5d8f6daa47f7a6a451d9cb13b74de18..feed5d3da8d3310dddf372a3a4b48ee74ff542be 100644
+--- a/lib/libxview/notify/ndisdispch.c
++++ b/lib/libxview/notify/ndisdispch.c
+@@ -265,7 +265,9 @@ Retry_Conditions:
+ 	    sigaddset( &auto_sigbits, SIGALRM );
+ 	    break;
+ 	  case NTFY_VIRTUAL_ITIMER:
++#ifdef SIGVTALRM
+             sigaddset( &auto_sigbits, SIGVTALRM );
++#endif
+ 	    break;
+ 	  case NTFY_WAIT3:
+             sigaddset( &auto_sigbits, SIGCHLD ); 

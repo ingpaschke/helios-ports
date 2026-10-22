@@ -1,0 +1,59 @@
+{
+  "format": 1,
+  "name": "regexp",
+  "version": "Helios-NG Henry Spencer regexp",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/axelmuhr/Helios-NG.git",
+    "revision": "1fe8f65ee15407945e5a1a25f39f88de64de0d50",
+    "subdirectory": "cmds/textutil",
+    "include": [
+      "regexp.c",
+      "regexp.h"
+    ],
+    "tree_sha256": "a88103d364223a4b4aae1525dce57606b4a9bd568942aa19c0ee4e3f14d1194e"
+  },
+  "patches": [],
+  "patched_tree_sha256": "16c9713d2d2118ae427aa125e08b165968e212722d770dd76c02ca8a182a2491",
+  "dependencies": [],
+  "build": {
+    "compile": {
+      "flags": [
+        "-std=gnu89",
+        "-Dhelios"
+      ]
+    },
+    "groups": [
+      {
+        "name": "regexp",
+        "sources": [
+          "${src}/regexp.c",
+          "${src}/helios/error.c"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "regexp",
+        "type": "archive",
+        "groups": [
+          "regexp"
+        ],
+        "output": "${stage}/local/lib/regexp.lib"
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/regexp.h",
+        "destination": "${stage}/local/include/regexp.h"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/LICENCE",
+        "destination": "${stage}/local/share/regexp/LICENCE"
+      }
+    ]
+  },
+  "files": "files"
+}

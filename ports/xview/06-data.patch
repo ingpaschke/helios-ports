@@ -1,0 +1,203 @@
+Subject: Declare shared toolkit data once for the native Helios linker
+
+diff --git a/lib/libxview/base/xv_error.c b/lib/libxview/base/xv_error.c
+index 2ef7cc7931118d76cafab89a3569139bd3b24c05..66f57be56b2e56fe577adcdf57b2ca0030563396 100644
+--- a/lib/libxview/base/xv_error.c
++++ b/lib/libxview/base/xv_error.c
+@@ -28,7 +28,7 @@ extern int      errno;
+ 
+ #ifndef __linux__
+ /* Global already defined in xv_init.c */
+-Xv_private_data char *xv_app_name;
++extern Xv_private_data char *xv_app_name;
+ #else
+ extern Xv_private_data char *xv_app_name;
+ #endif
+diff --git a/lib/libxview/misc/i18n_impl.h b/lib/libxview/misc/i18n_impl.h
+index a44187ec7395f1d77d0fc074c8015b444bd6e005..f4996d1b95c151788d1ae8f59be37e1e7468c0e6 100644
+--- a/lib/libxview/misc/i18n_impl.h
++++ b/lib/libxview/misc/i18n_impl.h
+@@ -50,7 +50,7 @@ extern char	*dgettext();
+ #define	xv_domain		XV_TEXT_DOMAIN
+ #else  /* XGETTEXT */
+ /* Initial value assigned at xv_init.c */
+-Xv_private_data CONST char	*xv_domain;
++extern Xv_private_data CONST char	*xv_domain;
+ #endif /* XGETTEXT */
+ 
+ #define XV_MSG(s)		(dgettext(xv_domain, s))
+diff --git a/lib/libxview/notice/notice_pt.c b/lib/libxview/notice/notice_pt.c
+index 06cd8ce0bd58fd911f4f0149c42902a5add74d50..7250f43977da057e70384d4c1357b010013e771e 100644
+--- a/lib/libxview/notice/notice_pt.c
++++ b/lib/libxview/notice/notice_pt.c
+@@ -30,7 +30,7 @@ Xv_public char xv_iso_select;
+  * Table containing valid values for OpenWindows.KeyboardCommands resource
+  */
+ #ifndef __linux__
+-Xv_private_data Defaults_pairs xv_kbd_cmds_value_pairs[4];
++extern Xv_private_data Defaults_pairs xv_kbd_cmds_value_pairs[4];
+ #else
+ /* Global already defined and initialized in server/server.c */
+ extern Defaults_pairs xv_kbd_cmds_value_pairs[4];
+diff --git a/lib/libxview/panel/panel.c b/lib/libxview/panel/panel.c
+index ae1c30135875de2f4b318f7b6f8ac3c0f8ee5b60..c60fc322854bedddb4f5c8b7de0b42d11c55c188 100644
+--- a/lib/libxview/panel/panel.c
++++ b/lib/libxview/panel/panel.c
+@@ -29,7 +29,7 @@ Pkg_private int panel_destroy();
+ static int      panel_layout();
+ 
+ #ifndef __linux__
+-Xv_private_data Defaults_pairs xv_kbd_cmds_value_pairs[4];
++extern Xv_private_data Defaults_pairs xv_kbd_cmds_value_pairs[4];
+ #else
+ extern Defaults_pairs xv_kbd_cmds_value_pairs[4];
+ #endif
+diff --git a/lib/libxview/scrollbar/sb.c b/lib/libxview/scrollbar/sb.c
+index 41cdfd71e8f8ab586644df0b6d0768c6aeaaffdc..e6c2610b47d611029fd960884e5187c32ce38b85 100644
+--- a/lib/libxview/scrollbar/sb.c
++++ b/lib/libxview/scrollbar/sb.c
+@@ -44,7 +44,7 @@ Attr_attribute  sb_join_view_menu_item_key;
+ Xv_private void	win_set_no_focus();
+ Xv_private Graphics_info	*xv_init_olgx();
+ #ifndef __linux__
+-Xv_private_data Defaults_pairs xv_kbd_cmds_value_pairs[4];
++extern Xv_private_data Defaults_pairs xv_kbd_cmds_value_pairs[4];
+ #else
+ extern Defaults_pairs xv_kbd_cmds_value_pairs[4];
+ #endif
+diff --git a/lib/libxview/selection/sel_impl.h b/lib/libxview/selection/sel_impl.h
+index 43f6f511396334e1f5e9aba9a1a85fcede825414..8fb835b7ed5741c18cdcdbdeee1553a3e7523df0 100644
+--- a/lib/libxview/selection/sel_impl.h
++++ b/lib/libxview/selection/sel_impl.h
+@@ -218,7 +218,7 @@ Xv_private int  xv_seln_handle_req();
+ Xv_private void xv_sel_send_old_owner_sel_clear();
+ Xv_private void xv_sel_set_compat_data();
+ 
+-#if !defined(__linux__) || defined(__DEFINE_SEL_IMPL_VARS)
++#if (!defined(__linux__) && !defined(helios)) || defined(__DEFINE_SEL_IMPL_VARS)
+ XContext  selCtx;
+ XContext  reqCtx;
+ XContext  targetCtx;
+diff --git a/lib/libxview/selection/selection.c b/lib/libxview/selection/selection.c
+index 7029d80e1319b34b8c4639094497863388f99905..6d4d6cf22499fdbad8200c453d55bc32b5354d98 100644
+--- a/lib/libxview/selection/selection.c
++++ b/lib/libxview/selection/selection.c
+@@ -10,12 +10,12 @@ static char     sccsid[] = "@(#)selection.c 1.11 93/06/28";
+  *	file for terms of the license.
+  */
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(helios)
+ /* Kludge to prevent multiple variables with same name */
+ #define __DEFINE_SEL_IMPL_VARS
+ #endif
+ #include <xview_private/sel_impl.h>
+-#ifdef __linux__
++#if defined(__linux__) || defined(helios)
+ #undef __DEFINE_SEL_IMPL_VARS
+ #endif
+ #include <xview/window.h>
+diff --git a/lib/libxview/server/server.c b/lib/libxview/server/server.c
+index 0b7d0bf6e628b9c9b4c6e78fff740eb1858a41a7..91c220d21b0450bde461ed089faf4f1b69980bf4 100644
+--- a/lib/libxview/server/server.c
++++ b/lib/libxview/server/server.c
+@@ -107,9 +107,9 @@ Xv_private_data char 	*xv_shell_prompt;
+ 
+ /* global default server parameters */
+ #ifndef __linux__
+-Xv_private_data Xv_Server xv_default_server;
+-Xv_private_data Xv_Screen xv_default_screen;
+-Xv_private_data Display *xv_default_display;
++extern Xv_private_data Xv_Server xv_default_server;
++extern Xv_private_data Xv_Screen xv_default_screen;
++extern Xv_private_data Display *xv_default_display;
+ #else
+ /* Globals already defined in base/xv_init.c */
+ extern Xv_Server xv_default_server;
+diff --git a/lib/libxview/server/svr_x.c b/lib/libxview/server/svr_x.c
+index 487484b7930bb1615e329a14cced5e424458b0f5..25f7756c97854cee44b27cd95397d7cc0b4f18c9 100644
+--- a/lib/libxview/server/svr_x.c
++++ b/lib/libxview/server/svr_x.c
+@@ -29,7 +29,7 @@ static char     sccsid[] = "@(#)svr_x.c 20.57 93/06/28";
+ 
+ extern Display *XOpenDisplay();
+ #ifndef __linux__
+-Xv_private_data Defaults_pairs xv_kbd_cmds_value_pairs[4];
++extern Xv_private_data Defaults_pairs xv_kbd_cmds_value_pairs[4];
+ #else
+ /* Global already defined and initialized in in server/server.c */
+ extern Defaults_pairs xv_kbd_cmds_value_pairs[4];
+diff --git a/lib/libxview/textsw/txt_edit.c b/lib/libxview/textsw/txt_edit.c
+index 46b6281057e5414d12b1ee2c6bdb68e893ef42d3..630710dd0e83b9debaad241cf892e327b619e110 100644
+--- a/lib/libxview/textsw/txt_edit.c
++++ b/lib/libxview/textsw/txt_edit.c
+@@ -29,7 +29,7 @@ static char     sccsid[] = "@(#)txt_edit.c 20.58 93/06/28";
+ 	((THRESHOLD * _delta) >= _old_length)
+ 
+ #ifndef __linux__
+-Xv_private_data char *xv_shell_prompt;
++extern Xv_private_data char *xv_shell_prompt;
+ #else
+ /* Global already defined in server/server.c */
+ extern char *xv_shell_prompt;
+diff --git a/lib/libxview/ttysw/charscreen.h b/lib/libxview/ttysw/charscreen.h
+index 288174c8b0cd531bfc9426d822aa1f2a4f1787ac..3dd088df75317318f261c732876dd901004a96d1 100644
+--- a/lib/libxview/ttysw/charscreen.h
++++ b/lib/libxview/ttysw/charscreen.h
+@@ -23,7 +23,7 @@
+  * Character dimensions (fixed width fonts only!)
+  * and of screen in pixels.
+  */
+-#if !defined(__linux__) || defined(__DEFINE_CHARSCREEN_VARS)
++#if (!defined(__linux__) && !defined(helios)) || defined(__DEFINE_CHARSCREEN_VARS)
+ int	chrheight, chrwidth, chrbase;
+ int	winheightp, winwidthp;
+ int	chrleftmargin;
+diff --git a/lib/libxview/ttysw/csr_change.c b/lib/libxview/ttysw/csr_change.c
+index c2a2605a726e77dbb232695ba1772e5b519e57c9..dc21087e1462d4a8b011ea114fdab8b266c0dc9b 100644
+--- a/lib/libxview/ttysw/csr_change.c
++++ b/lib/libxview/ttysw/csr_change.c
+@@ -45,7 +45,7 @@ static char     sccsid[] = "@(#)csr_change.c 20.51 93/06/28";
+ #include <xview/server.h>
+ #include <xview/font.h>
+ #ifndef __linux__
+-Xv_private_data char *xv_shell_prompt;
++extern Xv_private_data char *xv_shell_prompt;
+ #else
+ /* Global already defined in server/server.c */
+ extern char *xv_shell_prompt;
+diff --git a/lib/libxview/ttysw/csr_init.c b/lib/libxview/ttysw/csr_init.c
+index dd8244153268fe73093f5c46ede8412a9796120b..a7e0a088e83dac6559b6c26c69ce9fe816e3fe26 100644
+--- a/lib/libxview/ttysw/csr_init.c
++++ b/lib/libxview/ttysw/csr_init.c
+@@ -31,7 +31,7 @@ static char     sccsid[] = "@(#)csr_init.c 20.31 93/06/28";
+ #include <xview/window.h>
+ #include <xview/font.h>
+ #include <xview_private/charimage.h>
+-#ifdef __linux__
++#if defined(__linux__) || defined(helios)
+ /* charscreen.h defines some variables, and then the header file is included
+  * by more than one source file. The linux shlib-tools don't like it.
+  * Kludge around it by setting a define here which makes the variable
+@@ -39,7 +39,7 @@ static char     sccsid[] = "@(#)csr_init.c 20.31 93/06/28";
+ #define __DEFINE_CHARSCREEN_VARS
+ #endif
+ #include <xview_private/charscreen.h>
+-#ifdef __linux__
++#if defined(__linux__) || defined(helios)
+ #undef __DEFINE_CHARSCREEN_VARS
+ #endif
+ #ifdef OW_I18N
+diff --git a/lib/libxview/ttysw/tty_modes.c b/lib/libxview/ttysw/tty_modes.c
+index 4cc527b20a8834971295f5aaae8dc2c4d211ab70..dc097ce8ced42590060a63698a4c1143a42cebbc 100644
+--- a/lib/libxview/ttysw/tty_modes.c
++++ b/lib/libxview/ttysw/tty_modes.c
+@@ -52,7 +52,7 @@ static char     sccsid[] = "@(#)tty_modes.c 20.54 93/06/28";
+ #include <xview_private/txt_impl.h>
+ #include <xview/defaults.h>
+ 
+-int             ttysw_waiting_for_pty_input;
++extern int             ttysw_waiting_for_pty_input;
+ Xv_private Menu_item ttysw_get_scroll_cmd_from_menu_for_ttysw();
+ Xv_private Menu_item ttysw_get_scroll_cmd_from_menu_for_textsw();
+ /* static */ void ttysw_cooked_echo();

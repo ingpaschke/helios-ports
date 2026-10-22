@@ -1,0 +1,61 @@
+Subject: Find native editor filters and close menu-file probes
+
+diff --git a/lib/libxview/help/help_file.c b/lib/libxview/help/help_file.c
+index 3939a326f59e8fe08046157d90f9bf9ac7313a9e..8b0f3e03fabcb72102b860b6abd6d588f8090d28 100644
+--- a/lib/libxview/help/help_file.c
++++ b/lib/libxview/help/help_file.c
+@@ -18,7 +18,9 @@ static char     sccsid[] = "@(#)help_file.c 1.17 90/12/04";
+ 
+ #include <xview_private/i18n_impl.h>
+ 
+-#ifndef __linux__
++#ifdef helios
++#define DEFAULT_HELP_DIRECTORY "/helios/local/openwin/lib/help"
++#elif !defined(__linux__)
+ #define DEFAULT_HELP_DIRECTORY "/usr/lib/help"
+ #else
+ #if 1 /* FHS compliance, but search the old directories, too - mbuck@debian.org */
+diff --git a/lib/libxview/textsw/txt_e_menu.c b/lib/libxview/textsw/txt_e_menu.c
+index 5b64fe79cffd2d991793ebdcc899f018cba62a44..b4886c31fb7d89d245aa7570a69116c0071946a8 100644
+--- a/lib/libxview/textsw/txt_e_menu.c
++++ b/lib/libxview/textsw/txt_e_menu.c
+@@ -162,7 +162,11 @@ textsw_get_extras_filename(mi)
+ #endif
+ 
+     /* Giving up, try with ancient way (SunView1) */
++#ifdef helios
++    (void) strcpy(tmp, "/helios/local/openwin/lib/textmenu");
++#else
+     (void) sprintf(tmp, "/usr/lib/.%s", EXTRASMENU);
++#endif
+     result = xv_strsave(tmp);
+ 
+ found:
+@@ -179,21 +183,25 @@ check_filename_locale(locale, filename, copy)
+     int		copy;
+ {
+     char	tmp[MAXPATHLEN + 1];
++    int fd;
+ 
+     if ((int)strlen(filename) <= 0)
+ 	return NULL;
+ 
+     if (locale != NULL) {
+ 	(void) sprintf(tmp, "%s.%s", filename, locale);
+-	if (open(tmp, O_RDONLY) != -1) {
++	if ((fd = open(tmp, O_RDONLY)) != -1) {
++            close(fd);
+ 		copy = 1;
+ 		filename = tmp;
+ 		goto found;
+ 	}
+     }
+ 
+-    if (open(filename, O_RDONLY) != -1)
++    if ((fd = open(filename, O_RDONLY)) != -1) {
++        close(fd);
+ 	goto found;
++    }
+ 
+     return NULL;
+ 

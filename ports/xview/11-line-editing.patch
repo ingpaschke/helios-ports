@@ -1,0 +1,36 @@
+Subject: Keep cmdtool line editing in the native terminal server without Unix record mode
+
+diff --git a/lib/libxview/ttysw/termsw.c b/lib/libxview/ttysw/termsw.c
+index cadd2f8de263afd9bd68ce38c6b8aef6321f8289..b1c2e930c5d998c3c3dd79ddd1b74ed633fb3701 100644
+--- a/lib/libxview/ttysw/termsw.c
++++ b/lib/libxview/ttysw/termsw.c
+@@ -416,6 +416,11 @@ termsw_folio_init_internal(parent, termsw_folio, avlist)
+ 	tty_iscanon(ttysw_folio) && tty_isecho(ttysw_folio);
+ #   endif /* XV_USE_SVR4_PTYS */
+ 
++#ifdef helios
++    /* Native line editing remains in ttyserv; retain text scrollback. */
++    termsw_folio->cooked_echo = FALSE;
++    on = 0;
++#endif
+     /* Set the PTY to operate as a "remote terminal". */
+     fd = (int) xv_get(termsw_public, TTY_PTY_FD);
+ #if !defined(__linux__) || defined(TIOCREMOTE)
+diff --git a/lib/libxview/ttysw/tty_modes.c b/lib/libxview/ttysw/tty_modes.c
+index dc097ce8ced42590060a63698a4c1143a42cebbc..92858754a7dc3fc20f935f03db149fd0229592f6 100644
+--- a/lib/libxview/ttysw/tty_modes.c
++++ b/lib/libxview/ttysw/tty_modes.c
+@@ -357,7 +357,13 @@ ttysw_getp(ttysw_view)
+     (void) ioctl(ttysw->ttysw_tty, TIOCGETP, &ttysw->sgttyb);
+ #endif /* XV_USE_TERMIOS */
+ #endif /* XV_USE_SVR4_PTYS */
++#ifdef helios
++    /* Keep canonicalization and echo in the native terminal server. Its
++     * master has no record mode to bypass the slave's line discipline. */
++    termsw->cooked_echo = FALSE;
++#else
+     termsw->cooked_echo = (tty_isecho(ttysw) && tty_iscanon(ttysw));
++#endif
+ 
+     ttysw_cooked_echo(ttysw_view, cooked_echo, termsw->cooked_echo);
+ }

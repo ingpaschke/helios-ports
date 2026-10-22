@@ -1,0 +1,291 @@
+Subject: Run terminal clients through the native Helios terminal service
+
+diff --git a/lib/libxview/ttysw/term_ntfy.c b/lib/libxview/ttysw/term_ntfy.c
+index f5a819e92a8569e41a5789baf763339476f6eacb..33e951e28ab3f867ceb5bf8b81b4b6eed90450c9 100644
+--- a/lib/libxview/ttysw/term_ntfy.c
++++ b/lib/libxview/ttysw/term_ntfy.c
+@@ -16,7 +16,9 @@ static char     sccsid[] = "@(#)term_ntfy.c 20.60 93/06/28";
+ #include <sys/types.h>
+ #include <sys/file.h>
+ #include <sys/time.h>
++#ifndef helios
+ #include <sys/resource.h>
++#endif
+ #include <sys/wait.h>
+ #include <signal.h>
+ #include <stdio.h>
+diff --git a/lib/libxview/ttysw/tty.c b/lib/libxview/ttysw/tty.c
+index ecc1adad95d246f6d5b641772f28fa7add189031..35bec2bc2b0db50843d7a32560069a53c4e59fb6 100644
+--- a/lib/libxview/ttysw/tty.c
++++ b/lib/libxview/ttysw/tty.c
+@@ -534,7 +534,7 @@ static
+ tty_quit_on_death(client, pid, status, rusage)
+     caddr_t         client;
+     int             pid;
+-#ifndef SYSV_WAIT
++#if !defined(SYSV_WAIT) && !defined(helios)
+     union wait     *status;
+ #else
+     int     *status;
+@@ -586,7 +586,7 @@ static
+ tty_handle_death(tty_folio_private, pid, status, rusage)
+     Ttysw_folio     tty_folio_private;
+     int             pid;
+-#ifndef SYSV_WAIT
++#if !defined(SYSV_WAIT) && !defined(helios)
+     union wait     *status;
+ #else
+     int     *status;
+diff --git a/lib/libxview/ttysw/tty_gtty.c b/lib/libxview/ttysw/tty_gtty.c
+index 20fb1f724b842517359b5dffca32ab2c328a1a8a..d82dde0d46ac79118219a965dd6b4baf990ad96c 100644
+--- a/lib/libxview/ttysw/tty_gtty.c
++++ b/lib/libxview/ttysw/tty_gtty.c
+@@ -63,7 +63,13 @@ static  char sccsid[] = "@(#)tty_gtty.c 20.29 93/06/28 Copyr 1983 Sun Micro";
+ #define CEOL2 0
+ #endif /* __linux__ && !CINTR */
+ 
+-#ifdef __linux__
++#ifdef helios
++static struct termios default_modes = {
++    BRKINT | ICRNL | IXON, OPOST, CS8 | CREAD,
++    ISIG | ICANON | ECHO, 1, 0,
++    { 4, 0, 127, 3, 21, 28, 26, 17, 19 }
++};
++#elif defined(__linux__)
+ /* martin.buck@bigfoot.com */
+ #ifndef CSWTC
+ #define CSWTC 0
+@@ -278,6 +284,10 @@ ttysw_restoreparms(ttyfd)
+ we_getptyparms(tp)
+     struct termios	*tp;
+ {
++#ifdef helios
++    (void)tp;
++    return -1;
++#else
+     char	str[WE_TTYPARMSLEN];
+ #ifndef __linux__
+     short	temps[16];
+@@ -327,6 +337,7 @@ we_getptyparms(tp)
+ 	return (0);
+     }
+ #endif /* __linux__ */
++#endif
+ }
+ 
+ #else	/* XV_USE_TERMIOS */
+diff --git a/lib/libxview/ttysw/tty_impl.h b/lib/libxview/ttysw/tty_impl.h
+index 32bf9de4fba9ad927a2354f07283165d7cf420ea..598e5540dbf86aeba64bdea938cba9427f0112ec 100644
+--- a/lib/libxview/ttysw/tty_impl.h
++++ b/lib/libxview/ttysw/tty_impl.h
+@@ -22,6 +22,10 @@
+ #include <sys/ioctl.h>		/* for BSD-style tty state structures */
+ #endif
+ 
++#ifdef helios
++#include "terminal.h"
++#endif
++
+ #include <xview/tty.h>
+ #include <xview/sel_svc.h>
+ #include <xview_private/i18n_impl.h>
+@@ -210,19 +214,35 @@ typedef Ttysw_view_object* 	Ttysw_view_handle;
+  * Access functions for tty characteristics.
+  */
+ #ifdef	XV_USE_TERMIOS
++#ifdef helios
++#define tty_gettabs(t) 0
++#else
+ #define	tty_gettabs(t)		((t)->termios.c_oflag & XTABS)
+-#if !defined(__linux__) || defined(VDSUSP)
++#endif
++#ifdef VDSUSP
+ #define	tty_getdsuspc(t)	((int) ((t)->termios.c_cc[VDSUSP]))
+ #else
+ #define	tty_getdsuspc(t)	((int) -1)
+ #endif
+ #define	tty_geteofc(t)		((int) ((t)->termios.c_cc[VEOF]))
+ #define	tty_geteolc(t)		((int) ((t)->termios.c_cc[VEOL]))
++#ifdef VEOL2
+ #define	tty_geteol2c(t)		((int) ((t)->termios.c_cc[VEOL2]))
++#else
++#define tty_geteol2c(t) (-1)
++#endif
+ #define	tty_getintrc(t)		((int) ((t)->termios.c_cc[VINTR]))
++#ifdef VLNEXT
+ #define	tty_getlnextc(t)	((int) ((t)->termios.c_cc[VLNEXT]))
++#else
++#define tty_getlnextc(t) (-1)
++#endif
+ #define	tty_getquitc(t)		((int) ((t)->termios.c_cc[VQUIT]))
++#ifdef VREPRINT
+ #define	tty_getrprntc(t)	((int) ((t)->termios.c_cc[VREPRINT]))
++#else
++#define tty_getrprntc(t) (-1)
++#endif
+ #define	tty_getstartc(t)	((int) ((t)->termios.c_cc[VSTART]))
+ #define	tty_getstopc(t)		((int) ((t)->termios.c_cc[VSTOP]))
+ #define	tty_getsuspc(t)		((int) ((t)->termios.c_cc[VSUSP]))
+diff --git a/lib/libxview/ttysw/tty_init.c b/lib/libxview/ttysw/tty_init.c
+index b3430d4e4c450ba765258d1cd0eed52ede9f8c8a..9d6a24b513272e410da1da5cc6be6f75c3a92d6e 100644
+--- a/lib/libxview/ttysw/tty_init.c
++++ b/lib/libxview/ttysw/tty_init.c
+@@ -30,6 +30,7 @@ static char     sccsid[] = "@(#)tty_init.c 20.71 93/06/28";
+ #include <sys/bufmod.h>
+ #endif	/* XV_USE_SVR4_PTYS */
+ 
++#ifndef helios
+ #ifndef SVR4
+ #include <utmp.h>
+ #else
+@@ -39,6 +40,7 @@ static char     sccsid[] = "@(#)tty_init.c 20.71 93/06/28";
+   * compiles this way. */
+ #include <utmpx.h>
+ #endif
++#endif
+ #include <stdio.h>
+ #include <pwd.h>
+ #include <ctype.h>
+@@ -467,6 +469,25 @@ ttysw_fork_it(ttysw0, argv, wfd)
+     char          **argv;
+     int             wfd;	/* No longer used. */
+ {
++#ifdef helios
++    struct ttysubwindow *ttysw = (struct ttysubwindow *)ttysw0;
++    struct ttysw_createoptions opts;
++    Xv_opaque window = TTY_PUBLIC(ttysw);
++    int argc;
++    (void)wfd;
++    if (!argv || !argv[0] || !strcmp(argv[0], "-c")) {
++        argc = 0;
++        if (argv) while (argv[argc]) ++argc;
++        ttysw_parseargs(&opts, &argc, argv);
++        argv = opts.argv;
++    }
++    ttysw->ttysw_pidchild = xvh_terminal_start(argv,
++        (unsigned long)xv_get(window, XV_XID),
++        DisplayString((Display *)xv_get(window, XV_DISPLAY)));
++    if (ttysw->ttysw_pidchild > 0)
++        ttysw_add_FNDELAY(ttysw->ttysw_pty);
++    return ttysw->ttysw_pidchild;
++#else
+     struct ttysubwindow *ttysw = (struct ttysubwindow *) ttysw0;
+     struct ttysw_createoptions opts;
+     int		    offset	= 0;
+@@ -618,6 +639,7 @@ ttysw_fork_it(ttysw0, argv, wfd)
+     sleep(ttysw_error_sleep);
+     exit(1);
+     /* NOTREACHED */
++#endif /* helios */
+ }
+ 
+ /*
+@@ -690,10 +712,14 @@ ttysw_done(ttysw_folio_private)
+ 
+     ttysel_destroy(ttysw_folio_private);
+ 
++#ifdef helios
++    xvh_terminal_close();
++#else
+     if (ttysw_folio_private->ttysw_pty)
+ 	close(ttysw_folio_private->ttysw_pty);
+     if (ttysw_folio_private->ttysw_tty)
+ 	close(ttysw_folio_private->ttysw_tty);
++#endif
+ 
+ #ifdef OW_I18N
+     /*
+@@ -718,6 +744,12 @@ static int	/* Returns XV_ERROR or XV_OK */
+ ttyinit(ttysw)
+     Ttysw          *ttysw;
+ {
++#ifdef helios
++    if (xvh_terminal_open(&ttysw->ttysw_pty, &ttysw->ttysw_tty) < 0)
++        return XV_ERROR;
++    strcpy(ttysw->tty_name, "Helios terminal");
++    return XV_OK;
++#else
+     int		    tmpfd;
+     int		    pty = 0, tty = 0;
+     int             on = 1;
+@@ -980,6 +1012,7 @@ gotpty:
+ #endif 				/* sun */
+ 
+     return XV_OK;
++#endif /* helios */
+ }
+ 
+ /*  The following code was ifdef'ed out by ISC, but they used "#ifdef BSD",
+@@ -989,6 +1022,7 @@ gotpty:
+  *  into our code for now, figure it out later.
+  */
+ 
++#ifndef helios
+ #ifndef SVR4
+ #ifndef __linux__
+ /*
+@@ -1139,3 +1173,5 @@ updateutmp(username, ttyslotuse, ttyfd)
+ #endif /* __linux__ */
+ #endif /* SVR4 */
+ 
++
++#endif /* !helios: Unix session accounting */
+diff --git a/lib/libxview/ttysw/tty_main.c b/lib/libxview/ttysw/tty_main.c
+index 8403f6e3a25ec0bdb54c46adc9325c193a31922a..075bcda52b6f4427eb0f56ea7575c0a73862c69f 100644
+--- a/lib/libxview/ttysw/tty_main.c
++++ b/lib/libxview/ttysw/tty_main.c
+@@ -917,7 +917,7 @@ ttysw_pty_input(ttysw, pty)
+     if (cc > 0) {
+ 	int_ucntl = (unsigned) ucntl;
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(helios)
+ 	/* Under Linux, int_ucntl doesn't get set when enabling/disabling
+ 	 * ECHO mode. So we always have to read the current tty settings :-(
+ 	 * martin-2.buck@student.uni-ulm.de
+diff --git a/lib/libxview/ttysw/tty_ntfy.c b/lib/libxview/ttysw/tty_ntfy.c
+index b6a60c0048e6749ffbfdfcc64d62b6283808efee..cdee8c38d0d773bafebb7f5ef6b8b36c8e2a8c2d 100644
+--- a/lib/libxview/ttysw/tty_ntfy.c
++++ b/lib/libxview/ttysw/tty_ntfy.c
+@@ -17,7 +17,9 @@ static char     sccsid[] = "@(#)tty_ntfy.c 20.45 93/06/28";
+ #include <sys/types.h>
+ #include <sys/file.h>
+ #include <sys/time.h>
++#ifndef helios
+ #include <sys/resource.h>
++#endif
+ #include <sys/wait.h>
+ #include <signal.h>
+ #include <stdio.h>
+@@ -196,7 +198,7 @@ ttysw_sigwinch(ttysw)
+      * Only killpg when pgrp is not tool's.  This is the case of haven't
+      * completed ttysw_fork yet (or even tried to do it yet).
+      */
+-#ifndef __linux__
++#if !defined(__linux__) && !defined(helios)
+     if (getpgrp(0) != pgrp)
+ #else
+     if (getpgrp() != pgrp)
+diff --git a/lib/libxview/ttysw/tty_stty.c b/lib/libxview/ttysw/tty_stty.c
+index d1d920dbc4d067987a83d55f2e29a56aa5f84edf..a5dda30ccbac4359b9d15e29574ec5da05d5d438 100644
+--- a/lib/libxview/ttysw/tty_stty.c
++++ b/lib/libxview/ttysw/tty_stty.c
+@@ -114,6 +114,10 @@ Pkg_private void
+ we_setptyparms(tp)
+     register struct termios	*tp;
+ {
++#ifdef helios
++    (void)tp;
++    return 0;
++#else
+     static char            str[WE_TTYPARMSLEN];
+ 
+     str[0] = '\0';
+@@ -141,6 +145,7 @@ we_setptyparms(tp)
+ 		tp->c_cc[16]);
+ #endif
+     (void) putenv(str);
++#endif
+ }
+ 
+ #else	/* XV_USE_TERMIOS */

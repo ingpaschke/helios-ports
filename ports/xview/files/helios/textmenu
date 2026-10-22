@@ -1,0 +1,4 @@
+# External filters for selected editor text. Commands run natively on Helios.
+"Sort lines" /helios/bin/sort
+"Sort in reverse" /helios/bin/sort -r
+"Remove adjacent duplicates" /helios/bin/uniq

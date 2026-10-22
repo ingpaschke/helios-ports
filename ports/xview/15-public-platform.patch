@@ -1,0 +1,15 @@
+Subject: Select the native ABI from public headers without requiring a SunOS build flag
+
+diff --git a/lib/libxview/base/base.h b/lib/libxview/base/base.h
+index 753073a09a1c252aa4ec95379a96e5a6e510625f..518f2879df214e0e155ee7bbcb88ea54400bbaeb 100644
+--- a/lib/libxview/base/base.h
++++ b/lib/libxview/base/base.h
+@@ -53,7 +53,7 @@
+  * the macro SUNOS41. This has to be fixed later to accomodate non-SUNOS41 and
+  * non-SVR4 systems.
+  */
+-#if !defined(SUNOS41) && !defined(__linux__)
++#if !defined(SUNOS41) && !defined(__linux__) && !defined(helios)
+ #define XV_OS_SVR4
+ #define XV_USE_TTCOMPAT
+ #define SYSV_WAIT 

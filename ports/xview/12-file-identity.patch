@@ -1,0 +1,27 @@
+Subject: Compare resolved native stream names instead of unavailable inode numbers when saving backups
+
+diff --git a/lib/libxview/textsw/es_cp_file.c b/lib/libxview/textsw/es_cp_file.c
+index fed7a45bc8a5ce1064e31010b249f0879252acc7..899a7ea9bab1f5dbb09827ebdf3f041bcc188c12 100644
+--- a/lib/libxview/textsw/es_cp_file.c
++++ b/lib/libxview/textsw/es_cp_file.c
+@@ -72,12 +72,20 @@ es_copy_status(to, fold, from_mode)
+ 
+     if (fstat(fold, &stfrom) < 0)
+ 	return (FSTAT_FAILED);
++#ifdef helios
++    {
++        int same = xvh_same_file(fold, to);
++        if (same < 0) return FSTAT_FAILED;
++        if (same) { errno = EINVAL; return WILL_OVERWRITE; }
++    }
++#else
+     if (stat(to, &stto) >= 0) {
+ 	if (stfrom.st_dev == stto.st_dev &&
+ 	    stfrom.st_ino == stto.st_ino) {
+ 	    return (WILL_OVERWRITE);
+ 	}
+     }
++#endif
+     *from_mode = (int) stfrom.st_mode;
+     return (0);
+ }

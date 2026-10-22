@@ -1,0 +1,165 @@
+Subject: Use X11R4 resource allocation and supported native libc interfaces
+
+diff --git a/clients/clock/clock.c b/clients/clock/clock.c
+index fa7282d86c15dbcf43e41985c9a8b4eeab947a32..ee8665dd2552a9f21d6c286fe900e19fb3d6e4ac 100644
+--- a/clients/clock/clock.c
++++ b/clients/clock/clock.c
+@@ -54,7 +54,7 @@
+ #define		NULLPR	(struct pixrect *) NULL
+ #define		DIGITAL_ON		0
+ 
+-extern double rint();
++extern double xvh_round_pixel();
+ 
+ static int initializing;
+ static int centerX, centerY;
+@@ -614,8 +614,8 @@ init_numbers ()
+ {
+ 	int i;
+ 	for (i=0; i<360; i++) {
+-		cs[i] = (int) rint (100.0*cos(i*pi/180));
+-		sn[i] = (int) rint (100.0*sin(i*pi/180));
++		cs[i] = (int) xvh_round_pixel (100.0*cos(i*pi/180));
++		sn[i] = (int) xvh_round_pixel (100.0*sin(i*pi/180));
+ 	}
+ }
+ 
+@@ -646,7 +646,7 @@ armwidth (r)
+ 	int w;
+ 	float fudge = 1.0 + (20.0/r);
+ 	if (fudge > 1.6) fudge = 1.6;
+-	w = (int) rint ((double)fudge * r/ 8.0);
++	w = (int) xvh_round_pixel ((double)fudge * r/ 8.0);
+ 	if (w%2 == 0) w++;
+ 	return (w);
+ }
+diff --git a/lib/libxview/base/xv_parse.c b/lib/libxview/base/xv_parse.c
+index 65c56be3c2239a4aeafaaa053cc3c3a874bb2561..2f318c9302b8088992c9dbb4a623a5cd10251273 100644
+--- a/lib/libxview/base/xv_parse.c
++++ b/lib/libxview/base/xv_parse.c
+@@ -312,7 +312,7 @@ xv_parse_one(app_name, argc, argv)
+     if (argc <= slot->num_args) {
+ 	char            dummy[128];
+ 
+-	(void) snprintf(dummy, sizeof(dummy),
++	(void) xvh_format_strings(dummy, sizeof(dummy),
+ 			XV_MSG("%s: missing argument after %s"), 
+ 			app_name,
+ 		       argv[0]);
+@@ -392,7 +392,7 @@ xv_parse_one(app_name, argc, argv)
+ 	if (defaults_lookup(argv[1], known_scales) == -1) {
+ 		char dummy[1024];
+ 		
+-		(void) snprintf(dummy, sizeof(dummy),
++		(void) xvh_format_strings(dummy, sizeof(dummy),
+ 			XV_MSG("%s: unknown scale \"%s\" used with %s option"),
+ 			       app_name, argv[1], argv[0]);
+ 		xv_error(XV_NULL,
+@@ -611,7 +611,7 @@ NegArg:
+     {
+ 	char            dummy[128];
+ 
+-	(void) snprintf(dummy, sizeof(dummy),
++	(void) xvh_format_strings(dummy, sizeof(dummy),
+ 		XV_MSG("%s: can't have negative argument %s after %s"),
+ 		       app_name, argv[bad_arg], argv[0]);
+ 	xv_error(XV_NULL,
+diff --git a/lib/libxview/file_chooser/file_list.c b/lib/libxview/file_chooser/file_list.c
+index e7602498e8d884b478069d6805e64d7f8d4574c4..2b614b12e0d5ccdb064111ca41d3f71cf8fc4313 100644
+--- a/lib/libxview/file_chooser/file_list.c
++++ b/lib/libxview/file_chooser/file_list.c
+@@ -1267,6 +1267,7 @@ flist_match_regex( s, private )
+     return (re_match(private->regex_compile, s, strlen(s), 0, NULL) != -1);
+ }
+ #endif /* __linux__ */
++#endif /* helios */
+ /****************************************************************************/
+ 
+ 
+@@ -1518,5 +1519,3 @@ file_list_case_descend_compare( row1, row2 )
+ {
+     return strcmp(row2->xfrm, row1->xfrm);
+ }
+-
+-#endif /* helios */
+diff --git a/lib/libxview/notify/ndet_loop.c b/lib/libxview/notify/ndet_loop.c
+index 6258ec1bb1476513da40827683771e2e28ec6fc9..6a0d570fe7d52c35f258d23dd7cbc186b5b3b1e4 100644
+--- a/lib/libxview/notify/ndet_loop.c
++++ b/lib/libxview/notify/ndet_loop.c
+@@ -189,8 +189,10 @@ notify_start()
+ 		 ndis_clients != NTFY_CLIENT_NULL) ?
+ 	    &ndet_polling_tv : NTFY_TIMEVAL_NULL;
+ 	ibits = ndet_ibits;
++#ifndef helios
+ 	if (do_rpc)
+ 	    (void) ntfy_fd_cpy_or (&ibits, &svc_fdset);
++#endif
+ 	obits = ndet_obits;
+ 	ebits = ndet_ebits;
+ 	NTFY_END_CRITICAL;
+@@ -319,18 +321,22 @@ notify_start()
+ 	if (ntfy_fd_anyset(&ibits)) {
+ 	    fd_set rpc_bits;
+ 
++#ifndef helios
+ 	    if (do_rpc) {
+ 		rpc_bits = svc_fdset;
+ 		(void) ntfy_fd_cpy_and (&rpc_bits, &ibits);
+ 		(void) ntfy_fd_cpy_and (&ibits, &ndet_ibits);
+ 	    }
++#endif
+ 	    if (ntfy_new_enum_conditions(ntfy_cndtbl[(int) NTFY_INPUT],
+ 			      ndet_fd_send, (NTFY_ENUM_DATA) & enum_send) ==
+ 		(int) NTFY_ENUM_TERM)
+ 		goto Protected_Error;
+ 		/* micropriority to UI events over network */
++#ifndef helios
+ 	    if (do_rpc)
+ 		svc_getreqset (&rpc_bits);
++#endif
+ 	}
+ 	if (ntfy_fd_anyset(&obits))
+ 	    if (ntfy_new_enum_conditions(ntfy_cndtbl[(int) NTFY_OUTPUT],
+@@ -1084,5 +1090,9 @@ extern void
+ notify_enable_rpc_svc (flag)
+     int flag;
+ {
++#ifdef helios
++    if (flag) fprintf(stderr, "XView: Sun RPC event sources are unavailable on Helios\n");
++#else
+     do_rpc = flag;
++#endif
+ }
+diff --git a/lib/libxview/server/server.c b/lib/libxview/server/server.c
+index 91c220d21b0450bde461ed089faf4f1b69980bf4..ee5dcf0fc33d4ac8fd17824fa4ba8fa0a1ffe45d 100644
+--- a/lib/libxview/server/server.c
++++ b/lib/libxview/server/server.c
+@@ -780,7 +780,7 @@ server_init(parent, server_public, avlist)
+      */
+ 
+     /* Used by atom mgr */
+-#if 1
++#ifndef helios
+     /* Avoid crash with newer xcb-based xlibs. According to 
+      * http://lists.freedesktop.org/archives/xorg/2007-November/030388.html
+      * using XAllocID() this way only worked by chance so far, so use
+diff --git a/lib/libxview/textsw/es_file.c b/lib/libxview/textsw/es_file.c
+index e59df5f0b7aaee05694f75ac5ae0f44e960979a1..a86e7b1578af84d355fbf144ed82799d86edc658 100644
+--- a/lib/libxview/textsw/es_file.c
++++ b/lib/libxview/textsw/es_file.c
+@@ -823,6 +823,7 @@ es_file_commit(esh)
+     if (es_file_flush_write_buf(private, &private->write_buf) < 0) {
+ 	return (private->status);
+     }
++#ifndef helios
+     if (fsync(private->fd) == -1) {
+ #ifdef DEBUG
+     (void) fprintf(stderr,
+@@ -831,6 +832,7 @@ es_file_commit(esh)
+        /* BUG ALERT!  Who knows what state the file is in? */
+        return (ES_FSYNC_FAILED);
+     }
++#endif /* Helios Write acknowledgements do not provide fsync durability. */
+     private->flags |= COMMIT_DONE;
+     return (ES_SUCCESS);
+ }

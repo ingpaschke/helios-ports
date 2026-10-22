@@ -1,0 +1,36 @@
+Subject: Use the existing Helios regular-expression engine for file chooser filters
+
+diff --git a/lib/libxview/file_chooser/file_list.c b/lib/libxview/file_chooser/file_list.c
+index fd6aad66f1789cde63b14c642790b9d2652fc262..e7602498e8d884b478069d6805e64d7f8d4574c4 100644
+--- a/lib/libxview/file_chooser/file_list.c
++++ b/lib/libxview/file_chooser/file_list.c
+@@ -1147,6 +1147,23 @@ flist_update_list( private, rows, num_rows )
+ 
+ /****************************************************************************/
+ 
++#ifdef helios
++#include <regexp.h>
++
++static void
++flist_compile_regex(File_list_private *private)
++{
++    xv_free_ref(private->regex_compile);
++    private->regex_compile = (char *)regcomp(private->regex_pattern);
++}
++
++static int
++flist_match_regex(char *s, File_list_private *private)
++{
++    return private->regex_compile &&
++        regexec((regexp *)private->regex_compile, s, 1);
++}
++#else
+ #ifndef __linux__
+ /*
+  * Front end to regexp(3).
+@@ -1501,3 +1518,5 @@ file_list_case_descend_compare( row1, row2 )
+ {
+     return strcmp(row2->xfrm, row1->xfrm);
+ }
++
++#endif /* helios */

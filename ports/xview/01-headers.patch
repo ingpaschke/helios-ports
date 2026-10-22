@@ -1,0 +1,41 @@
+Subject: Use standard C allocation and string declarations on Helios
+
+diff --git a/lib/libxview/base/base.h b/lib/libxview/base/base.h
+index dea757a534f414bb5f1d4c7bd5a13f0c61afdff1..753073a09a1c252aa4ec95379a96e5a6e510625f 100644
+--- a/lib/libxview/base/base.h
++++ b/lib/libxview/base/base.h
+@@ -9,7 +9,7 @@
+ #ifndef xview_base_DEFINED
+ #define xview_base_DEFINED
+ #include <string.h>
+-#include <malloc.h>
++#include <stdlib.h>
+ 
+ #include <xview/xv_c_types.h>
+ 
+diff --git a/lib/libxview/panel/p_drop.c b/lib/libxview/panel/p_drop.c
+index 947eed5ccec68d9d3064fa23e9459783ad277998..fd0045b002c1614052f463fd9f8d62a884bfa6ea 100644
+--- a/lib/libxview/panel/p_drop.c
++++ b/lib/libxview/panel/p_drop.c
+@@ -10,7 +10,7 @@ static char     sccsid[] = "@(#)p_drop.c 1.22 93/06/28";
+  *	file for terms of the license.
+  */
+ 
+-#include <malloc.h>
++#include <stdlib.h>
+ #include <xview_private/draw_impl.h>
+ #include <xview_private/i18n_impl.h>
+ #include <xview_private/panel_impl.h>
+diff --git a/lib/libxview/panel/p_txt.c b/lib/libxview/panel/p_txt.c
+index b7e90127319b9c8b5ff727b57201bd43d5af7352..78d0d0a3392783552a9a556327be26c97707c2b0 100644
+--- a/lib/libxview/panel/p_txt.c
++++ b/lib/libxview/panel/p_txt.c
+@@ -10,7 +10,7 @@ static char     sccsid[] = "@(#)p_txt.c 20.217 93/06/28";
+  *	file for terms of the license.
+  */
+ 
+-#include <malloc.h>
++#include <stdlib.h>
+ #include <string.h>
+ #include <ctype.h>
+ #include <X11/X.h>

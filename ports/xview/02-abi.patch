@@ -1,0 +1,378 @@
+Subject: Support the Helios C ABI, X11R4 headers and native terminal attributes
+
+diff --git a/clients/textedit/textedit.c b/clients/textedit/textedit.c
+index 405f35830af29af674919dd9c4964cdeefbf2e95..36d4ece6350a3d6eaef37453b71273f2219137be 100644
+--- a/clients/textedit/textedit.c
++++ b/clients/textedit/textedit.c
+@@ -42,8 +42,10 @@ long	textsw_store_file();
+ */
+ char	*getwd();
+ #ifndef __linux__
++#ifndef helios
+ char *sprintf();
+ #endif
++#endif
+ void	frame_cmdline_help();
+ static int		off();
+ static Notify_value	mysigproc();
+diff --git a/lib/libxview/attr/attr.c b/lib/libxview/attr/attr.c
+index 44a4005075ce7bd90eed95d1861d73e7771c3823..6a74ef78ba2cadcf7312044f87bcc5454b96aeea 100644
+--- a/lib/libxview/attr/attr.c
++++ b/lib/libxview/attr/attr.c
+@@ -91,7 +91,7 @@ Xv_private Attr_avlist copy_va_to_av( valist1, avlist1, attr1 )
+    /* These two variables are used instead of the paramters so that the
+       position in the lists is maintained after a recursive call. 
+    */
+-#if (__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1)
++#if defined(helios) || (__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1)
+    __va_copy(valist, valist1);
+ #else
+    valist = valist1;
+diff --git a/lib/libxview/base/xv.c b/lib/libxview/base/xv.c
+index 4da2ddb7dd2b91cb31e5f48690198b35da3e99a5..8bcd872bea8350cae54481e78541d57e305d82b8 100644
+--- a/lib/libxview/base/xv.c
++++ b/lib/libxview/base/xv.c
+@@ -556,7 +556,7 @@ va_dcl
+ 	case XV_KEY_DATA:
+ 	case XV_IS_SUBTYPE_OF:
+ 	    status = XV_OK;
+-#if (__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1)
++#if defined(helios) || (__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1)
+ 	    __va_copy(args, args_save);
+ #else
+ 	    args = args_save;
+@@ -579,7 +579,7 @@ va_dcl
+ 	 * Go to the beginning of the varargs list every time to insure each
+          * pkg gets the start of the  varargs.
+ 	 */
+-#if (__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1)
++#if defined(helios) || (__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1)
+ 	__va_copy(args, args_save);
+ #else
+         args = args_save;
+diff --git a/lib/libxview/base/xv_debug.h b/lib/libxview/base/xv_debug.h
+index fdd4324784edae4ba37b4e189d0a7d75e595b1b6..273294cfe965cb3292431c874bc5acdfa36d862a 100644
+--- a/lib/libxview/base/xv_debug.h
++++ b/lib/libxview/base/xv_debug.h
+@@ -11,7 +11,9 @@
+ 
+ #ifndef FILE
+ #if !defined(SVR4) && !defined(__linux__)
++#ifndef helios
+ #undef NULL
++#endif
+ #endif /* SVR4 */
+ #include <stdio.h>
+ #endif /* FILE */
+diff --git a/lib/libxview/dnd/site.c b/lib/libxview/dnd/site.c
+index c6494ead0cf02e4c8d4207ec867871d76dabb41d..8787df56e05b261b411d518768326c95cdd4dc4f 100644
+--- a/lib/libxview/dnd/site.c
++++ b/lib/libxview/dnd/site.c
+@@ -246,7 +246,7 @@ DndDropAreaOps(site, mode, area)
+           /* (rectNode->rect) is of the wrong type. */
+           memmove(rect, &(rectNode->rect),  sizeof(Rect));
+ #else
+-	  bcopy(rectNode->rect, rect, sizeof(Rect));
++	  bcopy(&rectNode->rect, rect, sizeof(Rect));
+ #endif /* SVR4 */
+ 
+ 	  return((Xv_opaque)rect);
+diff --git a/lib/libxview/frame/fm_impl.h b/lib/libxview/frame/fm_impl.h
+index 4e2d56439cb208ed081fb66a5be2091ce12cca46..6d6b6590ec59aa17849bb80cd8cf609cfa412d80 100644
+--- a/lib/libxview/frame/fm_impl.h
++++ b/lib/libxview/frame/fm_impl.h
+@@ -19,7 +19,9 @@ static char     sccsid[] = "@(#)fm_impl.h 20.64 93/06/28";
+ /* standard includes */
+ #ifndef FILE
+ #if !defined(SVR4) && !defined(__linux__)
++#ifndef helios
+ #undef NULL
++#endif
+ #endif /* SVR4 */
+ #include <stdio.h>
+ #endif /* FILE */
+diff --git a/lib/libxview/frame/fm_props.h b/lib/libxview/frame/fm_props.h
+index ca6833a44eae17e4b1805052b2d2008071c86ee4..285c32a877873ea497dc7fe057df8ed3294b7667 100644
+--- a/lib/libxview/frame/fm_props.h
++++ b/lib/libxview/frame/fm_props.h
+@@ -15,7 +15,9 @@
+ /* standard includes */
+ #ifndef FILE
+ #if !defined(SVR4) && !defined(__linux__)
++#ifndef helios
+ #undef NULL
++#endif
+ #endif /* SVR4 */
+ #include <stdio.h>
+ #endif /* FILE */
+diff --git a/lib/libxview/frame/frame_base.h b/lib/libxview/frame/frame_base.h
+index c6aa5a6d02e6edd9309b1c385eb26e7a3b5511c5..d4f2cd54f1c6464e8234b40e52f46fc4830acdf6 100644
+--- a/lib/libxview/frame/frame_base.h
++++ b/lib/libxview/frame/frame_base.h
+@@ -19,7 +19,9 @@ static char     sccsid[] = "@(#)frame_base.h 1.30 93/06/28";
+ /* standard includes */
+ #ifndef FILE
+ #if !defined(SVR4) && !defined(__linux__)
++#ifndef helios
+ #undef NULL
++#endif
+ #endif /* SVR4 */
+ #include <stdio.h>
+ #endif /* FILE */
+diff --git a/lib/libxview/frame/frame_cmd.h b/lib/libxview/frame/frame_cmd.h
+index 08905ea50c685bc6b585b9bd6d2a0b03ccd8e09a..bbc69bd6c04116740e3077761c85a9e0f0fab0d6 100644
+--- a/lib/libxview/frame/frame_cmd.h
++++ b/lib/libxview/frame/frame_cmd.h
+@@ -19,7 +19,9 @@ static char     sccsid[] = "@(#)frame_cmd.h 1.39 93/06/28";
+ /* standard includes */
+ #ifndef FILE
+ #if !defined(SVR4) && !defined(__linux__)
++#ifndef helios
+ #undef NULL
++#endif
+ #endif /* SVR4 */
+ #include <stdio.h>
+ #endif /* FILE */
+diff --git a/lib/libxview/frame/frame_help.h b/lib/libxview/frame/frame_help.h
+index 76ba41ecc01eb289e542bd0283fb8162b8aa5d00..0a0f9dfe842770e3317995112d639f399193326c 100644
+--- a/lib/libxview/frame/frame_help.h
++++ b/lib/libxview/frame/frame_help.h
+@@ -19,7 +19,9 @@ static char     sccsid[] = "@(#)frame_help.h 1.27 93/06/28";
+ /* standard includes */
+ #ifndef FILE
+ #if !defined(SVR4) && !defined(__linux__)
++#ifndef helios
+ #undef NULL
++#endif
+ #endif /* SVR4 */
+ #include <stdio.h>
+ #endif /* FILE */
+diff --git a/lib/libxview/menu/om_public.c b/lib/libxview/menu/om_public.c
+index 6352b2e2d98c399e749ae6a9818c050584873beb..e447793f7143c2475881f56e467c7082a164d5ae 100644
+--- a/lib/libxview/menu/om_public.c
++++ b/lib/libxview/menu/om_public.c
+@@ -12,7 +12,9 @@ static char     sccsid[] = "@(#)om_public.c 20.146 93/06/28";
+ 
+ #include <xview/win_input.h>	/* includes types & time */
+ #ifndef FILE
++#ifndef helios
+ #undef NULL
++#endif
+ #include <stdio.h>
+ #endif				/* FILE */
+ #include <fcntl.h>
+diff --git a/lib/libxview/misc/portable.h b/lib/libxview/misc/portable.h
+index b4065845a460fc725f33bad57fc2551d28b726c7..659d16611ba79aa3c050666bab66da0f5fd11b0a 100644
+--- a/lib/libxview/misc/portable.h
++++ b/lib/libxview/misc/portable.h
+@@ -66,7 +66,7 @@ EXTERN_FUNCTION (Attr_avlist copy_va_to_av, (va_list valist, Attr_avlist avlist,
+  * Defines governing tty mode and pty behavior.  (These are relevant to the
+  * ttysw code.)
+  */
+-#ifdef __linux__
++#if defined(__linux__) || defined(helios)
+ #define	XV_USE_TERMIOS
+ #undef	XV_USE_SVR4_PTYS
+ #else
+diff --git a/lib/libxview/notify/ntfy.h b/lib/libxview/notify/ntfy.h
+index 7c5a52e380d13daf665bcce2a035b0cfd083981b..a83286ae46d89ce537a4ecbcc687219ac89ef8b2 100644
+--- a/lib/libxview/notify/ntfy.h
++++ b/lib/libxview/notify/ntfy.h
+@@ -34,7 +34,9 @@ extern int sigisemptyset(const sigset_t *);
+ #ifdef SVR4
+ #include <sys/rusage.h>
+ #endif
++#ifndef helios
+ #include <sys/resource.h>
++#endif
+ #include <xview/notify.h>
+ 
+ /*
+@@ -167,7 +169,7 @@ typedef struct ntfy_condition {
+  */
+ typedef	struct ntfy_wait3_data {
+ 	int	pid;			/* Process waiting for */
+-#if !defined(SVR4) && !defined(__linux__)
++#if !defined(SVR4) && !defined(__linux__) && !defined(helios)
+ 	union	wait status;		/* Return value from wait3 */
+ #else /* SVR4 */
+ 	int 	status;		/* Return value from wait3 */
+diff --git a/lib/libxview/notify/ntfyclient.c b/lib/libxview/notify/ntfyclient.c
+index 67b9927a40b937b5ffaf81e97374cedf028ab66e..decd1e46c315df36ac96ed57bf31eaed12f847c8 100644
+--- a/lib/libxview/notify/ntfyclient.c
++++ b/lib/libxview/notify/ntfyclient.c
+@@ -23,7 +23,9 @@ static char     sccsid[] = "@(#)ntfyclient.c 20.18 93/06/28 Copyr 1985 Sun Micro
+ /* Newsflash: As of libc-5.0.9, Linux has tsearch() & friends, so we define
+  * HAVE_TSEARCH here.                  <martin-2.buck@student.uni-ulm.de>
+  */
++#ifndef helios
+ #define HAVE_TSEARCH
++#endif
+ 
+ #include <xview_private/ntfy.h>
+ #include <xview_private/ndis.h>	/* For ndis_default_prioritizer */
+diff --git a/lib/libxview/panel/panel_impl.h b/lib/libxview/panel/panel_impl.h
+index d0002a0f60d10dc3c71f59f08fd7f0cf0d8be429..0edf03663f69ab1446c2d84d277f0ba3e7f6ac79 100644
+--- a/lib/libxview/panel/panel_impl.h
++++ b/lib/libxview/panel/panel_impl.h
+@@ -11,7 +11,9 @@
+ 
+ #ifndef FILE
+ #if !defined(SVR4) && !defined(__linux__)
++#ifndef helios
+ #undef NULL
++#endif
+ #endif /* SVR4 */
+ #include <stdio.h>
+ #endif /* FILE */
+diff --git a/lib/libxview/sel/seln_impl.h b/lib/libxview/sel/seln_impl.h
+index f10db83f15629acf1991bc2542b3f502502e09bb..1b2963ac479ab8c5dae50f9b41dc17f21817719f 100644
+--- a/lib/libxview/sel/seln_impl.h
++++ b/lib/libxview/sel/seln_impl.h
+@@ -12,7 +12,9 @@
+ #include <errno.h>
+ #ifndef FILE
+ #if !defined(SVR4) && !defined(__linux__)
++#ifndef helios
+ #undef NULL
++#endif
+ #endif /* SVR4 */
+ #include <stdio.h>
+ #endif /* FILE */
+diff --git a/lib/libxview/server/server.c b/lib/libxview/server/server.c
+index e81e81d6a45a79d0a2aeeda09ced46a3bcdab590..0b7d0bf6e628b9c9b4c6e78fff740eb1858a41a7 100644
+--- a/lib/libxview/server/server.c
++++ b/lib/libxview/server/server.c
+@@ -1670,7 +1670,7 @@ server_get_atom_type(server_public, atom)
+     Xv_Server       server_public;
+     Atom            atom;
+ {
+-    XPointer           xp;
++    caddr_t           xp;
+     Server_info        *server = SERVER_PRIVATE(server_public);
+ 
+ 
+diff --git a/lib/libxview/textsw/es_attr.c b/lib/libxview/textsw/es_attr.c
+index d18e427c7968d292761f7f9414951259b7add019..566261e84aa811c7d55aba4db4df13b83e657283 100644
+--- a/lib/libxview/textsw/es_attr.c
++++ b/lib/libxview/textsw/es_attr.c
+@@ -22,10 +22,10 @@ static char     sccsid[] = "@(#)es_attr.c 20.22 93/06/28";
+ 
+ Pkg_private int
+ #ifdef ANSI_FUNC_PROTO
+-es_set(register Es_handle esh, ...)
++es_set(Es_handle esh, ...)
+ #else
+ es_set(esh, va_alist)
+-    register Es_handle esh;
++    Es_handle esh;
+ va_dcl
+ #endif
+ {
+diff --git a/lib/libxview/textsw/txt_again.c b/lib/libxview/textsw/txt_again.c
+index b176ed0ac3c7f02a224b6ad7e37080b8aecdff77..ddd88e0c65b27090565c32533dbfd510b17e2292 100644
+--- a/lib/libxview/textsw/txt_again.c
++++ b/lib/libxview/textsw/txt_again.c
+@@ -179,7 +179,7 @@ textsw_string_min_free(ptr_to_string, min_free_desired)
+  * Recording routines
+  */
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(helios)
+ /* The textsw_printf as written created a FILE struct, and called
+  * _doprnt() to format the text to an XView internal buffer. If I
+  * understand this correctly, it's just a replacement for vsprintf.
+@@ -189,11 +189,11 @@ textsw_string_min_free(ptr_to_string, min_free_desired)
+ 
+ static int
+ #ifdef ANSI_FUNC_PROTO
+-textsw_printf(register string_t *ptr_to_string, register char  *fmt, ...)
++textsw_printf(register string_t *ptr_to_string, char  *fmt, ...)
+ #else
+ textsw_printf(ptr_to_string, fmt, va_alist)
+     register string_t *ptr_to_string;
+-    register char  *fmt;
++    char  *fmt;
+ va_dcl
+ #endif
+ {
+@@ -219,11 +219,11 @@ va_dcl
+ 
+ static int
+ #ifdef ANSI_FUNC_PROTO
+-textsw_printf(register string_t *ptr_to_string, register char  *fmt, ...)
++textsw_printf(register string_t *ptr_to_string, char  *fmt, ...)
+ #else
+ textsw_printf(ptr_to_string, fmt, va_alist)
+     register string_t *ptr_to_string;
+-    register char  *fmt;
++    char  *fmt;
+ va_dcl
+ #endif
+ {
+@@ -291,11 +291,11 @@ va_dcl
+ 
+ static int
+ #ifdef ANSI_FUNC_PROTO
+-textsw_printf(register string_t *ptr_to_string, register char  *fmt, ...)
++textsw_printf(register string_t *ptr_to_string, char  *fmt, ...)
+ #else
+ textsw_printf(ptr_to_string, fmt, va_alist)
+     register string_t *ptr_to_string;
+-    register char  *fmt;
++    char  *fmt;
+ va_dcl
+ #endif
+ {
+@@ -645,7 +645,7 @@ textsw_record_trash_insert(textsw)
+  * Replaying routines
+  */
+ 
+-#ifdef __linux__
++#if defined(__linux__) || defined(helios)
+ /* The textsw_scanf as written created a FILE struct, and called
+  * _doscan() to do the scanning on the instring.
+  * This depends heavily on the internal structure of FILE, and is not
+@@ -656,11 +656,11 @@ textsw_record_trash_insert(textsw)
+ 
+ static int
+ #ifdef ANSI_FUNC_PROTO
+-textsw_scanf(register string_t *ptr_to_string, register char  *fmt, ...)
++textsw_scanf(register string_t *ptr_to_string, char  *fmt, ...)
+ #else
+ textsw_scanf(ptr_to_string, fmt, va_alist)
+     register string_t *ptr_to_string;
+-    register char  *fmt;
++    char  *fmt;
+ va_dcl
+ #endif
+ {
+@@ -732,11 +732,11 @@ va_dcl
+ 
+ static int
+ #ifdef ANSI_FUNC_PROTO
+-textsw_scanf(register string_t *ptr_to_string, register char  *fmt, ...)
++textsw_scanf(register string_t *ptr_to_string, char  *fmt, ...)
+ #else
+ textsw_scanf(ptr_to_string, fmt, va_alist)
+     register string_t *ptr_to_string;
+-    register char  *fmt;
++    char  *fmt;
+ va_dcl
+ #endif
+ {
+diff --git a/lib/libxview/window/windowutil.c b/lib/libxview/window/windowutil.c
+index 2f370f0de61882b5e25f3e89bf07453f3c365381..cfbc9494db4a0d9c1a9ca444b08d3fad4fb8ae65 100644
+--- a/lib/libxview/window/windowutil.c
++++ b/lib/libxview/window/windowutil.c
+@@ -766,8 +766,8 @@ window_adjust_rects(rect_obj_list, parent_public, num_elems, parent_width, paren
+ 	 */
+ 
+ 	adjust_rect_obj(num_elems, this_sw, rect_obj_list, parent_width, parent_height);
+-	window_outer_to_innerrect(&(rect_obj_list[this_sw]),
+-				  rect_obj_list[this_sw].new_rect);
++	window_outer_to_innerrect(rect_obj_list[this_sw].sw,
++				  &rect_obj_list[this_sw].new_rect);
+     }
+ }
+ 

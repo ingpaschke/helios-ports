@@ -1,0 +1,16 @@
+Subject: Expose the native interval-timer types to XView applications
+
+diff --git a/lib/libxview/notify/notify.h b/lib/libxview/notify/notify.h
+index e9a1aaed6e827cfa538d49444919928e5f6944a1..ab58908554eb9847f10619e6458c7a4bf6b97072 100644
+--- a/lib/libxview/notify/notify.h
++++ b/lib/libxview/notify/notify.h
+@@ -18,6 +18,9 @@
+ 
+ #include <stdio.h>
+ #include <sys/types.h>
++#ifdef helios
++#include <xview/helios.h>
++#endif
+ 
+ #ifndef __linux__
+ #include <sys/signal.h>  /* sigset_t */
