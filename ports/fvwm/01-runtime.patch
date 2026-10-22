@@ -1,0 +1,581 @@
+Subject: Adapt window-manager tasks, input handling and session lifetime to Helios
+
+diff --git a/configure.h b/configure.h
+index 482533174575a3785406f204d6ea365416bc3d21..7aa1628a7aadfad7adc828d14502e2bca39cfa7b 100644
+--- a/configure.h
++++ b/configure.h
+@@ -1,7 +1,7 @@
+-#define FVWMDIR     "/usr/lib/X11/fvwm"
++#define FVWMDIR     "/helios/lib/fvwm"
+ /* #define FVWMDIR        "/local/homes/dsp/nation/modules"*/
+-#define FVWM_ICONDIR   "/usr/include/X11/bitmaps:/usr/include/X11/pixmaps"
+-#define FVWMRC         "/usr/lib/X11/fvwm/system.fvwmrc"
++#define FVWM_ICONDIR   "/helios/lib/fvwm/icons"
++#define FVWMRC         "/helios/etc/fvwm/fvwmrc"
+ 
+ /* Imake command needed to put modules in desired target location */
+ /* Use the second version if it causes grief */
+@@ -55,7 +55,7 @@
+  *   For monochrome, Xpm icons still work, but they're only better than regular
+  *   bitmaps because they're shaped (if you specify #define SHAPE).
+  ***************************************************************************/
+-#define XPM                      
++/* Helios: XPM disabled */
+ /*  linker flags needed to locate and link in the Xpm library, if you use it */
+ #define XPMLIBRARY -L/usr/lib/X11 -lXpm
+ 
+@@ -132,9 +132,9 @@
+ #if defined _POSIX_SOURCE || defined SYSV || defined __sun__
+ 
+ #define HAVE_WAITPID  1
+-#define HAVE_GETITIMER 1
+-#define HAVE_SETITIMER 1
+-#define HAVE_SYSCONF 1
++/* Helios: HAVE_GETITIMER disabled */
++/* Helios: HAVE_SETITIMER disabled */
++/* Helios: HAVE_SYSCONF disabled */
+ #define HAVE_UNAME 1
+ #undef HAVE_GETHOSTNAME 
+ 
+@@ -153,13 +153,13 @@
+  * Define if you have getitimer/setitimer.  
+  * undefining this will break auto-raise 
+  **************************************************************************/
+-#define HAVE_GETITIMER 1
+-#define HAVE_SETITIMER 1
++/* Helios: HAVE_GETITIMER disabled */
++/* Helios: HAVE_SETITIMER disabled */
+ 
+ /***************************************************************************
+  * Define if you have sysconf
+  **************************************************************************/
+-#define HAVE_SYSCONF 1
++/* Helios: HAVE_SYSCONF disabled */
+ 
+ /***************************************************************************
+  * Define if you have uname. Otherwise, define gethostname
+@@ -203,3 +203,6 @@
+ #define FVWM_INLINE inline
+ #endif
+ #endif
++
++#undef FVWM_INLINE
++#define FVWM_INLINE
+diff --git a/fvwm/add_window.c b/fvwm/add_window.c
+index a6835763c39bf2594ec90f00854246e44479f082..f51fbe9b066e890c3f301430a856c84599b4e6b3 100644
+--- a/fvwm/add_window.c
++++ b/fvwm/add_window.c
+@@ -560,10 +560,10 @@ FvwmWindow *AddWindow(Window w)
+       for(i=0;i<3;i++)
+ 	if(Scr.buttons2grab & (1<<i))
+ 	  {
+-	    XGrabButton(dpy,(i+1),0,tmp_win->frame,True,
++	    ktm_grab_button(dpy,(i+1),0,tmp_win->frame,True,
+ 			ButtonPressMask, GrabModeSync,GrabModeAsync,None,
+ 			Scr.FvwmCursors[SYS]);
+-	    XGrabButton(dpy,(i+1),LockMask,tmp_win->frame,True,
++	    ktm_grab_button(dpy,(i+1),LockMask,tmp_win->frame,True,
+ 			ButtonPressMask, GrabModeSync,GrabModeAsync,None,
+ 			Scr.FvwmCursors[SYS]);
+ 	  }
+@@ -615,14 +615,14 @@ void GrabButtons(FvwmWindow *tmp_win)
+ 	{
+ 	  if(MouseEntry->Button >0)
+ 	    {
+-	      XGrabButton(dpy, MouseEntry->Button, MouseEntry->Modifier, 
++	      ktm_grab_button(dpy, MouseEntry->Button, MouseEntry->Modifier, 
+ 			  tmp_win->w, 
+ 			  True, ButtonPressMask | ButtonReleaseMask,
+ 			  GrabModeAsync, GrabModeAsync, None, 
+ 			  Scr.FvwmCursors[DEFAULT]);
+ 	      if(MouseEntry->Modifier != AnyModifier)
+ 		{
+-		  XGrabButton(dpy, MouseEntry->Button, 
++		  ktm_grab_button(dpy, MouseEntry->Button, 
+ 			      (MouseEntry->Modifier | LockMask),
+ 			      tmp_win->w, 
+ 			      True, ButtonPressMask | ButtonReleaseMask,
+@@ -632,36 +632,36 @@ void GrabButtons(FvwmWindow *tmp_win)
+ 	    }
+ 	  else
+ 	    {
+-	      XGrabButton(dpy, 1, MouseEntry->Modifier, 
++	      ktm_grab_button(dpy, 1, MouseEntry->Modifier, 
+ 			  tmp_win->w, 
+ 			  True, ButtonPressMask | ButtonReleaseMask,
+ 			  GrabModeAsync, GrabModeAsync, None, 
+ 			  Scr.FvwmCursors[DEFAULT]);
+-	      XGrabButton(dpy, 2, MouseEntry->Modifier, 
++	      ktm_grab_button(dpy, 2, MouseEntry->Modifier, 
+ 			  tmp_win->w, 
+ 			  True, ButtonPressMask | ButtonReleaseMask,
+ 			  GrabModeAsync, GrabModeAsync, None, 
+ 			  Scr.FvwmCursors[DEFAULT]);
+-	      XGrabButton(dpy, 3, MouseEntry->Modifier, 
++	      ktm_grab_button(dpy, 3, MouseEntry->Modifier, 
+ 			  tmp_win->w, 
+ 			  True, ButtonPressMask | ButtonReleaseMask,
+ 			  GrabModeAsync, GrabModeAsync, None, 
+ 			  Scr.FvwmCursors[DEFAULT]);
+ 	      if(MouseEntry->Modifier != AnyModifier)
+ 		{
+-		  XGrabButton(dpy, 1,
++		  ktm_grab_button(dpy, 1,
+ 			      (MouseEntry->Modifier | LockMask),
+ 			      tmp_win->w, 
+ 			      True, ButtonPressMask | ButtonReleaseMask,
+ 			      GrabModeAsync, GrabModeAsync, None, 
+ 			      Scr.FvwmCursors[DEFAULT]);
+-		  XGrabButton(dpy, 2,
++		  ktm_grab_button(dpy, 2,
+ 			      (MouseEntry->Modifier | LockMask),
+ 			      tmp_win->w, 
+ 			      True, ButtonPressMask | ButtonReleaseMask,
+ 			      GrabModeAsync, GrabModeAsync, None, 
+ 			      Scr.FvwmCursors[DEFAULT]);
+-		  XGrabButton(dpy, 3,
++		  ktm_grab_button(dpy, 3,
+ 			      (MouseEntry->Modifier | LockMask),
+ 			      tmp_win->w, 
+ 			      True, ButtonPressMask | ButtonReleaseMask,
+@@ -691,11 +691,11 @@ void GrabKeys(FvwmWindow *tmp_win)
+     {
+       if(tmp->cont & (C_WINDOW|C_TITLE|C_RALL|C_LALL|C_SIDEBAR))
+ 	{
+-	  XGrabKey(dpy, tmp->keycode, tmp->mods, tmp_win->frame, True,
++	  ktm_grab_key(dpy, tmp->keycode, tmp->mods, tmp_win->frame, True,
+ 		   GrabModeAsync, GrabModeAsync);
+ 	  if(tmp->mods != AnyModifier)
+ 	    {
+-	      XGrabKey(dpy, tmp->keycode, tmp->mods|LockMask, 
++	      ktm_grab_key(dpy, tmp->keycode, tmp->mods|LockMask, 
+ 		       tmp_win->frame, True,
+ 		       GrabModeAsync, GrabModeAsync);	      
+ 	    }
+diff --git a/fvwm/borders.c b/fvwm/borders.c
+index c0428a253058c2755621d80ac4246201b50fd8ba..5c2a97974213057c4197175702fd1578938a3ee9 100644
+--- a/fvwm/borders.c
++++ b/fvwm/borders.c
+@@ -1196,10 +1196,10 @@ void SetFocus(Window w, FvwmWindow *Fw)
+ 	      for(i=0;i<3;i++)
+ 		if(Scr.buttons2grab & (1<<i))
+ 		  {
+-		    XGrabButton(dpy,(i+1),0,Scr.Ungrabbed->frame,True,
++		    ktm_grab_button(dpy,(i+1),0,Scr.Ungrabbed->frame,True,
+ 				ButtonPressMask, GrabModeSync,GrabModeAsync,
+ 				None,Scr.FvwmCursors[SYS]);
+-		    XGrabButton(dpy,(i+1),LockMask,Scr.Ungrabbed->frame,True,
++		    ktm_grab_button(dpy,(i+1),LockMask,Scr.Ungrabbed->frame,True,
+ 				ButtonPressMask, GrabModeSync,GrabModeAsync,
+ 				None,Scr.FvwmCursors[SYS]);
+ 		  }
+@@ -1227,10 +1227,10 @@ void SetFocus(Window w, FvwmWindow *Fw)
+ 	  for(i=0;i<3;i++)
+ 	    if(Scr.buttons2grab & (1<<i))
+ 	      {
+-		XGrabButton(dpy,(i+1),0,Scr.Ungrabbed->frame,True,
++		ktm_grab_button(dpy,(i+1),0,Scr.Ungrabbed->frame,True,
+ 			    ButtonPressMask, GrabModeSync,GrabModeAsync,None,
+ 			    Scr.FvwmCursors[SYS]);
+-		XGrabButton(dpy,(i+1),LockMask,Scr.Ungrabbed->frame,True,
++		ktm_grab_button(dpy,(i+1),LockMask,Scr.Ungrabbed->frame,True,
+ 			    ButtonPressMask, GrabModeSync,GrabModeAsync,None,
+ 			    Scr.FvwmCursors[SYS]);
+ 	      }
+@@ -1243,8 +1243,8 @@ void SetFocus(Window w, FvwmWindow *Fw)
+ 	  for(i=0;i<3;i++)
+ 	    if(Scr.buttons2grab & (1<<i))
+ 	      {
+-		XUngrabButton(dpy,(i+1),0,Fw->frame);
+-		XUngrabButton(dpy,(i+1),LockMask,Fw->frame);
++		ktm_ungrab_button(dpy,(i+1),0,Fw->frame);
++		ktm_ungrab_button(dpy,(i+1),LockMask,Fw->frame);
+ 	      }
+ 	  Scr.Ungrabbed = Fw;
+ 	}
+diff --git a/fvwm/events.c b/fvwm/events.c
+index 02ca33e1a880b30c6c47f1384c345acb439a6437..c23b872447e54746ce1a12ea1b579dfbbf4b83fa 100644
+--- a/fvwm/events.c
++++ b/fvwm/events.c
+@@ -70,7 +70,7 @@ extern FvwmWindow *FindCounterpart(Window target);
+ #endif /* NO_PAGER */
+ 
+ unsigned int mods_used = (ShiftMask | ControlMask | Mod1Mask |
+-			  Mod2Mask| Mod3Mask| Mod4Mask| Mod5Mask);
++			   Mod3Mask| Mod4Mask| Mod5Mask);
+ extern int menuFromFrameOrWindowOrTitlebar;
+ 
+ 
+@@ -899,7 +899,7 @@ void HandleButtonPress()
+   /* click to focus stuff goes here */
+   if((Scr.flags & ClickToFocus)&&(Tmp_win != Scr.Ungrabbed)&&
+      ((Event.xbutton.state&
+-       (ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask)) == 0))
++       (ControlMask|Mod1Mask|Mod3Mask|Mod4Mask|Mod5Mask)) == 0))
+     {
+       if(Tmp_win)
+ 	{
+@@ -1417,16 +1417,16 @@ int My_XNextEvent(Display *dpy, XEvent *event)
+   if((value.it_value.tv_usec != 0)||
+      (value.it_value.tv_sec != 0))
+ #ifdef __hpux
+-    retval=select(fd_width,(int *)&in_fdset, 0, 0, &value.it_value);
++    retval=ktm_select(fd_width,(int *)&in_fdset, 0, 0, &value.it_value);
+ #else
+-    retval=select(fd_width,&in_fdset, 0, 0, &value.it_value);
++    retval=ktm_select(fd_width,&in_fdset, 0, 0, &value.it_value);
+ #endif
+   else
+ #ifdef __hpux
+-    retval=select(fd_width,(int *)&in_fdset, (int *)&out_fdset,
++    retval=ktm_select(fd_width,(int *)&in_fdset, (int *)&out_fdset,
+ 		  0, NULL);
+ #else
+-    retval=select(fd_width,&in_fdset, &out_fdset, 0, NULL);
++    retval=ktm_select(fd_width,&in_fdset, &out_fdset, 0, NULL);
+ #endif
+   
+   /* Check for module input. */
+@@ -1437,7 +1437,7 @@ int My_XNextEvent(Display *dpy, XEvent *event)
+ 	  if((retval>0)&&(FD_ISSET(readPipes[i], &in_fdset)))
+ 	    {
+ 	      if((count = 
+-		  read(readPipes[i],&targetWindow, sizeof(Window))) >0)
++		  ktm_read_full(readPipes[i],&targetWindow, sizeof(Window))) >0)
+ 		{
+ 		  HandleModuleInput(targetWindow,i);
+ 		}
+diff --git a/fvwm/functions.c b/fvwm/functions.c
+index a29b6539fbf758690fde5db3dd5aa176f5e75ffe..0556314fabb5d2044e9d4481a782570108887a4a 100644
+--- a/fvwm/functions.c
++++ b/fvwm/functions.c
+@@ -370,9 +370,7 @@ void ExecuteFunction(int func,char *action, Window in_w, FvwmWindow *tmp_win,
+ 		   Scr.Root, Scr.FvwmCursors[WAIT], CurrentTime);
+       XSync (dpy,0);
+ 
+-      if (!(fork())) /* child process */
+-	if (execl("/bin/sh", "/bin/sh", "-c", action, (char *)0)==-1)
+-	  exit(100);
++      ktm_exec(action);
+       XUngrabPointer(dpy,CurrentTime);
+       XSync (dpy,0);
+       break;
+diff --git a/fvwm/fvwm.c b/fvwm/fvwm.c
+index ea773f1918528c665b72f633ed1cf5fe365538d6..9a198da73850a023b32242eea34476c16903d1f4 100644
+--- a/fvwm/fvwm.c
++++ b/fvwm/fvwm.c
+@@ -259,7 +259,7 @@ void main(int argc, char **argv)
+       }
+     x_fd = XConnectionNumber(dpy);
+     
+-    if (fcntl(x_fd, F_SETFD, 1) == -1) 
++    if (fcntl(x_fd, F_SETFD, FD_CLOEXEC) == -1) 
+       {
+ 	fvwm_err("close-on-exec failed",NULL,NULL,NULL);
+ 	exit (1);
+@@ -283,8 +283,8 @@ void main(int argc, char **argv)
+ 		  strcat(message," -debug");
+ 		strcat(message," -f ");
+ 		strcat(message,config_file);
+-		strcat(message," &\n");
+-		system(message);
++		
++		ktm_exec(message);
+ 	      }
+ 	  }
+       }
+@@ -296,7 +296,7 @@ void main(int argc, char **argv)
+     len = strlen(XDisplayString(dpy));
+     display_string = safemalloc(len+10);
+     sprintf(display_string,"DISPLAY=%s",XDisplayString(dpy));
+-    putenv(display_string);
++    ktm_putenv(display_string);
+     /* Add a HOSTDISPLAY environment variable, which is the same as
+      * DISPLAY, unless display = :0.0 or unix:0.0, in which case the full
+      * host name will be used for ease in networking . */
+@@ -306,7 +306,7 @@ void main(int argc, char **argv)
+ 	mygethostname(client,MAXHOSTNAME);
+ 	rdisplay_string = safemalloc(len+14 + strlen(client));
+ 	sprintf(rdisplay_string,"HOSTDISPLAY=%s:%s",client,&display_string[9]);
+-	putenv(rdisplay_string);
++	ktm_putenv(rdisplay_string);
+       }
+     else if(strncmp(display_string,"DISPLAY=unix:",13)==0)
+       {
+@@ -315,14 +315,14 @@ void main(int argc, char **argv)
+ 	rdisplay_string = safemalloc(len+14 + strlen(client));
+ 	sprintf(rdisplay_string,"HOSTDISPLAY=%s:%s",client,
+ 		&display_string[13]);
+-	putenv(rdisplay_string);
++	ktm_putenv(rdisplay_string);
+       }
+     else
+       {
+ 	char *rdisplay_string;
+ 	rdisplay_string = safemalloc(len+14);
+ 	sprintf(rdisplay_string,"HOSTDISPLAY=%s",XDisplayString(dpy));
+-	putenv(rdisplay_string);
++	ktm_putenv(rdisplay_string);
+       }
+ 
+     Scr.Root = RootWindow(dpy, Scr.screen);
+@@ -918,10 +918,10 @@ void Done(int restart, char *command)
+ 	 * not sleep, but this is adequate for now */
+ 	sleep(1);
+ 	ReapChildren();
+-	execvp(command,my_argv);
++	ktm_restart(command,my_argv);
+       }
+       fprintf(stderr, "FVWM: Call of '%s' failed!!!!\n",command);
+-      execvp(g_argv[0], g_argv);    /* that _should_ work */
++      ktm_restart(g_argv[0], g_argv);    /* that _should_ work */
+       fprintf(stderr, "FVWM: Call of '%s' failed!!!!\n", g_argv[0]); 
+     }
+   else
+diff --git a/fvwm/icons.c b/fvwm/icons.c
+index 090ecae0b26a53670298c0e752f66c788dab6e4a..18c012bd0a9aef5f50cbed649367929aba8e95a2 100644
+--- a/fvwm/icons.c
++++ b/fvwm/icons.c
+@@ -533,21 +533,21 @@ void GrabIconButtons(FvwmWindow *tmp_win, Window w)
+       if((MouseEntry->func != (int)0)&&(MouseEntry->Context & C_ICON))
+ 	{
+ 	  if(MouseEntry->Button >0)
+-	    XGrabButton(dpy, MouseEntry->Button, MouseEntry->Modifier, w, 
++	    ktm_grab_button(dpy, MouseEntry->Button, MouseEntry->Modifier, w, 
+ 			True, ButtonPressMask | ButtonReleaseMask,
+ 			GrabModeAsync, GrabModeAsync, None, 
+ 			Scr.FvwmCursors[DEFAULT]);
+ 	  else
+ 	    {
+-	      XGrabButton(dpy, 1, MouseEntry->Modifier, w,
++	      ktm_grab_button(dpy, 1, MouseEntry->Modifier, w,
+ 			  True, ButtonPressMask | ButtonReleaseMask,
+ 			  GrabModeAsync, GrabModeAsync, None, 
+ 			  Scr.FvwmCursors[DEFAULT]);
+-	      XGrabButton(dpy, 2, MouseEntry->Modifier, w,
++	      ktm_grab_button(dpy, 2, MouseEntry->Modifier, w,
+ 			  True, ButtonPressMask | ButtonReleaseMask,
+ 			  GrabModeAsync, GrabModeAsync, None, 
+ 			  Scr.FvwmCursors[DEFAULT]);
+-	      XGrabButton(dpy, 3, MouseEntry->Modifier, w,
++	      ktm_grab_button(dpy, 3, MouseEntry->Modifier, w,
+ 			  True, ButtonPressMask | ButtonReleaseMask,
+ 			  GrabModeAsync, GrabModeAsync, None, 
+ 			  Scr.FvwmCursors[DEFAULT]);
+@@ -576,7 +576,7 @@ void GrabIconKeys(FvwmWindow *tmp_win,Window w)
+   for (tmp = Scr.FuncKeyRoot.next; tmp != NULL; tmp = tmp->next)
+     {
+       if (tmp->cont & C_ICON)
+-	XGrabKey(dpy, tmp->keycode, tmp->mods, w, True,
++	ktm_grab_key(dpy, tmp->keycode, tmp->mods, w, True,
+ 		 GrabModeAsync, GrabModeAsync);
+     }
+   return;
+diff --git a/fvwm/pager.c b/fvwm/pager.c
+index 2b00853c62973548fc0c6a54a6d21a64c0482dcf..64baf61f4dc131eec34f676b92d9cae993a3f537 100644
+--- a/fvwm/pager.c
++++ b/fvwm/pager.c
+@@ -22,8 +22,8 @@
+ 
+ extern XEvent Event;
+ 
+-XGCValues Globalgcv;
+-unsigned long Globalgcm;
++extern XGCValues Globalgcv;
++extern unsigned long Globalgcm;
+ 
+ void DrawPartitionLines(void);
+ FvwmWindow *FindCounterpart(Window target);
+diff --git a/modules/FvwmPager/FvwmPager.c b/modules/FvwmPager/FvwmPager.c
+index 70fff6c251d2844aaa585240fe2a6e1b922906b0..5aa933440f104ed9be43764d1100b5f5f7e56acb 100644
+--- a/modules/FvwmPager/FvwmPager.c
++++ b/modules/FvwmPager/FvwmPager.c
+@@ -726,11 +726,17 @@ int My_XNextEvent(Display *dpy, XEvent *event)
+   FD_SET(x_fd,&in_fdset);
+   FD_SET(fd[1],&in_fdset);
+   
+-#ifdef __hpux
+-  select(fd_width,(int *)&in_fdset, 0, 0, NULL);
+-#else
+-  select(fd_width,&in_fdset, 0, 0, NULL);
+-#endif  
++{
++    struct hu_pollfd ready[2];
++    int result;
++    ready[0].fd=x_fd; ready[0].events=HU_POLLIN;
++    ready[1].fd=fd[1]; ready[1].events=HU_POLLIN;
++    result=hu_poll(ready,2,-1);
++    FD_ZERO(&in_fdset);
++    if (result<0) { if(errno!=EINTR) { perror("module poll"); DeadPipe(1); } return 0; }
++    if (ready[0].revents) FD_SET(x_fd,&in_fdset);
++    if (ready[1].revents) FD_SET(fd[1],&in_fdset);
++  }  
+   
+   if(FD_ISSET(x_fd, &in_fdset))
+     {
+diff --git a/modules/FvwmPager/x_pager.c b/modules/FvwmPager/x_pager.c
+index cb9fe6ab69d522a1c4dc654a2af1f37619a27006..4a9b87c4f20083caf1b6d00860d140658d3d96a6 100644
+--- a/modules/FvwmPager/x_pager.c
++++ b/modules/FvwmPager/x_pager.c
+@@ -52,7 +52,7 @@ int desk_h = 0;
+ int label_h = 0;
+ 
+ DeskInfo *Desks;
+-int Wait = 0;
++int PagerWaiting = 0;
+ XErrorHandler FvwmErrorHandler(Display *, XErrorEvent *);
+ 
+ 
+@@ -261,15 +261,15 @@ void initialize_pager(void)
+ 			    CopyFromParent, InputOutput,
+ 			    (Visual *) CopyFromParent,
+ 			    valuemask, &attributes);
+-  XGrabButton(dpy, 1, AnyModifier, icon_win, 
++  ktm_grab_button(dpy, 1, AnyModifier, icon_win, 
+ 	      True, ButtonPressMask | ButtonReleaseMask|ButtonMotionMask,
+ 	      GrabModeAsync, GrabModeAsync, None, 
+ 	      None);
+-  XGrabButton(dpy, 2, AnyModifier, icon_win, 
++  ktm_grab_button(dpy, 2, AnyModifier, icon_win, 
+ 	      True, ButtonPressMask | ButtonReleaseMask|ButtonMotionMask,
+ 	      GrabModeAsync, GrabModeAsync, None, 
+ 	      None);
+-  XGrabButton(dpy, 3, AnyModifier, icon_win, 
++  ktm_grab_button(dpy, 3, AnyModifier, icon_win, 
+ 	      True, ButtonPressMask | ButtonReleaseMask|ButtonMotionMask,
+ 	      GrabModeAsync, GrabModeAsync, None, 
+ 	      None);
+@@ -625,7 +625,7 @@ void MovePage(void)
+   char str[100],*sptr;
+   static int icon_desk_shown = -1000;
+ 
+-  Wait = 0;
++  PagerWaiting = 0;
+   n1 = Scr.Vx/Scr.MyDisplayWidth;
+   m1 = Scr.Vy/Scr.MyDisplayHeight;
+   n = (Scr.VxMax)/Scr.MyDisplayWidth;
+@@ -855,7 +855,7 @@ void SwitchToDeskAndPage(int Desk, XEvent *Event)
+   SendInfo(fd,command,0);  
+ 
+ #endif
+-  Wait = 1;
++  PagerWaiting = 1;
+ }
+ 
+ void IconSwitchPage(XEvent *Event)
+@@ -870,7 +870,7 @@ void IconSwitchPage(XEvent *Event)
+ 	  (icon_h*Scr.MyDisplayHeight));
+   SendInfo(fd,command,0);  
+ #endif
+-  Wait = 1;
++  PagerWaiting = 1;
+ }
+ 
+ 
+@@ -931,7 +931,7 @@ void AddNewWindow(PagerWindow *t)
+ 				  CopyFromParent,
+ 				  InputOutput,CopyFromParent,
+ 				  valuemask,&attributes);
+-      XGrabButton(dpy, 2, AnyModifier, t->IconView,
++      ktm_grab_button(dpy, 2, AnyModifier, t->IconView,
+ 		  True, ButtonPressMask | ButtonReleaseMask|ButtonMotionMask,
+ 		  GrabModeAsync, GrabModeAsync, None, 
+ 		  None);
+@@ -1132,7 +1132,7 @@ void Scroll(int Desk, int x, int y)
+ #ifndef NON_VIRTUAL
+   char command[256];
+   int sx, sy;
+-  if(Wait == 0)
++  if(PagerWaiting == 0)
+     {
+       if(Desk != Scr.CurrentDesk)
+ 	{
+@@ -1159,7 +1159,7 @@ void Scroll(int Desk, int x, int y)
+   
+       sprintf(command,"Scroll %d %d\n",sx,sy);
+       SendInfo(fd,command,0);
+-      Wait = 1;
++      PagerWaiting = 1;
+     }
+ #endif
+ }
+@@ -1170,7 +1170,7 @@ void IconScroll(int x, int y)
+ #ifndef NON_VIRTUAL
+   char command[256];
+   int sx, sy;
+-  if(Wait == 0)
++  if(PagerWaiting == 0)
+     {
+       if(x < 0)
+ 	x = 0;
+@@ -1192,7 +1192,7 @@ void IconScroll(int x, int y)
+   
+       sprintf(command,"Scroll %d %d\n",sx,sy);
+       SendInfo(fd,command,0);
+-      Wait = 1;
++      PagerWaiting = 1;
+     }
+ #endif
+ }
+diff --git a/modules/FvwmWinList/FvwmWinList.c b/modules/FvwmWinList/FvwmWinList.c
+index bfeaa1a160ae885915243cd15ce6e5cbffc806e8..e8796af9848694626ec494fe76e86307029a7e1f 100644
+--- a/modules/FvwmWinList/FvwmWinList.c
++++ b/modules/FvwmWinList/FvwmWinList.c
+@@ -655,11 +655,11 @@ Window dummyroot,dummychild;
+   XSetWMNormalHints(dpy,win,&hints);
+ 
+   if (!Transient) {
+-    XGrabButton(dpy,1,AnyModifier,win,True,GRAB_EVENTS,GrabModeAsync,
++    ktm_grab_button(dpy,1,AnyModifier,win,True,GRAB_EVENTS,GrabModeAsync,
+       GrabModeAsync,None,None);
+-    XGrabButton(dpy,2,AnyModifier,win,True,GRAB_EVENTS,GrabModeAsync,
++    ktm_grab_button(dpy,2,AnyModifier,win,True,GRAB_EVENTS,GrabModeAsync,
+       GrabModeAsync,None,None);
+-    XGrabButton(dpy,3,AnyModifier,win,True,GRAB_EVENTS,GrabModeAsync,
++    ktm_grab_button(dpy,3,AnyModifier,win,True,GRAB_EVENTS,GrabModeAsync,
+       GrabModeAsync,None,None);
+     SetMwmHints(MWM_DECOR_ALL|MWM_DECOR_RESIZEH|MWM_DECOR_MAXIMIZE|MWM_DECOR_MINIMIZE,
+       MWM_FUNC_ALL|MWM_FUNC_RESIZE|MWM_FUNC_MAXIMIZE|MWM_FUNC_MINIMIZE,
+diff --git a/modules/GoodStuff/GoodStuff.c b/modules/GoodStuff/GoodStuff.c
+index 701d98959947b43fde66009e1666a605a90927f9..d6b4877f8dc98e23f16529c729a4fae145c470b2 100644
+--- a/modules/GoodStuff/GoodStuff.c
++++ b/modules/GoodStuff/GoodStuff.c
+@@ -301,6 +301,7 @@ void Loop(void)
+ 	      break;
+ 	      
+ 	    case ButtonPress:
++              if(getenv("FVWM_TRACE")) { fprintf(stderr,"dock press %d %d state %x\n",Event.xbutton.x,Event.xbutton.y,Event.xbutton.state); fflush(stderr); }
+ 	      CurrentRow = (Event.xbutton.y/ButtonHeight);
+ 	      CurrentColumn = (Event.xbutton.x/ButtonWidth);
+ 	      CurrentButton = CurrentColumn + CurrentRow*num_columns;
+@@ -318,6 +319,7 @@ void Loop(void)
+ 	      break;
+ 	      
+ 	    case ButtonRelease:
++              if(getenv("FVWM_TRACE")) { fprintf(stderr,"dock release %d %d state %x\n",Event.xbutton.x,Event.xbutton.y,Event.xbutton.state); fflush(stderr); }
+ 	      CurrentRow = (Event.xbutton.y/ButtonHeight);
+ 	      CurrentColumn = (Event.xbutton.x/ButtonWidth);
+ 	      NewButton = CurrentColumn + CurrentRow*num_columns;
+@@ -1185,11 +1187,17 @@ int My_XNextEvent(Display *dpy, XEvent *event)
+   FD_SET(x_fd,&in_fdset);
+   FD_SET(fd[1],&in_fdset);
+ 
+-#ifdef __hpux
+-  select(fd_width,(int *)&in_fdset, 0, 0, NULL);
+-#else
+-  select(fd_width,&in_fdset, 0, 0, NULL);
+-#endif
++{
++    struct hu_pollfd ready[2];
++    int result;
++    ready[0].fd=x_fd; ready[0].events=HU_POLLIN;
++    ready[1].fd=fd[1]; ready[1].events=HU_POLLIN;
++    result=hu_poll(ready,2,-1);
++    FD_ZERO(&in_fdset);
++    if (result<0) { if(errno!=EINTR) { perror("module poll"); DeadPipe(1); } return 0; }
++    if (ready[0].revents) FD_SET(x_fd,&in_fdset);
++    if (ready[1].revents) FD_SET(fd[1],&in_fdset);
++  }
+ 
+ 
+   if(FD_ISSET(x_fd, &in_fdset))

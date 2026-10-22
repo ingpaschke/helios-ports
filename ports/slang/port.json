@@ -1,0 +1,35 @@
+{
+  "format": 1,
+  "name": "slang",
+  "version": "2.3.3",
+  "upstream": {
+    "kind": "archive",
+    "url": "https://www.jedsoft.org/releases/slang/slang-2.3.3.tar.bz2",
+    "filename": "slang-2.3.3.tar.bz2",
+    "sha256": "f9145054ae131973c61208ea82486d5dd10e3c5cdad23b7c4a0617743c8f5a18",
+    "subdirectory": "slang-2.3.3",
+    "tree_sha256": "0ac670bd2b9e6a12d0a527ab1b0eed9a08d0e893eeb5677702fee8ff99a57f46"
+  },
+  "patches": [
+    {
+      "file": "01-helios.patch",
+      "description": "Configure S-Lang for Helios and use native terminal services",
+      "sha256": "d8079a9bfcc842a7d812dadc9b85bb5cdb4a0a6f7ecfb040a5f0eed959331c74"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "1144d80271233b29de781d0dae0024b8b0184ee7d2085cb9c6fa8fcb904abd7c",
+  "dependencies": [],
+  "build": {
+    "prepare": [
+      {
+        "type": "copy",
+        "source": "${src}/src/terminfo/default.inc",
+        "destination": "${src}/src/terminfo.inc"
+      }
+    ],
+    "outputs": [
+      "${src}/src/terminfo.inc"
+    ]
+  }
+}

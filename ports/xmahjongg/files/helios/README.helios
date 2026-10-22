@@ -1,0 +1,25 @@
+Xmahjongg 3.7 for Helios
+==========================
+
+Start /helios/bin/x11/xmahjongg, or choose Play -> Mahjong solitaire.
+The command xshanghai is an alias for the same game.
+
+Remove matching pairs of free tiles: a free tile has no tile above it and
+at least one open side. Flowers match other flowers; seasons match seasons.
+
+Controls: h hints, Return takes a hinted match, u undoes, r redoes,
+n starts a new game, c cleans up, s solves, Escape cancels, q quits.
+Arrow keys and Space also allow keyboard play.
+
+Use --number 42 for a repeatable board; --list lists the available layouts,
+tilesets and backgrounds. Select them with --layout and --tileset.
+The --tileset small option is useful on smaller displays.
+Data files live in /helios/local/share/xmahjongg.
+DISPLAY and XAUTHORITY are inherited from the desktop.
+
+This is a native T800 C++ build, including GIF decoding, using the LLVM
+Helios C++ runtime and rebuilt X11R4 Xlib. The port uses the shared C++-compatible R4 headers and Helios's select descriptor
+representation, and includes errno.h directly.
+
+The source bundle, documentation and build recipe accompany the installed
+port. Upstream copyright and licence notices remain in the source.

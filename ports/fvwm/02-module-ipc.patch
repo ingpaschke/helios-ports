@@ -1,0 +1,377 @@
+Subject: Use native local channels for FVWM modules and check their protocol
+
+diff --git a/fvwm/module.c b/fvwm/module.c
+index 8b71609c56a5d9a1d68544ddd777083fdfd124d5..b3250448385bc08767db6515f8920a047497f877 100644
+--- a/fvwm/module.c
++++ b/fvwm/module.c
+@@ -104,6 +104,7 @@ void executeModule(char *action,FILE *fd, char **win, int *context)
+ 
+   if(action == NULL)
+     return;
++  if (strlen(action) >= sizeof(command)) return;
+   strcpy(command,action);
+ 
+   cptr = command;
+@@ -145,92 +146,44 @@ void executeModule(char *action,FILE *fd, char **win, int *context)
+       return;
+     }
+   
+-  /* I want one-ended pipes, so I open two two-ended pipes,
+-   * and close one end of each. I need one ended pipes so that
+-   * I can detect when the module crashes/malfunctions */
+-  if(pipe(fvwm_to_app)!=0)
+-    {
+-      fprintf(stderr,"Fvwm: Failed to open pipe\n");
+-      return;
+-    }
+-  if(pipe(app_to_fvwm)!=0)
+-    {
+-      fprintf(stderr,"Fvwm: Failed to open pipe2\n");
+-      close(fvwm_to_app[0]);
+-      close(fvwm_to_app[1]);
+-      return;
++  /* Explicit endpoint transfer works across processors; no fork or pipe. */
++  {
++    struct hu_spawn_actions actions;
++    struct hu_spawn_attr attr={HU_SPAWN_LOCAL,0,0,5};
++    pid_t pid;
++    int sendfd=-1, recvfd=-1, error;
++    if (hu_channel(fvwm_to_app)<0) { free(arg1); return; }
++    if (hu_channel(app_to_fvwm)<0) {
++      close(fvwm_to_app[0]); close(fvwm_to_app[1]); free(arg1); return;
+     }
+-
+-  
+-  val = fork();
+-  if(val > 0)
+-    {
+-      /* This fork remains running fvwm */
+-      /* close appropriate descriptors from each pipe so
+-       * that fvwm will be able to tell when the app dies */
+-      close(app_to_fvwm[1]);
+-      close(fvwm_to_app[0]);
+-
+-      /* add these pipes to fvwm's active pipe list */
+-      writePipes[i] = fvwm_to_app[1];
+-      readPipes[i] = app_to_fvwm[0];
+-      pipeOn[i] = -1;
+-      PipeMask[i] = MAX_MASK;
+-      free(arg1);
+-      pipeQueue[i] = NULL;
+-
+-      /* make the PositiveWrite pipe non-blocking. Don't want to jam up
+-	 fvwm because of an uncooperative module */
+-      fcntl(writePipes[i],F_SETFL,O_NDELAY);
+-      /* Mark the pipes close-on exec so other programs
+-       * won`t inherit them */
+-      if (fcntl(readPipes[i], F_SETFD, 1) == -1) 
+-	fvwm_err("module close-on-exec failed",NULL,NULL,NULL);
+-      if (fcntl(writePipes[i], F_SETFD, 1) == -1) 
+-	fvwm_err("module close-on-exec failed",NULL,NULL,NULL);
++    /* Stage sources above the fixed child descriptors, avoiding dup cycles. */
++    sendfd=fcntl(app_to_fvwm[1],F_DUPFD,10);
++    recvfd=fcntl(fvwm_to_app[0],F_DUPFD,10);
++    hu_spawn_actions_init(&actions);
++    error=(sendfd<0 || recvfd<0 || fvwm_to_app[1]>=FD_SETSIZE ||
++           app_to_fvwm[0]>=FD_SETSIZE) ? EMFILE : 0;
++    if (!error) error=hu_spawn_adddup2(&actions,sendfd,3);
++    if (!error) error=hu_spawn_adddup2(&actions,recvfd,4);
++    sprintf(arg5,"%lx",(unsigned long)win);
++    sprintf(arg6,"%lx",(unsigned long)context);
++    args[0]=arg1; args[1]="3"; args[2]="4"; args[3]=fvwm_file;
++    args[4]=arg5; args[5]=arg6; args[6]=aptr; args[7]=0;
++    if (!error) error=hu_spawn(&pid,arg1,&actions,&attr,args,0);
++    hu_spawn_actions_destroy(&actions);
++    if (sendfd>=0) close(sendfd);
++    if (recvfd>=0) close(recvfd);
++    close(app_to_fvwm[1]); close(fvwm_to_app[0]);
++    free(arg1);
++    if (error) {
++      close(app_to_fvwm[0]); close(fvwm_to_app[1]);
++      errno=error; perror("fvwm: module spawn"); return;
+     }
+-  else if (val ==0)
+-    {
+-      /* this is  the child */
+-      /* need to close config_fd if its still open! */
+-      if(config_fd != (FILE *)NULL)
+-	/* Fixes some funny stuff with svr4 and stream IO */
+-	/* fclose(config_fd) */
+-	close(fileno(config_fd));
+-
+-      /* this fork execs the module */
+-      close(fvwm_to_app[1]);
+-      close(app_to_fvwm[0]);
+-      sprintf(arg2,"%d",app_to_fvwm[1]);
+-      sprintf(arg3,"%d",fvwm_to_app[0]);
+-      sprintf(arg5,"%lx",(unsigned long)win);
+-      sprintf(arg6,"%lx",(unsigned long)context);
+-      args[0]=arg1;
+-      args[1]=arg2;
+-      args[2]=arg3;
+-      args[3]=fvwm_file;
+-      args[4]=arg5;
+-      args[5]=arg6;
+-      if(aptr != NULL)
+-	{
+-	  args[6] = aptr;
+-	  args[7] = 0;
+-	}
+-      else
+-	args[6]= 0;
+-      execvp(arg1,args);
+-      fprintf(stderr,"Execution of module failed: %s",arg1);      
+-      perror("");
+-      close(app_to_fvwm[1]);
+-      close(fvwm_to_app[0]);
+-      exit(1);
+-    }
+-  else
+-    {
+-      fprintf(stderr,"Fork failed\n");
+-      free(arg1);
+-    }
+-  return;
++    writePipes[i]=fvwm_to_app[1]; readPipes[i]=app_to_fvwm[0];
++    pipeOn[i]=-1; PipeMask[i]=MAX_MASK; pipeQueue[i]=NULL;
++    fcntl(writePipes[i],F_SETFL,O_NONBLOCK);
++    fcntl(writePipes[i],F_SETFD,FD_CLOEXEC);
++    fcntl(readPipes[i],F_SETFD,FD_CLOEXEC);
++  }
+ }
+ 
+ void HandleModuleInput(Window w, int channel)
+@@ -242,22 +195,22 @@ void HandleModuleInput(Window w, int channel)
+ 
+   /* Already read a (possibly NULL) window id from the pipe,
+    * Now read an fvwm bultin command line */
+-  n = read(readPipes[channel], &size, sizeof(int));
++  n = ktm_read_full(readPipes[channel], &size, sizeof(int));
+   if(n < sizeof(int))
+     {
+       KillModule(channel,1);
+       return;
+     }
+ 
+-  if(size >255)
++  if(size < 0 || size >255)
+     {
+       fprintf(stderr,"Module command is too big (%d)\n",size);
+-      size=255;
++      KillModule(channel,2); return;
+     }
+ 
+   pipeOn[channel] = 1;
+ 
+-  n = read(readPipes[channel],text, size);
++  n = ktm_read_full(readPipes[channel],text, size);
+   if(n < size)
+     {
+       KillModule(channel,2);
+@@ -265,7 +218,8 @@ void HandleModuleInput(Window w, int channel)
+     }
+   
+   text[n]=0;
+-  n = read(readPipes[channel],&cont, sizeof(int));
++  if (getenv("FVWM_TRACE")) { fprintf(stderr,"module %d: %s\n",channel,text); fflush(stderr); }
++  n = ktm_read_full(readPipes[channel],&cont, sizeof(int));
+   if(n < sizeof(int))
+     {
+       KillModule(channel,3);
+@@ -663,14 +617,14 @@ void FlushQueue(int module)
+       while(d->done < d->size)
+ 	{
+ 	  a = write(writePipes[module],&dptr[d->done], d->size - d->done);
+-	  if(a >=0)
++	  if(a >0)
+ 	    d->done += a;
+ 	  /* the write returns EWOULDBLOCK or EAGAIN if the pipe is full.
+ 	   * (This is non-blocking I/O). SunOS returns EWOULDBLOCK, OSF/1
+ 	   * returns EAGAIN under these conditions. Hopefully other OSes
+ 	   * return one of these values too. Solaris 2 doesn't seem to have
+ 	   * a man page for write(2) (!) */
+-	  else if ((errno == EWOULDBLOCK)||(errno == EAGAIN)||(errno==EINTR))
++	  else if (a < 0 && ((errno == EWOULDBLOCK)||(errno == EAGAIN)||(errno==EINTR)))
+ 	    {
+ 	      return;
+ 	    }
+diff --git a/libs/GetFdWidth.c b/libs/GetFdWidth.c
+index ac7ea3d12864fcf48b71784561b295b60385e342..3b5c01f49f4d6054e1c05ce676af66ea53bdcc60 100644
+--- a/libs/GetFdWidth.c
++++ b/libs/GetFdWidth.c
+@@ -1,15 +1,2 @@
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <unistd.h>
+-
+-#include "../configure.h"
+-
+-
+-int GetFdWidth(void)
+-{
+-#ifdef HAVE_SYSCONF
+-  return sysconf(_SC_OPEN_MAX);
+-#else
+-  return getdtablesize();
+-#endif
+-}
++#include <sys/types.h>
++int GetFdWidth(void) { return FD_SETSIZE; }
+diff --git a/libs/ReadPacket.c b/libs/ReadPacket.c
+index 6251fe6ce1d9dd99f1d02d51914d669a98a38bb2..11e276c3d6fa174462f84154cf06cf79d6e63361 100644
+--- a/libs/ReadPacket.c
++++ b/libs/ReadPacket.c
+@@ -1,57 +1,19 @@
+ #include <stdio.h>
+-#include <stdlib.h>
+ #include "fvwmlib.h"
+ #include "../fvwm/module.h"
+-
+-/************************************************************************
+- * 
+- * Reads a single packet of info from fvwm. Prototype is:
+- * unsigned long header[3];
+- * unsigned long *body;
+- * int fd[2];
+- * void DeadPipe(int nonsense); /* Called if the pipe is no longer open 
+- *
+- * ReadFvwmPacket(fd[1],header, &body);
+- *
+- * Returns:
+- *   > 0 everything is OK.
+- *   = 0 invalid packet.
+- *   < 0 pipe is dead. (Should never occur)
+- *
+- **************************************************************************/
+ int ReadFvwmPacket(int fd, unsigned long *header, unsigned long **body)
+ {
+-  int count,total,count2,body_length;
+-  char *cbody;
+   extern void DeadPipe(int);
+-
+-  if((count = read(fd,header,3*sizeof(unsigned long))) >0)
+-    {
+-      if(header[0] == START_FLAG)
+-	{
+-	  body_length = header[2]-3;
+-	  *body = (unsigned long *)
+-	    safemalloc(body_length * sizeof(unsigned long));
+-	  cbody = (char *)(*body);
+-	  total = 0;
+-	  while(total < body_length*sizeof(unsigned long))
+-	    {
+-	      if((count2=
+-		  read(fd,&cbody[total],
+-		       body_length*sizeof(unsigned long)-total)) >0)
+-		{
+-		  total += count2;
+-		}
+-	      else if(count2 < 0)
+-		{
+-		  DeadPipe(1);
+-		}
+-	    }
+-	}
+-      else
+-	count = 0;
+-    }
+-  if(count <= 0)
+-    DeadPipe(1);
+-  return count;
++  unsigned size;
++  *body=0;
++  if (ktm_read_full(fd,header,3*sizeof(*header))<0 ||
++      header[0]!=START_FLAG || header[2]<3 || header[2]>4096) {
++    DeadPipe(1); return -1;
++  }
++  size=(header[2]-3)*sizeof(*header);
++  *body=(unsigned long *)safemalloc(size ? size : 1);
++  if (ktm_read_full(fd,*body,size)<0) {
++    free(*body); *body=0; DeadPipe(1); return -1;
++  }
++  return 3*sizeof(*header);
+ }
+diff --git a/libs/SendInfo.c b/libs/SendInfo.c
+index bf9cfe9f5109562f7ed4d19594f1dc14281eb1e5..a4a9ad6746ae639771b3dc0c4bb1ee3de91f0f99 100644
+--- a/libs/SendInfo.c
++++ b/libs/SendInfo.c
+@@ -1,26 +1,15 @@
+-#include <stdio.h>
+-#include <ctype.h>
+-
+-/***********************************************************************
+- *
+- *  Procedure:
+- *	SendInfo - send a command back to fvwm 
+- *
+- ***********************************************************************/
++#include <string.h>
+ void SendInfo(int *fd,char *message,unsigned long window)
+ {
+-  int w;
+-
+-  if(message != NULL)
+-    {
+-      write(fd[0],&window, sizeof(unsigned long));
+-      w=strlen(message);
+-      write(fd[0],&w,sizeof(int));
+-      write(fd[0],message,w);
+-
+-      /* keep going */
+-      w=1;
+-      write(fd[0],&w,sizeof(int));
+-    }
++  char frame[sizeof(unsigned long)+2*sizeof(int)+255];
++  int length, cont=1, offset=0;
++  extern void DeadPipe(int);
++  if (!message) return;
++  length=strlen(message);
++  if (length>255) { DeadPipe(1); return; }
++  memcpy(frame+offset,&window,sizeof(window)); offset+=sizeof(window);
++  memcpy(frame+offset,&length,sizeof(length)); offset+=sizeof(length);
++  memcpy(frame+offset,message,length); offset+=length;
++  memcpy(frame+offset,&cont,sizeof(cont)); offset+=sizeof(cont);
++  if (ktm_write_full(fd[0],frame,offset)<0) DeadPipe(1);
+ }
+-
+diff --git a/libs/SendText.c b/libs/SendText.c
+index 6f9063382f4d0d658afd660d7e53c5b1e82b9ecf..6670183d76ab0dba8313eb1480c615b4c82ab959 100644
+--- a/libs/SendText.c
++++ b/libs/SendText.c
+@@ -1,24 +1,15 @@
+-#include <stdio.h>
+-#include <ctype.h>
+-/************************************************************************
+- *
+- * Sends arbitrary text to fvwm
+- *
+- ***********************************************************************/
++#include <string.h>
+ void SendText(int *fd,char *message,unsigned long window)
+ {
+-  int w;
+-  
+-  if(message != NULL)
+-    {
+-      write(fd[0],&window, sizeof(unsigned long));
+-      
+-      w=strlen(message);
+-      write(fd[0],&w,sizeof(int));
+-      write(fd[0],message,w);
+-      
+-      /* keep going */
+-      w = 1;
+-      write(fd[0],&w,sizeof(int));
+-    }
++  char frame[sizeof(unsigned long)+2*sizeof(int)+255];
++  int length, cont=1, offset=0;
++  extern void DeadPipe(int);
++  if (!message) return;
++  length=strlen(message);
++  if (length>255) { DeadPipe(1); return; }
++  memcpy(frame+offset,&window,sizeof(window)); offset+=sizeof(window);
++  memcpy(frame+offset,&length,sizeof(length)); offset+=sizeof(length);
++  memcpy(frame+offset,message,length); offset+=length;
++  memcpy(frame+offset,&cont,sizeof(cont)); offset+=sizeof(cont);
++  if (ktm_write_full(fd[0],frame,offset)<0) DeadPipe(1);
+ }

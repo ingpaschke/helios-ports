@@ -1,0 +1,6 @@
+Helios logo assets
+
+helios-logo.svg supplies the desktop logo. render_logo.py uses rsvg-convert
+and Pillow to produce a 16-level antialiased coverage mask for core X11.
+helios-logo.xbm contains the 40x32 bitmap from the Helios distribution's
+/helios/include/x11/bitmaps/helios.

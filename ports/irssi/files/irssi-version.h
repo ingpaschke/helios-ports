@@ -1,0 +1,3 @@
+#define IRSSI_VERSION "0.8.10-helios"
+#define IRSSI_VERSION_DATE 20051211
+#define IRSSI_VERSION_TIME 0

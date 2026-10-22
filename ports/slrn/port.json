@@ -1,0 +1,271 @@
+{
+  "format": 1,
+  "name": "slrn",
+  "version": "1.0.3a",
+  "upstream": {
+    "kind": "archive",
+    "url": "https://www.jedsoft.org/releases/slrn/slrn-1.0.3a.tar.bz2",
+    "filename": "slrn-1.0.3a.tar.bz2",
+    "sha256": "3ba8a4d549201640f2b82d53fb1bec1250f908052a7983f0061c983c634c2dac",
+    "subdirectory": "slrn-1.0.3",
+    "tree_sha256": "9df30e09fe210dc26a69ab1ad9c2d6b15f7376ef66216ebcf0661a980484a781"
+  },
+  "patches": [
+    {
+      "file": "01-runtime.patch",
+      "description": "Adapt terminal input, locking and task execution to Helios",
+      "sha256": "8bddea64c11b68e897c24af35cdf2c3547d85631948d24a5824e719dada774b6"
+    },
+    {
+      "file": "02-network.patch",
+      "description": "Use native socket readiness, name resolution and TLS",
+      "sha256": "50ade12b7815c4f01a2e9c6b37ddb1a7cdcf5b322809a8dc7e9b7ab684218e08"
+    },
+    {
+      "file": "03-configuration.patch",
+      "description": "Select supported features and install terminal and newsreader defaults",
+      "sha256": "18dc51cb89c6ebe9b653859071de9c1ceed40ac7429cd8e092b7eb408dca79d4"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "a829f87875fe672b5bc8c7639756d6347c5f5a1814a15b370af14c4a09002d47",
+  "dependencies": [
+    "slang"
+  ],
+  "requires_compat": true,
+  "host_tools": [
+    "tic"
+  ],
+  "build": {
+    "compile": {
+      "flags": [
+        "-std=gnu99",
+        "-D_BSD",
+        "-D__HELIOS",
+        "-D__TRAN",
+        "-D__HELIOSTRAN",
+        "-Dunix",
+        "-D__unix__",
+        "-DHAVE_CONFIG_H",
+        "-DSLANG_INSTALL_PREFIX=\"/helios/local\"",
+        "-DSLRN_SLANG_DIR=\"/helios/local/share/slrn/macros\"",
+        "-DSLRN_LIB_DIR=\"/helios/local/share/slrn\"",
+        "-DSLRN_CONF_DIR=\"/helios/etc\"",
+        "-DNLS_LOCALEDIR=\"/helios/local/share/locale\"",
+        "-Wno-error=implicit-function-declaration",
+        "-Wno-error=int-conversion",
+        "-Wno-error=incompatible-pointer-types",
+        "-I${source_dir}",
+        "-I${src:slang}/src",
+        "-I${src}/src",
+        "-I${src}/helios",
+        "-I${compat}/include/helios-unix",
+        "-include",
+        "${src}/helios/platform.h"
+      ]
+    },
+    "groups": [
+      {
+        "name": "slrn",
+        "sources": [
+          "${src:slang}/src/sltermin.c",
+          "${src:slang}/src/sldisply.c",
+          "${src:slang}/src/slutty.c",
+          "${src:slang}/src/slang.c",
+          "${src:slang}/src/slarray.c",
+          "${src:slang}/src/slclass.c",
+          "${src:slang}/src/slcmd.c",
+          "${src:slang}/src/slerr.c",
+          "${src:slang}/src/slgetkey.c",
+          "${src:slang}/src/slkeymap.c",
+          "${src:slang}/src/slmalloc.c",
+          "${src:slang}/src/slmath.c",
+          "${src:slang}/src/slmemchr.c",
+          "${src:slang}/src/slmemcmp.c",
+          "${src:slang}/src/slmemcpy.c",
+          "${src:slang}/src/slmemset.c",
+          "${src:slang}/src/slmisc.c",
+          "${src:slang}/src/slparse.c",
+          "${src:slang}/src/slprepr.c",
+          "${src:slang}/src/slregexp.c",
+          "${src:slang}/src/slrline.c",
+          "${src:slang}/src/slsearch.c",
+          "${src:slang}/src/slsmg.c",
+          "${src:slang}/src/slstd.c",
+          "${src:slang}/src/sltoken.c",
+          "${src:slang}/src/sltypes.c",
+          "${src:slang}/src/slxstrng.c",
+          "${src:slang}/src/slcurses.c",
+          "${src:slang}/src/slscroll.c",
+          "${src:slang}/src/slsignal.c",
+          "${src:slang}/src/slkeypad.c",
+          "${src:slang}/src/slerrno.c",
+          "${src:slang}/src/slstring.c",
+          "${src:slang}/src/slstruct.c",
+          "${src:slang}/src/slcmplex.c",
+          "${src:slang}/src/slarrfun.c",
+          "${src:slang}/src/slimport.c",
+          "${src:slang}/src/slpath.c",
+          "${src:slang}/src/slarith.c",
+          "${src:slang}/src/slassoc.c",
+          "${src:slang}/src/slcompat.c",
+          "${src:slang}/src/slposdir.c",
+          "${src:slang}/src/slstdio.c",
+          "${src:slang}/src/slproc.c",
+          "${src:slang}/src/sltime.c",
+          "${src:slang}/src/slstrops.c",
+          "${src:slang}/src/slbstr.c",
+          "${src:slang}/src/slpack.c",
+          "${src:slang}/src/slintall.c",
+          "${src:slang}/src/slistruc.c",
+          "${src:slang}/src/slposio.c",
+          "${src:slang}/src/slnspace.c",
+          "${src:slang}/src/slarrmis.c",
+          "${src:slang}/src/slospath.c",
+          "${src:slang}/src/slscanf.c",
+          "${src:slang}/src/sllower.c",
+          "${src:slang}/src/slupper.c",
+          "${src:slang}/src/slischar.c",
+          "${src:slang}/src/slutf8.c",
+          "${src:slang}/src/slwcwidth.c",
+          "${src:slang}/src/slwclut.c",
+          "${src:slang}/src/slcommon.c",
+          "${src:slang}/src/sllist.c",
+          "${src:slang}/src/slexcept.c",
+          "${src:slang}/src/slfpu.c",
+          "${src:slang}/src/slsig.c",
+          "${src:slang}/src/slboseos.c",
+          "${src}/src/art.c",
+          "${src}/src/art_misc.c",
+          "${src}/src/art_sort.c",
+          "${src}/src/charset.c",
+          "${src}/src/decode.c",
+          "${src}/src/editscore.c",
+          "${src}/src/group.c",
+          "${src}/src/grplens.c",
+          "${src}/src/hash.c",
+          "${src}/src/hdrutils.c",
+          "${src}/src/help.c",
+          "${src}/src/hooks.c",
+          "${src}/src/interp.c",
+          "${src}/src/menu.c",
+          "${src}/src/mime.c",
+          "${src}/src/misc.c",
+          "${src}/src/post.c",
+          "${src}/src/print.c",
+          "${src}/src/ranges.c",
+          "${src}/src/score.c",
+          "${src}/src/server.c",
+          "${src}/src/slrn.c",
+          "${src}/src/slrndir.c",
+          "${src}/src/snprintf.c",
+          "${src}/src/sortdate.c",
+          "${src}/src/startup.c",
+          "${src}/src/strutil.c",
+          "${src}/src/ttymsg.c",
+          "${src}/src/util.c",
+          "${src}/src/version.c",
+          "${src}/src/vfile.c",
+          "${src}/src/xover.c",
+          "${src}/src/parse2822.c",
+          "${src}/helios/platform.c"
+        ]
+      },
+      {
+        "name": "probe",
+        "sources": [
+          "${src}/helios/platform-probe.c",
+          "${src}/helios/platform.c"
+        ]
+      }
+    ],
+    "link": {
+      "libraries": [
+        "${compat}/lib/helios-unix.lib",
+        "${sdk}/lib/bsd.lib",
+        "${sdk}/lib/c.lib",
+        "${sdk}/lib/helios.lib",
+        "${runtime}"
+      ]
+    },
+    "targets": [
+      {
+        "name": "slrn",
+        "type": "executable",
+        "groups": [
+          "slrn"
+        ],
+        "output": "${stage}/local/bin/slrn",
+        "stack": 262144,
+        "heap": 1048576
+      },
+      {
+        "name": "slrn-probe",
+        "type": "executable",
+        "groups": [
+          "probe"
+        ],
+        "output": "${work}/platform-probe",
+        "stack": 32768,
+        "heap": 32768
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/helios/slrn.rc",
+        "destination": "${stage}/etc/slrn.rc"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/doc/help.txt",
+        "destination": "${stage}/etc/help.txt"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/helios/README.txt",
+        "destination": "${stage}/local/share/slrn/README.txt"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/macros",
+        "destination": "${stage}/local/share/slrn/macros"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/doc/slrn.rc",
+        "destination": "${stage}/local/share/slrn/sample.slrnrc"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/doc",
+        "destination": "${stage}/local/share/slrn/doc"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYING",
+        "destination": "${stage}/local/share/slrn/COPYING.slrn"
+      },
+      {
+        "type": "copy",
+        "source": "${src:slang}/COPYING",
+        "destination": "${stage}/local/share/slrn/COPYING.slang"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYRIGHT",
+        "destination": "${stage}/local/share/slrn/COPYRIGHT.slrn"
+      },
+      {
+        "type": "run",
+        "command": [
+          "tic",
+          "-o",
+          "${stage}/local/share/terminfo",
+          "${src}/helios/helios.ti"
+        ],
+        "cwd": "${src}"
+      }
+    ]
+  }
+}

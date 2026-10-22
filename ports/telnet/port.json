@@ -1,0 +1,88 @@
+{
+  "format": 1,
+  "name": "telnet",
+  "version": "Helios-NG Telnet with terminal and NAWS support",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/axelmuhr/Helios-NG.git",
+    "revision": "1fe8f65ee15407945e5a1a25f39f88de64de0d50",
+    "subdirectory": "tcpip/cmds/telnet",
+    "include": [
+      "telnet.c",
+      "fdset.h",
+      "general.h",
+      "sys_bsd.c",
+      "ring.h",
+      "terminal.c",
+      "commands.c",
+      "defines.h",
+      "network.c",
+      "ring.c",
+      "types.h",
+      "externs.h",
+      "main.c",
+      "utilities.c",
+      "tn3270.c",
+      "telnet-naws.h"
+    ],
+    "tree_sha256": "66dc49b914f4695187da304de02a632617ac8a340b69b0948d9607574ac1bf34"
+  },
+  "patches": [
+    {
+      "file": "01-helios.patch",
+      "description": "Translate terminal input and negotiate the current window dimensions",
+      "sha256": "ce1246104a9f437685f0f0fa9474857d62ee01760d914f71e241f9b3358c0a30"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "5c949e917f8b3a75581a3afc559f80cc1fe9a264c7b3ea470f0ce83acdb3ed75",
+  "dependencies": [],
+  "build": {
+    "groups": [
+      {
+        "name": "telnet",
+        "sources": [
+          "${src}/commands.c",
+          "${src}/main.c",
+          "${src}/network.c",
+          "${src}/ring.c",
+          "${src}/telnet.c",
+          "${src}/terminal.c",
+          "${src}/sys_bsd.c",
+          "${src}/tn3270.c",
+          "${src}/utilities.c"
+        ],
+        "flags": [
+          "-D_BSD",
+          "-D__HELIOS",
+          "-D__TRAN",
+          "-D__HELIOSTRAN",
+          "-Dunix"
+        ],
+        "compiler": "hcc",
+        "includes": [
+          "${sdk}/include",
+          "${src}"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "telnet",
+        "type": "executable",
+        "groups": [
+          "telnet"
+        ],
+        "libraries": [
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${stage}/bin/telnet",
+        "stack": 16384,
+        "heap": 16384
+      }
+    ]
+  }
+}

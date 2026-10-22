@@ -1,0 +1,90 @@
+{
+  "format": 1,
+  "name": "nethack",
+  "version": "3.1.3",
+  "upstream": {
+    "kind": "archive",
+    "url": "https://www.nic.funet.fi/pub/unix/games/nethack/nethack3.1.3.tar.gz",
+    "filename": "nethack3.1.3.tar.gz",
+    "sha256": "c1fafa75d6b303beb68d0abb874ba6ddaf3e30adbc44d4762b349707b9f41546",
+    "subdirectory": "nethack313",
+    "tree_sha256": "9ae5d8222c6e174372317f59e7c945d0830bf24a369c867261e12f588562b729"
+  },
+  "patches": [
+    {
+      "file": "01-runtime.patch",
+      "description": "Adapt filenames, locking and runtime services to Helios",
+      "sha256": "b626cc31660b49619a7cc848c0b86c69924bf5d7fc1da33b5c3a04ff917341fe"
+    },
+    {
+      "file": "02-data-layout.patch",
+      "description": "Keep generated game data and level serialization consistent with the target ABI",
+      "sha256": "24a1bd19bb10f4962bdbd9b541e7d43e7109e64fae3ed61ab7fef882179ac54f"
+    },
+    {
+      "file": "03-x11.patch",
+      "description": "Configure the X11 interface and verify its application resources",
+      "sha256": "16ea22b5b34c689f34c2b69663a652555c2697ea53d43c066e07a41fdb3b5e7e"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "fc2b6284bd9a359f5b3986d17c5584da5c091b740262e9e04998a5145b732e25",
+  "dependencies": [
+    "x11"
+  ],
+  "requires_host_sdk": true,
+  "host_tools": [
+    "gcc",
+    "qemu-i386"
+  ],
+  "build": {
+    "prepare": [
+      {
+        "type": "copy",
+        "source": "${host_sdk}",
+        "destination": "${src}/build/host-sdk"
+      },
+      {
+        "type": "run",
+        "command": [
+          "${python}",
+          "${src}/tools/build.py",
+          "--cpu",
+          "t800",
+          "--sysroot",
+          "${sdk}",
+          "--asm",
+          "${asm}",
+          "--clang",
+          "${clang}",
+          "--runtime",
+          "${runtime}",
+          "--x11-source",
+          "${src:x11}",
+          "--x11-library",
+          "${dep:x11}/lib",
+          "--x11-include",
+          "${dep:x11}/include"
+        ],
+        "cwd": "${src}"
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/build/t800/stage",
+        "destination": "${stage}"
+      },
+      {
+        "type": "symlink",
+        "source": "../games/nh313/nethack",
+        "destination": "${stage}/local/bin/nethack"
+      },
+      {
+        "type": "symlink",
+        "source": "../games/nh313/recover",
+        "destination": "${stage}/local/bin/nhrecover"
+      }
+    ]
+  }
+}

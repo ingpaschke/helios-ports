@@ -1,0 +1,122 @@
+Subject: Build the native interpreters with explicit toolchain and portability settings
+
+diff --git a/src/common/input.c b/src/common/input.c
+index ce545cc6aa17a554f4b652b1f73f56708990d62f..6a2616c2205bf56cf9ce708ccb4b876478a7a690 100644
+--- a/src/common/input.c
++++ b/src/common/input.c
+@@ -167,7 +167,14 @@ void z_read(void)
+ 		f_setup.err_report_repeat = 0;
+ 	}
+ 
+-	/* Supply default arguments */
++	/* Supply default arguments.  A read with fewer than three
++	 * operands has no timeout (Z-Machine Standard 1.1, 15: read);
++	 * without this, zargs[2] keeps whatever the previous instruction
++	 * left there.  Advent's "Are you sure you want to quit?" reads
++	 * with two operands right after an instruction that left 23865,
++	 * which made it a timed read of 2386.5 seconds. */
++	if (zargc < 3)
++		zargs[2] = 0;
+ 	if (zargc < 4)
+ 		zargs[3] = 0;
+ 
+diff --git a/src/common/missing.c b/src/common/missing.c
+index 3c369e33a5d415bef7678b739cc138a64ea38bcd..7fa3791b6a8893a7f85fa79f26ddb0b17c0f8a30 100644
+--- a/src/common/missing.c
++++ b/src/common/missing.c
+@@ -21,6 +21,7 @@
+ 
+ #include "frotz.h"
+ #include <stdlib.h>
++#include <string.h>
+ 
+ #ifdef NO_STRRCHR
+ char *my_strrchr(const char *s, int c)
+diff --git a/src/dumb/dfrotz.h b/src/dumb/dfrotz.h
+index 62fed4cf786041d3bd3f81894c74cc7183b4923b..4b0ca73330df65d4c6063cc4e7c8dc0ab29f96e3 100644
+--- a/src/dumb/dfrotz.h
++++ b/src/dumb/dfrotz.h
+@@ -24,7 +24,9 @@
+ #include <ctype.h>
+ #include <time.h>
+ 
++#ifndef HELIOS_PORT
+ #include <sys/param.h>
++#endif
+ 
+ #ifndef MAX
+ #define MAX(x,y) ((x)>(y)) ? (x) : (y)
+diff --git a/src/dumb/dinit.c b/src/dumb/dinit.c
+index 21aaf30e3230d7ee002720d1520b6bd2d044eb7a..6fb07219f3d8213c75a1f12a9a2626fe1edda304 100644
+--- a/src/dumb/dinit.c
++++ b/src/dumb/dinit.c
+@@ -57,7 +57,7 @@ While running, enter \"\\help\" to list the runtime escape sequences.\n"
+ static int user_text_width = 80;
+ static int user_text_height = 24;
+ static int user_random_seed = -1;
+-static bool plain_ascii = FALSE;
++extern bool plain_ascii;	/* doutput.c */
+ 
+ bool quiet_mode;
+ bool do_more_prompts;
+@@ -220,7 +220,7 @@ void os_process_arguments(int argc, char *argv[])
+ 	/* Save the story file name */
+ 	f_setup.story_file = strdup(argv[zoptind]);
+ 
+-#ifdef NO_BASENAME
++#if defined(NO_BASENAME) && !defined(HELIOS_PORT)
+ 	f_setup.story_name = strdup(f_setup.story_file);
+ #else
+ 	f_setup.story_name = strdup(basename(argv[zoptind]));
+@@ -241,6 +241,12 @@ void os_process_arguments(int argc, char *argv[])
+ 	p = strrchr(f_setup.story_name, '.');
+ 	if ( p != NULL )
+ 		*p = '\0';	/* extension removed */
++#ifdef HELIOS_PORT
++	/* Helios on the ATW800 keeps files on a GEMDOS disk (8.3 names):
++	 * keep default save/script/record names 8.3-safe. */
++	if (strlen(f_setup.story_name) > 8)
++		f_setup.story_name[8] = '\0';
++#endif
+ 
+ 	/* Create nice default file names */
+ 	f_setup.script_name = malloc((strlen(f_setup.story_name) + strlen(EXT_SCRIPT) + 1) * sizeof(char));
+@@ -385,6 +391,18 @@ FILE *os_load_story(void)
+ 	if (f_setup.exec_in_blorb)
+ 		fseek(fp, blorb_res.data.startpos, SEEK_SET);
+ 
++	return fp;
++#elif defined(HELIOS_PORT)
++	FILE *fp = fopen(f_setup.story_file, "rb");
++
++	/* As the curses frotz on Helios: a bare name is also looked for in
++	 * /helios/local/games. */
++	if (fp == NULL && strchr(f_setup.story_file, '/') == NULL) {
++		char path[PATH_MAX];
++
++		sprintf(path, "/helios/local/games/%.200s", f_setup.story_file);
++		fp = fopen(path, "rb");
++	}
+ 	return fp;
+ #else
+ 	return fopen(f_setup.story_file, "rb");
+diff --git a/src/dumb/doutput.c b/src/dumb/doutput.c
+index 80716284841c5ab655c526ca8a402592d85a941d..cdae6c1c76c62fc2d86871cce8238749559add88 100644
+--- a/src/dumb/doutput.c
++++ b/src/dumb/doutput.c
+@@ -29,7 +29,14 @@ static bool show_line_numbers = FALSE;
+ static bool show_line_types = FALSE;
+ static bool show_pictures = TRUE;
+ static bool visual_bell = TRUE;
+-static bool plain_ascii = FALSE;
++/* Shared with dinit.c (-p); upstream 2.55 had a separate static copy in
++ * each file, so -p never reached the output code.  Helios consoles (and
++ * the ATW800's Atari character set) are not Latin-1: default to ASCII. */
++#ifdef HELIOS_PORT
++bool plain_ascii = TRUE;
++#else
++bool plain_ascii = FALSE;
++#endif
+ 
+ static char latin1_to_ascii[] =
+ 	"    !   c   L   >o< Y   |   S   ''  C   a   <<  not -   R   _   "

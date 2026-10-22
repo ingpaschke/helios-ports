@@ -1,0 +1,226 @@
+Subject: Build font utilities on the host and generate the twm fallback configuration
+
+diff --git a/fonts/bdftosnf/bdftosnf.c b/fonts/bdftosnf/bdftosnf.c
+index 142c542b2f0e87e77cb77516506e29e1e1262e4e..d199b90cddf41884412081ddf580b8caa52b3182 100644
+--- a/fonts/bdftosnf/bdftosnf.c
++++ b/fonts/bdftosnf/bdftosnf.c
+@@ -4,7 +4,7 @@
+ #include <X11/Xos.h>
+ #include <errno.h> 
+ #include <ctype.h> 
+-/* #include <malloc.h> */	extern char *malloc(), *realloc();
++/* #include <malloc.h> */	
+ 
+ #include "misc.h"
+ #include <X11/X.h>
+@@ -39,7 +39,7 @@ int byteorder = DEFAULTBYTEORDER;
+  * read the next line and keep a count for error messages
+  */
+ char *
+-getline(s)
++bdf_getline(s)
+     char *s;
+ {
+     s = gets(s);
+@@ -436,16 +436,16 @@ main(argc, argv)
+     fi.glyphSets = 1;
+     fi.chDefault = 0;	/* may be overridden by a property */
+ 
+-    getline(linebuf);
++    bdf_getline(linebuf);
+ 
+     if ((sscanf(linebuf, "STARTFONT %s", namebuf) != 1) ||
+ 	!streq(namebuf, "2.1"))
+ 	fatal("bad 'STARTFONT'");
+-    getline(linebuf);
++    bdf_getline(linebuf);
+ 
+     if (sscanf(linebuf, "FONT %[^\n]", fontName) != 1)
+ 	fatal("bad 'FONT'");
+-    getline(linebuf);
++    bdf_getline(linebuf);
+ 
+     if (!prefix(linebuf, "SIZE"))
+ 	fatal("missing 'SIZE'");
+@@ -455,11 +455,11 @@ main(argc, argv)
+ 	fatal("SIZE values must be > 0");
+     if (xRes != yRes)
+         fatal("x and y resolution must be equal");
+-    getline(linebuf);
++    bdf_getline(linebuf);
+ 
+     if (!prefix(linebuf, "FONTBOUNDINGBOX"))
+ 	fatal("missing 'FONTBOUNDINGBOX'");
+-    getline(linebuf);
++    bdf_getline(linebuf);
+ 
+     if (prefix(linebuf, "STARTPROPERTIES")) {
+ 	int nprops;
+@@ -471,7 +471,7 @@ main(argc, argv)
+ 	pfp = (FontPropPtr)malloc((unsigned)(nprops+GENPROPS) *
+ 				  sizeof(FontPropRec));
+ 	font.pFP = pfp;
+-	getline(linebuf);
++	bdf_getline(linebuf);
+ 	while((nprops-- > 0) && !prefix(linebuf, "ENDPROPERTIES")) {
+ 
+ 	    switch (sscanf(linebuf, "%s%s%s", namebuf, secondbuf, thirdbuf) ) {
+@@ -520,7 +520,7 @@ main(argc, argv)
+ 	        pfp++;
+ 	    else
+ 		fi.nProps--;
+-	    getline(linebuf);
++	    bdf_getline(linebuf);
+ 	}
+ 	if (!prefix(linebuf, "ENDPROPERTIES"))
+ 	    fatal("missing 'ENDPROPERTIES'");
+@@ -573,13 +573,13 @@ main(argc, argv)
+     } else { /* no properties */
+ 	fatal("missing 'STARTPROPERTIES'");
+     }
+-    getline(linebuf);
++    bdf_getline(linebuf);
+ 
+     if (sscanf(linebuf, "CHARS %d", &nchars) != 1)
+ 	fatal("bad 'CHARS'");
+     if (nchars < 1)
+ 	fatal("invalid number of CHARS");
+-    getline(linebuf);
++    bdf_getline(linebuf);
+ 
+     while ((nchars-- > 0) && prefix(linebuf, "STARTCHAR"))  {
+         int	t;
+@@ -598,7 +598,7 @@ main(argc, argv)
+ 	if (sscanf(linebuf, "STARTCHAR %s", charName) != 1)
+ 	    fatal("bad character name");
+ 
+-	getline( linebuf);
++	bdf_getline( linebuf);
+ 	if ((t=sscanf(linebuf, "ENCODING %d %d", &enc, &enc2)) < 1)
+ 	    fatal("bad 'ENCODING'");
+ 	if ((enc < -1) || ((t == 2) && (enc2 < -1)))
+@@ -608,11 +608,11 @@ main(argc, argv)
+ 	if (enc == -1) {
+ 	    if (ignoredcharwarn) warning("character '%s' ignored\n", charName);
+ 	    do {
+-	    	char *s = getline(linebuf);
++	    	char *s = bdf_getline(linebuf);
+ 		if (!s)
+ 		    fatal("Unexpected EOF");
+ 	    } while (!prefix(linebuf, "ENDCHAR"));
+-	    getline(linebuf);
++	    bdf_getline(linebuf);
+ 	    continue;
+ 	}
+ 	if (enc > MAXENCODING)
+@@ -630,26 +630,26 @@ main(argc, argv)
+ 	    bzero((char *)cinfos[char_row], sizeof(CharInfoRec)*INDICES);
+ 	}
+ 
+-	getline( linebuf);
++	bdf_getline( linebuf);
+ 	if (sscanf( linebuf, "SWIDTH %d %d", &wx, &wy) != 2)
+ 	    fatal("bad 'SWIDTH'");
+ 	if (wy != 0)
+ 	    fatal("SWIDTH y value must be zero");
+ 
+-	getline( linebuf);
++	bdf_getline( linebuf);
+ 	if (sscanf( linebuf, "DWIDTH %d %d", &wx, &wy) != 2)
+ 	    fatal("bad 'DWIDTH'");
+ 	if (wy != 0)
+ 	    fatal("DWIDTH y value must be zero");
+ 
+-	getline( linebuf);
++	bdf_getline( linebuf);
+ 	if (sscanf( linebuf, "BBX %d %d %d %d", &bw, &bh, &bl, &bb) != 4)
+ 	    fatal("bad 'BBX'");
+ 	if ((bh < 0) || (bw < 0))
+ 	    fatal("character '%s' has a negative sized bitmap, %dx%d", 
+ 	    	  charName, bw, bh);
+ 
+-	getline( linebuf);
++	bdf_getline( linebuf);
+ 	if (prefix(linebuf, "ATTRIBUTES"))
+ 	{
+ 	    for (p = linebuf + strlen("ATTRIBUTES ");
+@@ -657,7 +657,7 @@ main(argc, argv)
+ 		p ++)
+ 		/* empty for loop */ ;
+ 	    attributes = hexbyte(p)<< 8 + hexbyte(p+2);
+-	    getline( linebuf);	/* set up for BITMAP which follows */
++	    bdf_getline( linebuf);	/* set up for BITMAP which follows */
+ 	}
+ 	else
+ 	    attributes = 0;
+@@ -689,7 +689,7 @@ main(argc, argv)
+ 	hexperrow = (bw + 7) >> 3;
+ 	if (hexperrow == 0) hexperrow = 1;
+ 	for (row=0; row < bh; row++) {
+-	    getline(linebuf);
++	    bdf_getline(linebuf);
+ 	    p = linebuf;
+ 	    t = strlen(p);
+ 	    if (t & 1)
+@@ -727,11 +727,11 @@ main(argc, argv)
+ 	if (badbits)
+ 	    warning("character '%s' has bits outside bounding box ignored",
+ 		    charName);
+-	getline( linebuf);
++	bdf_getline( linebuf);
+ 	if (!prefix(linebuf, "ENDCHAR"))
+             fatal("missing 'ENDCHAR'");
+ 	nGl++;
+-	getline( linebuf);		/* get STARTCHAR or ENDFONT */
++	bdf_getline( linebuf);		/* get STARTCHAR or ENDFONT */
+     }
+ 
+     if (nchars != -1)
+diff --git a/fonts/bdftosnf/fontutil.c b/fonts/bdftosnf/fontutil.c
+index 1ad9717f0253354ec7140a1ed026a54d49096131..fd7b4d2c6b8622e13f711511dcf6fdf328b95e8b 100644
+--- a/fonts/bdftosnf/fontutil.c
++++ b/fonts/bdftosnf/fontutil.c
+@@ -11,7 +11,7 @@
+ #include "port.h"	/* used by converters only */
+ #include "bdftosnf.h"	/* used by converters only */
+ 
+-char *	malloc();
++
+ 
+ static void computeInk(), computeInkMetrics();
+ 
+diff --git a/fonts/bdftosnf/showsnf.c b/fonts/bdftosnf/showsnf.c
+index a41a036305a61d6dc3755d0923c7939107467668..6272383c89912d0a473f05a015ae54783d903c8d 100644
+--- a/fonts/bdftosnf/showsnf.c
++++ b/fonts/bdftosnf/showsnf.c
+@@ -6,7 +6,7 @@ static char	*rcsid = "$XConsortium: showsnf.c,v 1.15 89/12/12 20:48:27 rws Exp $
+ #include <X11/Xos.h>
+ #include <sys/stat.h> 
+ #include <errno.h> 
+-/* #include <malloc.h> */	extern char *malloc(), *realloc();
++/* #include <malloc.h> */	
+ 
+ #include "misc.h"
+ #include <X11/Xmd.h>
+diff --git a/fonts/mkfontdir/mkfontdir.c b/fonts/mkfontdir/mkfontdir.c
+index 7090475c10437796903051386751124d1dcc5669..78398893b259280ce76104ebc25098ada2e93aea 100644
+--- a/fonts/mkfontdir/mkfontdir.c
++++ b/fonts/mkfontdir/mkfontdir.c
+@@ -329,7 +329,7 @@ unsigned long *
+ Xalloc (n)
+ unsigned long	n;
+ {
+-	extern char	*malloc ();
++	
+ 
+ 	return (unsigned long *) malloc ((unsigned) n);
+ }
+@@ -339,7 +339,7 @@ Xrealloc (l, n)
+ unsigned char	*l;
+ unsigned long	n;
+ {
+-	extern char	*realloc ();
++	
+ 
+ 	return (unsigned long *) realloc ((char *) l, (unsigned) n);
+ }

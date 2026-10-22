@@ -1,0 +1,68 @@
+Subject: Configure the X11 interface and verify its application resources
+
+diff --git a/win/X11/winX.c b/win/X11/winX.c
+index 3b8a269ad5499e192ac63dc35c0b4d5022149c7b..6d0897b308fe1af8b183df6ba277bb70eb786497 100644
+--- a/win/X11/winX.c
++++ b/win/X11/winX.c
+@@ -1,3 +1,4 @@
++/* Modified for the Helios port, 2026-10-09 and 2026-10-10. See sys/helios/README.txt. */
+ /*	SCCS Id: @(#)winX.c	3.1	93/02/17		  */
+ /* Copyright (c) Dean Luick, 1992				  */
+ /* NetHack may be freely redistributed.  See license for details. */
+@@ -43,6 +44,10 @@
+ #include "hack.h"
+ #include "winX.h"
+ 
++#ifdef HELIOS
++extern void Delay();
++#endif
++
+ /* Should be defined in <X11/Intrinsic.h> but you never know */
+ #ifndef XtSpecificationRelease
+ #define XtSpecificationRelease 0
+@@ -818,6 +823,15 @@ X11_init_nhwindows()
+ 	0
+     };
+     static const char *av[] = { "nethack" };
++#ifdef HELIOS
++    static String fallback_resources[] = {
++	"NetHack*font: fixed",
++	"NetHack*map*font: fixed",
++	"NetHack*display_file*font: fixed",
++	"NetHack*tombstone*font: fixed",
++	(String)0
++    };
++#endif
+     register const char **pp;
+     int i;
+     Cardinal num_args;
+@@ -837,7 +851,11 @@ X11_init_nhwindows()
+ 		    "NetHack",		/* application class */
+ 		    (XrmOptionDescList)0, 0,	/* options list */
+ 		    &i, av,		/* command line args */
++#ifdef HELIOS
++		    fallback_resources,
++#else
+ 		    (String *)0,	/* fallback resources */
++#endif
+ 		    (ArgList)args, num_args);
+     XtOverrideTranslations(toplevel,
+ 	XtParseTranslationTable("<Message>WM_PROTOCOLS: X11_hangup()"));
+@@ -949,6 +967,17 @@ X11_delay_output()
+ {
+     if (!x_inited) return;
+ 
++#ifdef HELIOS
++    /*
++     * Helios times out message waits only once a second, so a 30 ms Xt
++     * timer fires up to a second late, and select() returns early only
++     * when other events arrive.  Send the drawing and sleep instead.
++     */
++    XSync(XtDisplay(toplevel), False);
++    Delay(30000L);			/* microseconds */
++    return;
++#endif
++
+     (void) XtAppAddTimeOut(app_context, 30L, d_timeout, (XtPointer) 0);
+ 
+     /* The timeout function will enable the event loop exit. */

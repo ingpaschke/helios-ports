@@ -1,0 +1,89 @@
+{
+  "format": 1,
+  "name": "xterm-tty",
+  "version": "Helios-NG ttyserv with xterm terminal adapter",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/axelmuhr/Helios-NG.git",
+    "revision": "1fe8f65ee15407945e5a1a25f39f88de64de0d50",
+    "subdirectory": "servers/ttyserv/ttyserv",
+    "include": [
+      "ttylib.c",
+      "setterm.c",
+      "input.c",
+      "termcap.c",
+      "globals.c",
+      "ttydev.c",
+      "terminal.c",
+      "tty.c",
+      "ansi.c",
+      "ttydev.h",
+      "tty.h"
+    ],
+    "tree_sha256": "255134bf76e8b417be55ae37c9478ca9ff909d7e20a9a06ede3653734075a028"
+  },
+  "patches": [
+    {
+      "file": "01-helios.patch",
+      "description": "Report terminal dimensions and deliver resize notifications",
+      "sha256": "374ed08d4db85b6aed7503a7e6e168d33c0262215bacc88db06783cb6c86227f"
+    }
+  ],
+  "patched_tree_sha256": "113d63aff935d892e4120c565e05b848b51a63edfcdd7bdf5eca36d3654efa24",
+  "dependencies": [],
+  "build": {
+    "groups": [
+      {
+        "name": "tty",
+        "sources": [
+          "${src}/globals.c",
+          "${src}/termcap.c",
+          "${src}/input.c",
+          "${src}/terminal.c",
+          "${src}/ansi.c",
+          "${src}/tty.c",
+          "${src}/ttydev.c"
+        ],
+        "flags": [
+          "-D_BSD",
+          "-D__HELIOS",
+          "-D__TRAN",
+          "-D__HELIOSTRAN"
+        ],
+        "compiler": "hcc",
+        "includes": [
+          "${sdk}/include",
+          "${src}"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "xterm-ttyserv",
+        "type": "executable",
+        "groups": [
+          "tty"
+        ],
+        "libraries": [
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${work}/xterm-ttyserv",
+        "heap": 4000,
+        "start": "${sdk}/lib/cstart.o",
+        "objects": [
+          "${sdk}/lib/servlib.def"
+        ]
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${work}/xterm-ttyserv",
+        "destination": "${stage}/lib/xterm-ttyserv"
+      }
+    ]
+  }
+}

@@ -1,0 +1,309 @@
+Subject: Adapt filenames, locking and runtime services to Helios
+
+diff --git a/include/config.h b/include/config.h
+index 9bbf31b8cf94b78706ea63772d78fb098f374f2e..41054c35f56016088845512dd6ed682e6bf3a7ea 100644
+--- a/include/config.h
++++ b/include/config.h
+@@ -1,3 +1,4 @@
++/* Modified for the Helios port, 2026-10-09. See sys/helios/README.txt. */
+ /*	SCCS Id: @(#)config.h	3.1	92/08/29	*/
+ /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
+ /* NetHack may be freely redistributed.  See license for details. */
+@@ -188,7 +189,12 @@
+  * Define all of those you want supported in your binary.
+  * Some combinations make no sense.  See the installation document.
+  */
++#ifdef HELIOS
++# define X11_GRAPHICS
++# define DEFAULT_WINDOW_SYS "X11"
++#else
+ #define TTY_GRAPHICS	/* good old tty based graphics */
++#endif
+ /* #define X11_GRAPHICS	/* X11 interface */
+ 
+ /*
+@@ -259,7 +265,7 @@
+  *	compression.
+  */
+ 
+-#ifdef UNIX
++#if defined(UNIX) && !defined(HELIOS)
+ /* path and file name extension for compression program */
+ # define COMPRESS "/usr/ucb/compress"	     /* Lempel-Ziv compression */
+ # define COMPRESS_EXTENSION ".Z"	     /* compress's extension */
+@@ -288,7 +294,13 @@
+  * If you define HACKDIR, then this will be the default playground;
+  * otherwise it will be the current directory.
+  */
+-#define HACKDIR "/usr/games/lib/nethackdir" 	/* nethack directory */
++#ifndef HACKDIR
++# ifdef HELIOS
++#  define HACKDIR "/helios/local/games/nh313"
++# else
++#  define HACKDIR "/usr/games/lib/nethackdir"
++# endif
++#endif
+ 
+ /*
+  * Some system administrators are stupid enough to make Hack suid root
+diff --git a/include/system.h b/include/system.h
+index e334297d4e2566a0e2526e47a0b2f17017814240..ce5c3317cfb8d3e7937d1bafb618a60c680d14a7 100644
+--- a/include/system.h
++++ b/include/system.h
+@@ -1,3 +1,4 @@
++/* Modified for the Helios port, 2026-10-09. See sys/helios/README.txt. */
+ /*	SCCS Id: @(#)system.h 3.1	92/12/11	*/
+ /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
+ /* NetHack may be freely redistributed.  See license for details. */
+@@ -5,6 +6,24 @@
+ #ifndef SYSTEM_H
+ #define SYSTEM_H
+ 
++#ifdef HELIOS
++/* Use the actual SDK declarations, including its non-const POSIX arguments. */
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <time.h>
++#define SIG_RET_TYPE void (*)()
++#define Sprintf (void) sprintf
++#define Strcat (void) strcat
++#define Strcpy (void) strcpy
++#define Vprintf (void) vprintf
++#define Vfprintf (void) vfprintf
++#define Vsprintf (void) vsprintf
++#else
++
+ #ifndef __GO32__  /* djgpp compiler for msdos */
+ 
+ #define E extern
+@@ -484,4 +503,5 @@ E int FDECL(atoi, (const char *));
+ 
+ #endif /* __GO32__ */
+ 
++#endif /* !HELIOS */
+ #endif /* SYSTEM_H */
+diff --git a/include/unixconf.h b/include/unixconf.h
+index cf9204be7c3d46195cf76279ff94bcd8fba6040d..cb65c3f90f8a824d252884713b4424b2087859b5 100644
+--- a/include/unixconf.h
++++ b/include/unixconf.h
+@@ -1,3 +1,4 @@
++/* Modified for the Helios port, 2026-10-09. See sys/helios/README.txt. */
+ /*	SCCS Id: @(#)unixconf.h	3.1	90/22/02	*/
+ /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
+ /* NetHack may be freely redistributed.  See license for details. */
+@@ -6,6 +7,10 @@
+ #ifndef UNIXCONF_H
+ #define UNIXCONF_H
+ 
++#ifdef HELIOS
++#include "heliosconf.h"
++#else
++
+ /*
+  * Some include files are in a different place under SYSV
+  *	BSD		   SYSV
+@@ -257,5 +262,6 @@
+ # undef hc
+ #endif
+ 
++#endif /* !HELIOS */
+ #endif /* UNIXCONF_H */
+ #endif /* UNIX */
+diff --git a/src/files.c b/src/files.c
+index c6c701a98a73e23ef2bdc9287ff6d481e8875571..d182a659d63c642ec0c8662e15a45d472acd4521 100644
+--- a/src/files.c
++++ b/src/files.c
+@@ -1,3 +1,4 @@
++/* Modified for the Helios port, 2026-10-09. See sys/helios/README.txt. */
+ /*	SCCS Id: @(#)files.c	3.1	93/06/27	*/
+ /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
+ /* NetHack may be freely redistributed.  See license for details. */
+@@ -73,6 +74,10 @@ fopen_datafile(filename, mode)
+ const char *filename, *mode;
+ {
+ 	FILE *fp;
++#ifdef HELIOS
++	/* Data offsets count bytes; DOS-backed I/O servers translate text streams. */
++	if (!strcmp(mode, "r")) mode = "rb";
++#endif
+ #ifdef AMIGA
+ 	fp = fopenp(filename, mode);
+ #else
+@@ -587,6 +592,8 @@ const char *filename;
+ 	if (semi_colon) *semi_colon = '\0';
+       }
+ 	Strcat(lockname, ".lock;1");
++# elif defined(HELIOS)
++	Strcat(lockname, ".lck");
+ # else
+ 	Strcat(lockname, "_lock");
+ # endif
+@@ -681,11 +688,13 @@ const char *filename;
+ 
+ 	lockname = make_lockname(filename);
+ 
+-	if (unlink(lockname) < 0)
+-		HUP raw_printf("Can't unlink %s.", lockname);
+ # ifdef NO_FILE_LINKS
++	/* DOS-backed Helios servers cannot delete an open file.  The name
++	 * still excludes other lockers until unlink() removes it. */
+ 	(void) close(lockfd);
+ # endif
++	if (unlink(lockname) < 0)
++		HUP raw_printf("Can't unlink %s.", lockname);
+ 
+ #endif  /* UNIX || VMS */
+ }
+@@ -696,7 +705,9 @@ const char *filename;
+ /* ----------  BEGIN CONFIG FILE HANDLING ----------- */
+ 
+ const char *configfile =
+-#ifdef UNIX
++#ifdef HELIOS
++			"nethack.cnf";
++#elif defined(UNIX)
+ 			".nethackrc";
+ #else
+ # ifdef MAC
+@@ -726,7 +737,13 @@ const char *filename;
+ 	/* "filename" is an environment variable, so it should hang around */
+ 	if (filename) {
+ #ifdef UNIX
+-		if (access(filename, 4) == -1) {
++		if (access(filename,
++#ifdef HELIOS
++			   R_OK
++#else
++			   4
++#endif
++			   ) == -1) {
+ 			/* 4 is R_OK on newer systems */
+ 			/* nasty sneaky attempt to read file through
+ 			 * NetHack's setuid permissions -- this is the only
+@@ -761,6 +778,14 @@ const char *filename;
+ 	Sprintf(tmp_config, "%s%s", getenv("HOME"), "NetHack.cnf");
+ 	if ((fp = fopenp(tmp_config, "r")) != (FILE *)0)
+ 		return(fp);
++# elif defined(HELIOS)
++	if (getenv("HOME")) {
++	    Sprintf(tmp_config, "%s/nethack.cnf", getenv("HOME"));
++	    if ((fp = fopenp(tmp_config, "r")) != (FILE *)0)
++		return(fp);
++	}
++	if ((fp = fopenp(HACKDIR "/nethack.cnf", "r")) != (FILE *)0)
++		return(fp);
+ # else	/* should be only UNIX left */
+ 	Sprintf(tmp_config, "%s/%s", getenv("HOME"), ".nethackrc");
+ 	if ((fp = fopenp(tmp_config, "r")) != (FILE *)0)
+diff --git a/src/hacklib.c b/src/hacklib.c
+index 534c0f69d426f1b3bd7311f7f488e1296b68eaec..8876aba3e4bb5dba49770703fc51e6df9bb15deb 100644
+--- a/src/hacklib.c
++++ b/src/hacklib.c
+@@ -1,3 +1,4 @@
++/* Modified for the Helios port, 2026-10-09. See sys/helios/README.txt. */
+ /*	SCCS Id: @(#)hacklib.c	 3.1	 91/11/25	*/
+ /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
+ /* Copyright (c) Robert Patrick Rankin, 1991		  */
+@@ -458,8 +459,8 @@ get_date()
+ 	Static char datestr[7];
+ 	register struct tm *lt = getlt();
+ 
+-	Sprintf(datestr, "%2d%2d%2d",
+-		lt->tm_year, lt->tm_mon + 1, lt->tm_mday);
++	Sprintf(datestr, "%02d%02d%02d",
++		lt->tm_year % 100, lt->tm_mon + 1, lt->tm_mday);
+ 	if(datestr[2] == ' ') datestr[2] = '0';
+ 	if(datestr[4] == ' ') datestr[4] = '0';
+ 	return(datestr);
+diff --git a/sys/unix/unixunix.c b/sys/unix/unixunix.c
+index 8cb6b54272f28daa0d4cd31c7b74e5a6637977cc..39abef7768c82532fe86a8177df20b3c26347890 100644
+--- a/sys/unix/unixunix.c
++++ b/sys/unix/unixunix.c
+@@ -1,3 +1,4 @@
++/* Modified for the Helios port, 2026-10-09. See sys/helios/README.txt. */
+ /*	SCCS Id: @(#)unixunix.c	3.1	90/22/02
+ /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
+ /* NetHack may be freely redistributed.  See license for details. */
+@@ -12,6 +13,12 @@
+ #include <fcntl.h>
+ #endif
+ #include <signal.h>
++#if defined(HELIOS) && !defined(HELIOS_HOST_TOOLS)
++#include "../helios/tasklock.h"
++#endif
++#ifndef O_RDONLY
++#define O_RDONLY 0 /* historical Unix headers did not always expose this */
++#endif
+ #if defined(BSD) || defined(ULTRIX)
+ #include <sys/wait.h>
+ #endif
+@@ -102,6 +109,16 @@ int fd;
+ 	time_t date;
+ 
+ 	if(fstat(fd, &buf)) return(0);			/* cannot get status */
++#if defined(HELIOS) && !defined(HELIOS_HOST_TOOLS)
++        {
++            int live=helios_lock_live(lock);
++            if (live==1) return 0;
++            if (live==0) { close(fd); return 1; }
++            /* Old installations have no native owner record. Never infer
++             * liveness from their task-local PID or erase them by age. */
++            return 0;
++        }
++#endif
+ #ifndef INSURANCE
+ 	if(buf.st_size != sizeof(int)) return(0);	/* not an xlock file */
+ #endif
+@@ -188,7 +205,7 @@ getlock()
+ 		do {
+ 			lock[0] = 'a' + i++;
+ 
+-			if((fd = open(lock, 0)) == -1) {
++			if((fd = open(lock, O_RDONLY)) == -1) {
+ 			    if(errno == ENOENT) goto gotlock; /* no such file */
+ 			    perror(lock);
+ 			    unlock_file(HLOCK);
+@@ -204,7 +221,7 @@ getlock()
+ 		unlock_file(HLOCK);
+ 		error("Too many hacks running now.");
+ 	} else {
+-		if((fd = open(lock, 0)) == -1) {
++		if((fd = open(lock, O_RDONLY)) == -1) {
+ 			if(errno == ENOENT) goto gotlock;    /* no such file */
+ 			perror(lock);
+ 			unlock_file(HLOCK);
+@@ -241,7 +258,6 @@ getlock()
+ 
+ gotlock:
+ 	fd = creat(lock, FCMASK);
+-	unlock_file(HLOCK);
+ 	if(fd == -1) {
+ 		error("cannot creat lock file.");
+ 	} else {
+@@ -252,7 +268,11 @@ gotlock:
+ 		if(close(fd) == -1) {
+ 			error("cannot close lock");
+ 		}
++#if defined(HELIOS) && !defined(HELIOS_HOST_TOOLS)
++                if (!helios_write_owner(lock)) error("cannot write native task owner");
++#endif
+ 	}
++        unlock_file(HLOCK);
+ }	
+ 
+ void
+@@ -266,6 +286,10 @@ register char *s;
+ 
+ 	while((lp=index(s, '.')) || (lp=index(s, '/')) || (lp=index(s,' ')))
+ 		*lp = '_';
++#ifdef HELIOS
++	/* Atari and PC I/O servers expose DOS 8.3 filenames. */
++	if (strlen(s) > 8) s[8] = '\0';
++#endif
+ #if defined(SYSV) && !defined(AIX_31)
+ 	/* avoid problems with 14 character file name limit */
+ # ifdef COMPRESS

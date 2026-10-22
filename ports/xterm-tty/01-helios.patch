@@ -1,0 +1,83 @@
+Subject: Report terminal dimensions and deliver resize notifications
+
+diff --git a/terminal.c b/terminal.c
+index 3b3ea0b6c1bd9c6611c9d983f28d808dae38bebc..34632c18c291aefe49ee22207fc221bfea29955f 100644
+--- a/terminal.c
++++ b/terminal.c
+@@ -133,7 +133,7 @@ TermPutString (char *str)
+  *
+  ************************************************************************/
+ 
+-static void
++void
+ TermPutData (char *data, int count)
+ {
+ #ifdef	DEBUG
+diff --git a/tty.c b/tty.c
+index 8a22dc19ce53c3c926b7fe4b105d7b69c1fb1895..c1bbd4b513e6f44b565a161d655c72687dbb1b95 100644
+--- a/tty.c
++++ b/tty.c
+@@ -1208,6 +1208,10 @@ ReadRaw (Window *w, char *buffer, int count, int timeout, word *rc)
+ 	    	return result;
+ 	    }
+ #endif
++            /* A raw terminal read may be short. Once input has arrived,
++             * return the available batch; never wait to fill the caller's
++             * buffer (Irssi and stdio commonly request hundreds of bytes). */
++            if (result > 0) break;
+ 	    Delay (tstep);		/* sleep a little bit,		*/
+ 	    if ((timeout -= (int)tstep) < 0)	/* then check for timeout :	*/
+ 		break;			/* reached, so break		*/
+@@ -1440,7 +1444,9 @@ WriteData (Window *w, char *data, int count)
+     char	ch;
+ 
+     if (w->raw_out)
+-	AnsiWriteData (s, data, count);
++        /* xterm owns raw terminal interpretation, including OSC/private CSI.
++         * The general-purpose ttyserv ANSI renderer strips those sequences. */
++        TermPutData(data,count);
+     else
+     {
+ 	while ((count)--)
+@@ -1930,6 +1936,7 @@ void
+ DeviceWindowSetInfo (Attributes *a)
+ {
+     Window *w = Cur_Window;
++    int resized = 0;
+     
+     unless (w)
+     	return;
+@@ -1966,6 +1973,7 @@ DeviceWindowSetInfo (Attributes *a)
+ 	Window *	wp;
+ 
+ 	
++	resized = 1;
+ 	term_rows = w->Attribs.Min;
+ 	term_cols = w->Attribs.Time;
+ 
+@@ -2005,6 +2013,15 @@ DeviceWindowSetInfo (Attributes *a)
+ #endif
+ 
+     Signal (&Attr_Lock);
++    /* POSIX owns the event port of the foreground terminal process. The KTM
++     * POSIX library recognizes this signal notification separately from ^C. */
++    if (resized && w->EventPort != NullPort) {
++        MCB event;
++        InitMCB(&event, MsgHdr_Flags_preserve, w->EventPort, NullPort,
++                ErrBit | EG_Exception | EE_Signal | SIGWINCH);
++        event.Timeout = OneSec;
++        PutMsg(&event);
++    }
+ }
+ 
+ 
+diff --git a/tty.h b/tty.h
+index 98333f1ad7704cfbdba43063701a153be2b1ad09..2a32c442014c6d4c36b55f1b809a0d0c3746a7b8 100644
+--- a/tty.h
++++ b/tty.h
+@@ -344,3 +344,5 @@ extern void		WindowEnableEvents ( MCB *m, Window *w, int *id );
+ #endif
+ 
+ /*--- end of tty.h ---*/
++
++extern void TermPutData(char *, int);

@@ -1,0 +1,81 @@
+Subject: Use native socket readiness, name resolution and TLS
+
+diff --git a/src/sltcp.c b/src/sltcp.c
+index 40ada13af3e1b6b7893fd95aabf9289c05676864..866206c62e0dfb0a21d94a4cb40961a6838f1052 100644
+--- a/src/sltcp.c
++++ b/src/sltcp.c
+@@ -153,9 +153,9 @@ struct _SLTCP_Type
+ # define SLTCP_READ(x,y,z)	recv((x),(y),(z),0)
+ # define SLTCP_WRITE(x,y,z)	send((x),(y),(z),0)
+ #else
+-# define SLTCP_CLOSE(x)		close(x)
+-# define SLTCP_READ(x,y,z)	read((x),(y),(z))
+-# define SLTCP_WRITE(x,y,z)	write((x),(y),(z))
++# define SLTCP_CLOSE(x)		hu_tls_fd_close(x)
++# define SLTCP_READ(x,y,z)	hu_tls_fd_read((x),(y),(z))
++# define SLTCP_WRITE(x,y,z)	hu_tls_fd_write((x),(y),(z))
+ #endif
+ 
+ int (*SLTCP_Interrupt_Hook) (void);
+@@ -640,8 +640,7 @@ SLTCP_Type *sltcp_open_connection (char *host, int port, int use_ssl) /*{{{*/
+ 	if (NULL == (ssl = alloc_ssl ()))
+ 	  return NULL;
+ #else
+-	print_error (_("\n\n*** This program does not support SSL\n"));
+-	return NULL;
++        /* The portable TLS adapter handles this connection below. */
+ #endif
+      }
+ 
+@@ -671,6 +670,14 @@ SLTCP_Type *sltcp_open_connection (char *host, int port, int use_ssl) /*{{{*/
+      }
+ 
+    tcp->tcp_fd = fd;
++   if(use_ssl) {
++       struct hu_tls_info info;
++       memset(&info,0,sizeof(info));
++       if(hu_tls_fd_connect(fd,host,30000,&info)<0) {
++           print_error("TLS: %s\n",info.message[0]?info.message:strerror(errno));
++           sltcp_close(tcp);return NULL;
++       }
++   }
+ 
+ #if SLTCP_HAS_SSL_SUPPORT
+    if (ssl == NULL)
+@@ -787,10 +794,15 @@ static unsigned int do_write (SLTCP_Type *tcp, unsigned char *buf, unsigned int
+ 
+    while (total != len)
+      {
+-	nwrite = SLTCP_WRITE (fd, (char *) buf, (len - total));
++	nwrite = SLTCP_WRITE (fd, (char *) buf + total, (len - total));
+ 
++	if (nwrite == 0) break;
+ 	if (nwrite == -1)
+ 	  {
++            if (hu_tls_fd_get(fd) && (errno==EAGAIN || errno==EWOULDBLOCK)) {
++                if (hu_tls_wait(hu_tls_fd_get(fd),HU_TLS_WRITE,SLtcp_TimeOut_Secs*1000)<=0) break;
++                continue;
++            }
+ 	     if (-1 == check_errno ())
+ 	       break;
+ 	     continue;
+@@ -909,7 +921,7 @@ static int wait_for_input (SLTCP_Type *tcp) /*{{{*/
+ 	tv.tv_sec = SLtcp_TimeOut_Secs;
+ 	tv.tv_usec = 0;
+ 
+-	ret = select(fd + 1, &fds, NULL, NULL, &tv);
++	ret = hu_tls_fd_select(fd + 1, &fds, NULL, NULL, &tv);
+ 
+ 	if (ret > 0)
+ 	  return 0;
+@@ -987,6 +999,10 @@ static int do_read (SLTCP_Type *tcp) /*{{{*/
+ #endif
+      while (-1 == (nread = SLTCP_READ (fd, (char *)tcp->tcp_read_ptr, SLTCP_BUF_SIZE)))
+        {
++	  if (hu_tls_fd_get(fd) && (errno==EAGAIN || errno==EWOULDBLOCK)) {
++             if (-1 == wait_for_input(tcp)) return -1;
++             continue;
++          }
+ 	  if (-1 == check_errno ())
+ 	    return -1;
+        }

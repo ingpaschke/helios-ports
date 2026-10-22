@@ -1,0 +1,15 @@
+Subject: Select supported features and install terminal and newsreader defaults
+
+diff --git a/src/version.c b/src/version.c
+index 10b81af83dcb6e473d6abac0b523c2370841bf6a..f6edc53a9befc34e6d0f6a9330d4a6905bb25e05 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -65,7 +65,7 @@ static Compile_Option_Type External_Lib_Options [] =
+ {
+    {"canlock",			SLRN_HAS_CANLOCK},
+    {"inews",			SLRN_HAS_INEWS_SUPPORT},
+-   {"ssl",			SLTCP_HAS_SSL_SUPPORT},
++   {"ssl (Helios TLS)",		1},
+    {"uudeview",    		SLRN_HAS_UUDEVIEW},
+ #ifdef HAVE_ICONV
+    {"iconv",			1},

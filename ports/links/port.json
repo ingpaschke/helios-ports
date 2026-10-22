@@ -1,0 +1,172 @@
+{
+  "format": 1,
+  "name": "links",
+  "version": "2.30",
+  "upstream": {
+    "kind": "archive",
+    "url": "https://links.twibright.com/download/links-2.30.tar.gz",
+    "filename": "links-2.30.tar.gz",
+    "sha256": "7f0d54f4f7d1f094c25c9cbd657f98bc998311122563b1d757c9aeb1d3423b9e",
+    "subdirectory": "links-2.30",
+    "tree_sha256": "7fcd67b646d57918af9a014e67432673b20784b71a8dd47ceae0a73bfd6a40df"
+  },
+  "patches": [
+    {
+      "file": "01-platform.patch",
+      "description": "Adapt the event loop, terminal and platform operations to Helios",
+      "sha256": "cec09f9d210004c8386324489d352c7a9a4d9ce856e9898483f8dba2b6c0781d"
+    },
+    {
+      "file": "02-network.patch",
+      "description": "Adapt DNS and HTTPS to the helios-unix resolver and TLS provider",
+      "sha256": "8c5b5b770be63e4214f5ec57251c23cc018860370d9b303f9e765060a1ad895c"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "17099157e61f5ecbaab4edd74e2d1aeb88376cde799961611c49566dfc8d78ba",
+  "dependencies": [],
+  "requires_compat": true,
+  "build": {
+    "groups": [
+      {
+        "name": "links",
+        "sources": [
+          "${src}/af_unix.c",
+          "${src}/avif.c",
+          "${src}/auth.c",
+          "${src}/beos.c",
+          "${src}/bfu.c",
+          "${src}/block.c",
+          "${src}/bookmark.c",
+          "${src}/cache.c",
+          "${src}/charsets.c",
+          "${src}/compress.c",
+          "${src}/connect.c",
+          "${src}/cookies.c",
+          "${src}/data.c",
+          "${src}/default.c",
+          "${src}/dip.c",
+          "${src}/directfb.c",
+          "${src}/dither.c",
+          "${src}/dns.c",
+          "${src}/doh.c",
+          "${src}/dos.c",
+          "${src}/drivers.c",
+          "${src}/error.c",
+          "${src}/file.c",
+          "${src}/finger.c",
+          "${src}/fn_impl.c",
+          "${src}/fontconf.c",
+          "${src}/font_inc.c",
+          "${src}/framebuf.c",
+          "${src}/freetype.c",
+          "${src}/ftp.c",
+          "${src}/gif.c",
+          "${src}/grx.c",
+          "${src}/hpux.c",
+          "${src}/html.c",
+          "${src}/html_gr.c",
+          "${src}/html_r.c",
+          "${src}/html_tbl.c",
+          "${src}/http.c",
+          "${src}/https.c",
+          "${src}/img.c",
+          "${src}/imgcache.c",
+          "${src}/jpeg.c",
+          "${src}/jsint.c",
+          "${src}/kbd.c",
+          "${src}/language.c",
+          "${src}/listedit.c",
+          "${src}/lru.c",
+          "${src}/mailto.c",
+          "${src}/main.c",
+          "${src}/memory.c",
+          "${src}/menu.c",
+          "${src}/objreq.c",
+          "${src}/os_dep.c",
+          "${src}/pmshell.c",
+          "${src}/png.c",
+          "${src}/sched.c",
+          "${src}/select.c",
+          "${src}/session.c",
+          "${src}/smb.c",
+          "${src}/string.c",
+          "${src}/suffix.c",
+          "${src}/svg.c",
+          "${src}/svgalib.c",
+          "${src}/terminal.c",
+          "${src}/tiff.c",
+          "${src}/types.c",
+          "${src}/url.c",
+          "${src}/view.c",
+          "${src}/view_gr.c",
+          "${src}/vms.c",
+          "${src}/webp.c",
+          "${src}/x.c",
+          "${src}/xbm.c",
+          "${src}/helios/platform.c"
+        ],
+        "flags": [
+          "-std=gnu89",
+          "-Dhelios",
+          "-D_BSD",
+          "-DHAVE_CONFIG_H",
+          "-Wno-error=implicit-function-declaration",
+          "-Wno-error=int-conversion",
+          "-Wno-error=incompatible-pointer-types",
+          "-I${compat}/include/helios-unix",
+          "-I${src}/helios",
+          "-I${src}",
+          "-include",
+          "${src}/helios/platform.h"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "links",
+        "type": "executable",
+        "groups": [
+          "links"
+        ],
+        "libraries": [
+          "${compat}/lib/helios-unix.lib",
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${stage}/local/bin/links",
+        "stack": 262144,
+        "heap": 1048576
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/helios/links.cfg",
+        "destination": "${stage}/etc/links.cfg"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/helios/welcome.html",
+        "destination": "${stage}/local/share/links/welcome.html"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/helios/README.txt",
+        "destination": "${stage}/local/share/links/README.txt"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYING",
+        "destination": "${stage}/local/share/links/COPYING"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/links.1",
+        "destination": "${stage}/local/share/links/links.1"
+      }
+    ]
+  }
+}

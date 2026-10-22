@@ -1,0 +1,1283 @@
+{
+  "format": 1,
+  "name": "x11",
+  "version": "MIT X11R4 patch level 18",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/LegalizeAdulthood/X11R4.git",
+    "revision": "793f7f4e147f3eb5172273818cf97a4d72f7bde0",
+    "subdirectory": "mit",
+    "tree_sha256": "9341a739994bb57e078eda4bf959fae2c24a965096a899e12906075039f9b7de"
+  },
+  "patches": [
+    {
+      "file": "01-platform.patch",
+      "description": "Use Helios platform declarations in X clients and utilities",
+      "sha256": "12af9e5881c264c8bca4d7250678fe2df61b249f1aeaa2f2de7dc2f4fe7cca80"
+    },
+    {
+      "file": "02-cxx-headers.patch",
+      "description": "Declare Xlib return types explicitly for C++ consumers",
+      "sha256": "0142f124fcbb741413ea76a63bf3b388443c25a878ad113e70f3287b181e1c50"
+    },
+    {
+      "file": "03-transport.patch",
+      "description": "Adapt Xlib transport and authorization to Helios",
+      "sha256": "40dee1e78e9aceb8b526232178b2d4f6ce324988ff5ec1b6bd03cc3c8e49bd17"
+    },
+    {
+      "file": "04-widgets.patch",
+      "description": "Adapt Xt and Xmu to the Helios compiler and runtime",
+      "sha256": "6f302fab9087cba81748499dcea8b2e367e2ec73a8e493f460fb52a21c3473ac"
+    },
+    {
+      "file": "05-xterm.patch",
+      "description": "Connect xterm to the native terminal service and handle input and resize events",
+      "sha256": "7776d26a44b68ca809cd094186bbb1f4028a0c77eb3ae3b43a403352f7365a6e"
+    },
+    {
+      "file": "06-xdm.patch",
+      "description": "Run XDM logins and display sessions as native Helios tasks",
+      "sha256": "ca449d1d0307e4db1f1d329fe1fd7045f29c175924dca8933a653a25f58dac2b"
+    },
+    {
+      "file": "07-build-tools.patch",
+      "description": "Build font utilities on the host and generate the twm fallback configuration",
+      "sha256": "a44eae45325d3d35dc4148d11cd371b92b5a56ed2a1fa082da6423ac9beeec85"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "bbb719c391fe7e1b1d16efa3f10884e17480b6fe7d532630321a7357afc4b4d6",
+  "dependencies": [
+    "xterm-tty"
+  ],
+  "requires_compat": true,
+  "host_tools": [
+    "bison",
+    "flex"
+  ],
+  "build": {
+    "prepare": [
+      {
+        "type": "glob-copy",
+        "source": "${src}/include",
+        "pattern": "*.h",
+        "destination": "${work}/include/X11/"
+      },
+      {
+        "type": "glob-copy",
+        "source": "${src}/lib/X",
+        "pattern": "*.h",
+        "destination": "${work}/include/X11/"
+      },
+      {
+        "type": "glob-copy",
+        "source": "${src}/lib/Xau",
+        "pattern": "*.h",
+        "destination": "${work}/include/X11/"
+      },
+      {
+        "type": "glob-copy",
+        "source": "${src}/lib/Xdmcp",
+        "pattern": "*.h",
+        "destination": "${work}/include/X11/"
+      },
+      {
+        "type": "glob-copy",
+        "source": "${src}/lib/Xt",
+        "pattern": "*.h",
+        "destination": "${work}/include/X11/"
+      },
+      {
+        "type": "glob-copy",
+        "source": "${src}/lib/Xmu",
+        "pattern": "*.h",
+        "destination": "${work}/include/X11/Xmu"
+      },
+      {
+        "type": "glob-copy",
+        "source": "${src}/lib/Xaw",
+        "pattern": "*.h",
+        "destination": "${work}/include/X11/Xaw"
+      },
+      {
+        "type": "glob-copy",
+        "source": "${src}/extensions/include",
+        "pattern": "*.h",
+        "destination": "${work}/include/X11/extensions"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/include/bitmaps",
+        "destination": "${work}/include/X11/bitmaps"
+      },
+      {
+        "type": "glob-copy",
+        "source": "${src}/lib/Xau",
+        "pattern": "*.c",
+        "destination": "${src}/lib/X"
+      },
+      {
+        "type": "run",
+        "command": [
+          "bison",
+          "-d",
+          "-o",
+          "gram.c",
+          "gram.y"
+        ],
+        "cwd": "${src}/clients/twm"
+      },
+      {
+        "type": "run",
+        "command": [
+          "flex",
+          "-o",
+          "lex.c",
+          "lex.l"
+        ],
+        "cwd": "${src}/clients/twm"
+      },
+      {
+        "type": "run",
+        "command": [
+          "${python}",
+          "${src}/helios/generate-twm.py"
+        ],
+        "cwd": "${src}/clients/twm"
+      }
+    ],
+    "compile": {
+      "flags": [
+        "-std=gnu89",
+        "-Dhelios",
+        "-D_BSD",
+        "-DTCPCONN",
+        "-DNO_TCP_H",
+        "-DNeedFunctionPrototypes=0",
+        "-DNeedWidePrototypes=0",
+        "-DNO_ALLOCA",
+        "-Wno-error=implicit-function-declaration",
+        "-Wno-error=int-conversion",
+        "-Wno-error=incompatible-pointer-types",
+        "-Wno-error=return-mismatch",
+        "-I${work}/include",
+        "-I${work}/include/X11",
+        "-I${work}/include/X11/extensions",
+        "-I${src}",
+        "-I${source_dir}",
+        "-include",
+        "${src}/helios/x11-platform.h"
+      ]
+    },
+    "groups": [
+      {
+        "name": "Xau",
+        "sources": [
+          "${src}/lib/Xau/AuDispose.c",
+          "${src}/lib/Xau/AuFileName.c",
+          "${src}/lib/Xau/AuGetAddr.c",
+          "${src}/lib/Xau/AuLock.c",
+          "${src}/lib/Xau/AuRead.c",
+          "${src}/lib/Xau/AuUnlock.c",
+          "${src}/lib/Xau/AuWrite.c"
+        ]
+      },
+      {
+        "name": "Xdmcp",
+        "sources": [
+          "${src}/lib/Xdmcp/A8Eq.c",
+          "${src}/lib/Xdmcp/AA8.c",
+          "${src}/lib/Xdmcp/AA16.c",
+          "${src}/lib/Xdmcp/AA32.c",
+          "${src}/lib/Xdmcp/AofA8.c",
+          "${src}/lib/Xdmcp/CA8.c",
+          "${src}/lib/Xdmcp/DA8.c",
+          "${src}/lib/Xdmcp/DA16.c",
+          "${src}/lib/Xdmcp/DA32.c",
+          "${src}/lib/Xdmcp/DAofA8.c",
+          "${src}/lib/Xdmcp/Fill.c",
+          "${src}/lib/Xdmcp/Flush.c",
+          "${src}/lib/Xdmcp/RA8.c",
+          "${src}/lib/Xdmcp/RA16.c",
+          "${src}/lib/Xdmcp/RA32.c",
+          "${src}/lib/Xdmcp/RAofA8.c",
+          "${src}/lib/Xdmcp/RC8.c",
+          "${src}/lib/Xdmcp/RC16.c",
+          "${src}/lib/Xdmcp/RC32.c",
+          "${src}/lib/Xdmcp/RHead.c",
+          "${src}/lib/Xdmcp/RR.c",
+          "${src}/lib/Xdmcp/RaA8.c",
+          "${src}/lib/Xdmcp/RaA16.c",
+          "${src}/lib/Xdmcp/RaA32.c",
+          "${src}/lib/Xdmcp/RaAoA8.c",
+          "${src}/lib/Xdmcp/WA8.c",
+          "${src}/lib/Xdmcp/WA16.c",
+          "${src}/lib/Xdmcp/WA32.c",
+          "${src}/lib/Xdmcp/WAofA8.c",
+          "${src}/lib/Xdmcp/WC8.c",
+          "${src}/lib/Xdmcp/WC16.c",
+          "${src}/lib/Xdmcp/WC32.c",
+          "${src}/lib/Xdmcp/Whead.c",
+          "${src}/lib/Xdmcp/Alloc.c",
+          "${src}/lib/Xdmcp/CmpKey.c",
+          "${src}/lib/Xdmcp/DecKey.c",
+          "${src}/lib/Xdmcp/GenKey.c",
+          "${src}/lib/Xdmcp/IncKey.c"
+        ]
+      },
+      {
+        "name": "X",
+        "sources": [
+          "${src}/lib/X/Context.c",
+          "${src}/lib/X/Depths.c",
+          "${src}/lib/X/ParseCmd.c",
+          "${src}/lib/X/Quarks.c",
+          "${src}/lib/X/XAllCells.c",
+          "${src}/lib/X/XAllPlanes.c",
+          "${src}/lib/X/XAllowEv.c",
+          "${src}/lib/X/XAutoRep.c",
+          "${src}/lib/X/XBackgnd.c",
+          "${src}/lib/X/XBdrWidth.c",
+          "${src}/lib/X/XBell.c",
+          "${src}/lib/X/XBorder.c",
+          "${src}/lib/X/XChAccCon.c",
+          "${src}/lib/X/XChClMode.c",
+          "${src}/lib/X/XChActPGb.c",
+          "${src}/lib/X/XChCmap.c",
+          "${src}/lib/X/XChGC.c",
+          "${src}/lib/X/XChKeyCon.c",
+          "${src}/lib/X/XChPntCon.c",
+          "${src}/lib/X/XChProp.c",
+          "${src}/lib/X/XChSaveSet.c",
+          "${src}/lib/X/XChWAttrs.c",
+          "${src}/lib/X/XChWindow.c",
+          "${src}/lib/X/XChkIfEv.c",
+          "${src}/lib/X/XChkMaskEv.c",
+          "${src}/lib/X/XChkWinEv.c",
+          "${src}/lib/X/XChkTypEv.c",
+          "${src}/lib/X/XChkTypWEv.c",
+          "${src}/lib/X/XCirWin.c",
+          "${src}/lib/X/XCirWinDn.c",
+          "${src}/lib/X/XCirWinUp.c",
+          "${src}/lib/X/XClDisplay.c",
+          "${src}/lib/X/XClear.c",
+          "${src}/lib/X/XClearArea.c",
+          "${src}/lib/X/XConfWind.c",
+          "${src}/lib/X/XConnDis.c",
+          "${src}/lib/X/XConvSel.c",
+          "${src}/lib/X/XCopyArea.c",
+          "${src}/lib/X/XCopyCmap.c",
+          "${src}/lib/X/XCopyGC.c",
+          "${src}/lib/X/XCopyPlane.c",
+          "${src}/lib/X/XCrBFData.c",
+          "${src}/lib/X/XCrCmap.c",
+          "${src}/lib/X/XCrCursor.c",
+          "${src}/lib/X/XCrGC.c",
+          "${src}/lib/X/XCrGlCur.c",
+          "${src}/lib/X/XCrPFBData.c",
+          "${src}/lib/X/XCrPixmap.c",
+          "${src}/lib/X/XCrWindow.c",
+          "${src}/lib/X/XCursor.c",
+          "${src}/lib/X/XDefCursor.c",
+          "${src}/lib/X/XDelProp.c",
+          "${src}/lib/X/XDestSubs.c",
+          "${src}/lib/X/XDestWind.c",
+          "${src}/lib/X/XDisName.c",
+          "${src}/lib/X/XDrArc.c",
+          "${src}/lib/X/XDrArcs.c",
+          "${src}/lib/X/XDrLine.c",
+          "${src}/lib/X/XDrLines.c",
+          "${src}/lib/X/XDrPoint.c",
+          "${src}/lib/X/XDrPoints.c",
+          "${src}/lib/X/XDrRect.c",
+          "${src}/lib/X/XDrRects.c",
+          "${src}/lib/X/XDrSegs.c",
+          "${src}/lib/X/XErrDes.c",
+          "${src}/lib/X/XErrHndlr.c",
+          "${src}/lib/X/XEvToWire.c",
+          "${src}/lib/X/XFetchName.c",
+          "${src}/lib/X/XFillArc.c",
+          "${src}/lib/X/XFillArcs.c",
+          "${src}/lib/X/XFillPoly.c",
+          "${src}/lib/X/XFillRect.c",
+          "${src}/lib/X/XFillRects.c",
+          "${src}/lib/X/XFlush.c",
+          "${src}/lib/X/XFont.c",
+          "${src}/lib/X/XFontNames.c",
+          "${src}/lib/X/XFontInfo.c",
+          "${src}/lib/X/XFreeCmap.c",
+          "${src}/lib/X/XFreeCols.c",
+          "${src}/lib/X/XFreeCurs.c",
+          "${src}/lib/X/XFreeEData.c",
+          "${src}/lib/X/XFreeGC.c",
+          "${src}/lib/X/XFreePix.c",
+          "${src}/lib/X/XFSSaver.c",
+          "${src}/lib/X/XGCMisc.c",
+          "${src}/lib/X/XGeom.c",
+          "${src}/lib/X/XGetAtomNm.c",
+          "${src}/lib/X/XGetColor.c",
+          "${src}/lib/X/XGetDflt.c",
+          "${src}/lib/X/XGetFPath.c",
+          "${src}/lib/X/XGetFProp.c",
+          "${src}/lib/X/XGetGeom.c",
+          "${src}/lib/X/XGetHColor.c",
+          "${src}/lib/X/XGetHints.c",
+          "${src}/lib/X/XGetIFocus.c",
+          "${src}/lib/X/XGetImage.c",
+          "${src}/lib/X/XGetKCnt.c",
+          "${src}/lib/X/XGetMoEv.c",
+          "${src}/lib/X/XGetPCnt.c",
+          "${src}/lib/X/XGetPntMap.c",
+          "${src}/lib/X/XGetProp.c",
+          "${src}/lib/X/XGetSOwner.c",
+          "${src}/lib/X/XGetSSaver.c",
+          "${src}/lib/X/XGetStCmap.c",
+          "${src}/lib/X/XGetWAttrs.c",
+          "${src}/lib/X/XGrButton.c",
+          "${src}/lib/X/XGrKey.c",
+          "${src}/lib/X/XGrKeybd.c",
+          "${src}/lib/X/XGrPointer.c",
+          "${src}/lib/X/XGrServer.c",
+          "${src}/lib/X/XHost.c",
+          "${src}/lib/X/XIfEvent.c",
+          "${src}/lib/X/XImUtil.c",
+          "${src}/lib/X/XImText.c",
+          "${src}/lib/X/XImText16.c",
+          "${src}/lib/X/XInitExt.c",
+          "${src}/lib/X/XInsCmap.c",
+          "${src}/lib/X/XIntAtom.c",
+          "${src}/lib/X/XKeyBind.c",
+          "${src}/lib/X/XKillCl.c",
+          "${src}/lib/X/XLiHosts.c",
+          "${src}/lib/X/XLiICmaps.c",
+          "${src}/lib/X/XLiProps.c",
+          "${src}/lib/X/XListExt.c",
+          "${src}/lib/X/XLoadFont.c",
+          "${src}/lib/X/XLookupCol.c",
+          "${src}/lib/X/XLowerWin.c",
+          "${src}/lib/X/XMacros.c",
+          "${src}/lib/X/XMapRaised.c",
+          "${src}/lib/X/XMapSubs.c",
+          "${src}/lib/X/XMapWindow.c",
+          "${src}/lib/X/XMaskEvent.c",
+          "${src}/lib/X/XMisc.c",
+          "${src}/lib/X/XModMap.c",
+          "${src}/lib/X/XMoveWin.c",
+          "${src}/lib/X/XNextEvent.c",
+          "${src}/lib/X/XOpenDis.c",
+          "${src}/lib/X/XParseCol.c",
+          "${src}/lib/X/XParseGeom.c",
+          "${src}/lib/X/XPeekEvent.c",
+          "${src}/lib/X/XPeekIfEv.c",
+          "${src}/lib/X/XPending.c",
+          "${src}/lib/X/XPmapBgnd.c",
+          "${src}/lib/X/XPmapBord.c",
+          "${src}/lib/X/XPolyReg.c",
+          "${src}/lib/X/XPolyTxt.c",
+          "${src}/lib/X/XPolyTxt16.c",
+          "${src}/lib/X/XPutBEvent.c",
+          "${src}/lib/X/XPutImage.c",
+          "${src}/lib/X/XQuBest.c",
+          "${src}/lib/X/XQuColor.c",
+          "${src}/lib/X/XQuColors.c",
+          "${src}/lib/X/XQuCurShp.c",
+          "${src}/lib/X/XQuExt.c",
+          "${src}/lib/X/XQuKeybd.c",
+          "${src}/lib/X/XQuPntr.c",
+          "${src}/lib/X/XQuStipShp.c",
+          "${src}/lib/X/XQuTextE16.c",
+          "${src}/lib/X/XQuTextExt.c",
+          "${src}/lib/X/XQuTileShp.c",
+          "${src}/lib/X/XQuTree.c",
+          "${src}/lib/X/XRaiseWin.c",
+          "${src}/lib/X/XRdBitF.c",
+          "${src}/lib/X/XRecolorC.c",
+          "${src}/lib/X/XReconfWin.c",
+          "${src}/lib/X/XRegion.c",
+          "${src}/lib/X/XRepWindow.c",
+          "${src}/lib/X/XRestackWs.c",
+          "${src}/lib/X/XRotProp.c",
+          "${src}/lib/X/XSelInput.c",
+          "${src}/lib/X/XSendEvent.c",
+          "${src}/lib/X/XSetBack.c",
+          "${src}/lib/X/XSetCRects.c",
+          "${src}/lib/X/XSetClMask.c",
+          "${src}/lib/X/XSetClOrig.c",
+          "${src}/lib/X/XSetDashes.c",
+          "${src}/lib/X/XSetFPath.c",
+          "${src}/lib/X/XSetFont.c",
+          "${src}/lib/X/XSetFore.c",
+          "${src}/lib/X/XSetFunc.c",
+          "${src}/lib/X/XSetHints.c",
+          "${src}/lib/X/XSetIFocus.c",
+          "${src}/lib/X/XSetLStyle.c",
+          "${src}/lib/X/XSetPMask.c",
+          "${src}/lib/X/XSetPntMap.c",
+          "${src}/lib/X/XSetSOwner.c",
+          "${src}/lib/X/XSetSSaver.c",
+          "${src}/lib/X/XSetState.c",
+          "${src}/lib/X/XSetStip.c",
+          "${src}/lib/X/XSetStCmap.c",
+          "${src}/lib/X/XSetTile.c",
+          "${src}/lib/X/XSetTSOrig.c",
+          "${src}/lib/X/XStBytes.c",
+          "${src}/lib/X/XStColor.c",
+          "${src}/lib/X/XStColors.c",
+          "${src}/lib/X/XStNColor.c",
+          "${src}/lib/X/XStName.c",
+          "${src}/lib/X/XStrKeysym.c",
+          "${src}/lib/X/XSync.c",
+          "${src}/lib/X/XSynchro.c",
+          "${src}/lib/X/XText.c",
+          "${src}/lib/X/XText16.c",
+          "${src}/lib/X/XTextExt.c",
+          "${src}/lib/X/XTextExt16.c",
+          "${src}/lib/X/XTrCoords.c",
+          "${src}/lib/X/XUndefCurs.c",
+          "${src}/lib/X/XUngrabBut.c",
+          "${src}/lib/X/XUngrabKbd.c",
+          "${src}/lib/X/XUngrabKey.c",
+          "${src}/lib/X/XUngrabPtr.c",
+          "${src}/lib/X/XUngrabSvr.c",
+          "${src}/lib/X/XUninsCmap.c",
+          "${src}/lib/X/XUnldFont.c",
+          "${src}/lib/X/XUnmapSubs.c",
+          "${src}/lib/X/XUnmapWin.c",
+          "${src}/lib/X/XVisUtil.c",
+          "${src}/lib/X/XWarpPtr.c",
+          "${src}/lib/X/XWinEvent.c",
+          "${src}/lib/X/XWindow.c",
+          "${src}/lib/X/XWrBitF.c",
+          "${src}/lib/X/XlibInt.c",
+          "${src}/lib/X/Xrm.c",
+          "${src}/lib/X/Xstreams.c",
+          "${src}/lib/X/evtomask.c",
+          "${src}/lib/X/globals.c",
+          "${src}/lib/X/GetGCVals.c",
+          "${src}/lib/X/GetNrmHint.c",
+          "${src}/lib/X/GetRGBCMap.c",
+          "${src}/lib/X/GetTxtProp.c",
+          "${src}/lib/X/GetWMCMapW.c",
+          "${src}/lib/X/GetWMProto.c",
+          "${src}/lib/X/Iconify.c",
+          "${src}/lib/X/PixFormats.c",
+          "${src}/lib/X/PropAlloc.c",
+          "${src}/lib/X/ReconfWM.c",
+          "${src}/lib/X/SetNrmHint.c",
+          "${src}/lib/X/SetRGBCMap.c",
+          "${src}/lib/X/SetTxtProp.c",
+          "${src}/lib/X/SetWMCMapW.c",
+          "${src}/lib/X/SetWMProps.c",
+          "${src}/lib/X/SetWMProto.c",
+          "${src}/lib/X/StrToText.c",
+          "${src}/lib/X/TextToStr.c",
+          "${src}/lib/X/WMGeom.c",
+          "${src}/lib/X/Withdraw.c",
+          "${src}/lib/X/AuDispose.c",
+          "${src}/lib/X/AuGetAddr.c",
+          "${src}/lib/X/AuFileName.c",
+          "${src}/lib/X/AuRead.c"
+        ]
+      },
+      {
+        "name": "Xt",
+        "sources": [
+          "${src}/lib/Xt/ActionHook.c",
+          "${src}/lib/Xt/Alloc.c",
+          "${src}/lib/Xt/ArgList.c",
+          "${src}/lib/Xt/Callback.c",
+          "${src}/lib/Xt/ClickTime.c",
+          "${src}/lib/Xt/Composite.c",
+          "${src}/lib/Xt/Constraint.c",
+          "${src}/lib/Xt/Convert.c",
+          "${src}/lib/Xt/Converters.c",
+          "${src}/lib/Xt/Core.c",
+          "${src}/lib/Xt/Create.c",
+          "${src}/lib/Xt/Destroy.c",
+          "${src}/lib/Xt/Display.c",
+          "${src}/lib/Xt/Error.c",
+          "${src}/lib/Xt/Event.c",
+          "${src}/lib/Xt/EventUtil.c",
+          "${src}/lib/Xt/Functions.c",
+          "${src}/lib/Xt/GCManager.c",
+          "${src}/lib/Xt/Geometry.c",
+          "${src}/lib/Xt/GetActKey.c",
+          "${src}/lib/Xt/GetResList.c",
+          "${src}/lib/Xt/GetValues.c",
+          "${src}/lib/Xt/Initialize.c",
+          "${src}/lib/Xt/Intrinsic.c",
+          "${src}/lib/Xt/Keyboard.c",
+          "${src}/lib/Xt/Manage.c",
+          "${src}/lib/Xt/NextEvent.c",
+          "${src}/lib/Xt/Object.c",
+          "${src}/lib/Xt/PassivGrab.c",
+          "${src}/lib/Xt/Pointer.c",
+          "${src}/lib/Xt/Popup.c",
+          "${src}/lib/Xt/PopupCB.c",
+          "${src}/lib/Xt/RectObj.c",
+          "${src}/lib/Xt/Resources.c",
+          "${src}/lib/Xt/Selection.c",
+          "${src}/lib/Xt/SetSens.c",
+          "${src}/lib/Xt/SetValues.c",
+          "${src}/lib/Xt/SetWMCW.c",
+          "${src}/lib/Xt/Shell.c",
+          "${src}/lib/Xt/TMparse.c",
+          "${src}/lib/Xt/TMstate.c",
+          "${src}/lib/Xt/VarCreate.c",
+          "${src}/lib/Xt/VarGet.c",
+          "${src}/lib/Xt/Varargs.c",
+          "${src}/lib/Xt/Vendor.c"
+        ]
+      },
+      {
+        "name": "Xmu",
+        "sources": [
+          "${src}/lib/Xmu/AllCmap.c",
+          "${src}/lib/Xmu/Atoms.c",
+          "${src}/lib/Xmu/ClientWin.c",
+          "${src}/lib/Xmu/CloseHook.c",
+          "${src}/lib/Xmu/CmapAlloc.c",
+          "${src}/lib/Xmu/CrCmap.c",
+          "${src}/lib/Xmu/CrPixFBit.c",
+          "${src}/lib/Xmu/CursorName.c",
+          "${src}/lib/Xmu/CvtCache.c",
+          "${src}/lib/Xmu/CvtStdSel.c",
+          "${src}/lib/Xmu/DefErrMsg.c",
+          "${src}/lib/Xmu/DelCmap.c",
+          "${src}/lib/Xmu/DisplayQue.c",
+          "${src}/lib/Xmu/DrawLogo.c",
+          "${src}/lib/Xmu/DrRndRect.c",
+          "${src}/lib/Xmu/FToCback.c",
+          "${src}/lib/Xmu/GetHost.c",
+          "${src}/lib/Xmu/GrayPixmap.c",
+          "${src}/lib/Xmu/Initer.c",
+          "${src}/lib/Xmu/LocBitmap.c",
+          "${src}/lib/Xmu/Lookup.c",
+          "${src}/lib/Xmu/LookupCmap.c",
+          "${src}/lib/Xmu/Lower.c",
+          "${src}/lib/Xmu/RdBitF.c",
+          "${src}/lib/Xmu/ScrOfWin.c",
+          "${src}/lib/Xmu/ShapeWidg.c",
+          "${src}/lib/Xmu/StdCmap.c",
+          "${src}/lib/Xmu/StrToBS.c",
+          "${src}/lib/Xmu/StrToBmap.c",
+          "${src}/lib/Xmu/StrToCurs.c",
+          "${src}/lib/Xmu/StrToJust.c",
+          "${src}/lib/Xmu/StrToLong.c",
+          "${src}/lib/Xmu/StrToOrnt.c",
+          "${src}/lib/Xmu/StrToShap.c",
+          "${src}/lib/Xmu/StrToWidg.c",
+          "${src}/lib/Xmu/UpdMapHint.c",
+          "${src}/lib/Xmu/VisCmap.c",
+          "${src}/lib/Xmu/Xct.c"
+        ]
+      },
+      {
+        "name": "Xaw",
+        "sources": [
+          "${src}/lib/Xaw/AsciiSink.c",
+          "${src}/lib/Xaw/AsciiSrc.c",
+          "${src}/lib/Xaw/AsciiText.c",
+          "${src}/lib/Xaw/Box.c",
+          "${src}/lib/Xaw/Clock.c",
+          "${src}/lib/Xaw/Command.c",
+          "${src}/lib/Xaw/Dialog.c",
+          "${src}/lib/Xaw/Form.c",
+          "${src}/lib/Xaw/Grip.c",
+          "${src}/lib/Xaw/Label.c",
+          "${src}/lib/Xaw/List.c",
+          "${src}/lib/Xaw/Logo.c",
+          "${src}/lib/Xaw/Mailbox.c",
+          "${src}/lib/Xaw/MenuButton.c",
+          "${src}/lib/Xaw/Paned.c",
+          "${src}/lib/Xaw/Scrollbar.c",
+          "${src}/lib/Xaw/Simple.c",
+          "${src}/lib/Xaw/SimpleMenu.c",
+          "${src}/lib/Xaw/Sme.c",
+          "${src}/lib/Xaw/SmeBSB.c",
+          "${src}/lib/Xaw/SmeLine.c",
+          "${src}/lib/Xaw/StripChart.c",
+          "${src}/lib/Xaw/Text.c",
+          "${src}/lib/Xaw/TextSink.c",
+          "${src}/lib/Xaw/TextSrc.c",
+          "${src}/lib/Xaw/TextAction.c",
+          "${src}/lib/Xaw/TextPop.c",
+          "${src}/lib/Xaw/TextTr.c",
+          "${src}/lib/Xaw/Toggle.c",
+          "${src}/lib/Xaw/Vendor.c",
+          "${src}/lib/Xaw/Viewport.c",
+          "${src}/lib/Xaw/XawInit.c"
+        ]
+      },
+      {
+        "name": "Xext",
+        "sources": [
+          "${src}/extensions/lib/globals.c",
+          "${src}/extensions/lib/extutil.c",
+          "${src}/extensions/lib/XMultibuf.c",
+          "${src}/extensions/lib/XShape.c",
+          "${src}/extensions/lib/MITMisc.c",
+          "${src}/extensions/lib/XTestExt1.c"
+        ]
+      },
+      {
+        "name": "appres",
+        "sources": [
+          "${src}/clients/appres/appres.c"
+        ]
+      },
+      {
+        "name": "oclock",
+        "sources": [
+          "${src}/clients/oclock/oclock.c",
+          "${src}/clients/oclock/Clock.c",
+          "${src}/clients/oclock/transform.c"
+        ]
+      },
+      {
+        "name": "twm",
+        "sources": [
+          "${src}/clients/twm/gram.c",
+          "${src}/clients/twm/lex.c",
+          "${src}/clients/twm/deftwmrc.c",
+          "${src}/clients/twm/add_window.c",
+          "${src}/clients/twm/gc.c",
+          "${src}/clients/twm/list.c",
+          "${src}/clients/twm/twm.c",
+          "${src}/clients/twm/parse.c",
+          "${src}/clients/twm/menus.c",
+          "${src}/clients/twm/events.c",
+          "${src}/clients/twm/resize.c",
+          "${src}/clients/twm/util.c",
+          "${src}/clients/twm/version.c",
+          "${src}/clients/twm/iconmgr.c",
+          "${src}/clients/twm/cursor.c",
+          "${src}/clients/twm/icons.c"
+        ]
+      },
+      {
+        "name": "xauth",
+        "sources": [
+          "${src}/clients/xauth/xauth.c",
+          "${src}/clients/xauth/gethost.c",
+          "${src}/clients/xauth/process.c",
+          "${src}/clients/xauth/parsedpy.c"
+        ]
+      },
+      {
+        "name": "xbiff",
+        "sources": [
+          "${src}/clients/xbiff/xbiff.c"
+        ]
+      },
+      {
+        "name": "xcalc",
+        "sources": [
+          "${src}/clients/xcalc/actions.c",
+          "${src}/clients/xcalc/math.c",
+          "${src}/clients/xcalc/xcalc.c"
+        ]
+      },
+      {
+        "name": "xclock",
+        "sources": [
+          "${src}/clients/xclock/xclock.c"
+        ]
+      },
+      {
+        "name": "xdm",
+        "sources": [
+          "${src}/clients/xdm/ktm-session.c",
+          "${src}/clients/xdm/ktm.c",
+          "${src}/clients/xdm/auth.c",
+          "${src}/clients/xdm/daemon.c",
+          "${src}/clients/xdm/server.c",
+          "${src}/clients/xdm/dpylist.c",
+          "${src}/clients/xdm/dm.c",
+          "${src}/clients/xdm/error.c",
+          "${src}/clients/xdm/file.c",
+          "${src}/clients/xdm/greet.c",
+          "${src}/clients/xdm/reset.c",
+          "${src}/clients/xdm/resource.c",
+          "${src}/clients/xdm/protodpy.c",
+          "${src}/clients/xdm/policy.c",
+          "${src}/clients/xdm/session.c",
+          "${src}/clients/xdm/socket.c",
+          "${src}/clients/xdm/util.c",
+          "${src}/clients/xdm/verify.c",
+          "${src}/clients/xdm/Login.c",
+          "${src}/clients/xdm/mitauth.c",
+          "${src}/clients/xdm/cryptokey.c"
+        ],
+        "flags": [
+          "-DUDP_SOCKET",
+          "-DNOXDMTITLE",
+          "-DBINDIR=\"/helios/bin/x11\"",
+          "-DXDMDIR=\"/helios/etc/xdm\""
+        ]
+      },
+      {
+        "name": "xdpyinfo",
+        "sources": [
+          "${src}/clients/xdpyinfo/xdpyinfo.c"
+        ]
+      },
+      {
+        "name": "xedit",
+        "sources": [
+          "${src}/clients/xedit/xedit.c",
+          "${src}/clients/xedit/commands.c",
+          "${src}/clients/xedit/util.c"
+        ]
+      },
+      {
+        "name": "xfd",
+        "sources": [
+          "${src}/clients/xfd/xfd.c",
+          "${src}/clients/xfd/fontgrid.c"
+        ]
+      },
+      {
+        "name": "xfontsel",
+        "sources": [
+          "${src}/clients/xfontsel/xfontsel.c"
+        ]
+      },
+      {
+        "name": "xhost",
+        "sources": [
+          "${src}/clients/xhost/xhost.c"
+        ]
+      },
+      {
+        "name": "xkill",
+        "sources": [
+          "${src}/clients/xkill/xkill.c"
+        ]
+      },
+      {
+        "name": "xlogo",
+        "sources": [
+          "${src}/clients/xlogo/xlogo.c"
+        ]
+      },
+      {
+        "name": "xlsatoms",
+        "sources": [
+          "${src}/clients/xlsatoms/xlsatoms.c"
+        ]
+      },
+      {
+        "name": "xlsclients",
+        "sources": [
+          "${src}/clients/xlsclients/xlsclients.c"
+        ]
+      },
+      {
+        "name": "xlsfonts",
+        "sources": [
+          "${src}/clients/xlsfonts/xlsfonts.c",
+          "${src}/clients/xlsfonts/dsimple.c"
+        ]
+      },
+      {
+        "name": "xlswins",
+        "sources": [
+          "${src}/clients/xlswins/xlswins.c"
+        ]
+      },
+      {
+        "name": "xmag",
+        "sources": [
+          "${src}/clients/xmag/xmag.c"
+        ]
+      },
+      {
+        "name": "xman",
+        "sources": [
+          "${src}/clients/xman/ScrollByL.c",
+          "${src}/clients/xman/handler.c",
+          "${src}/clients/xman/man.c",
+          "${src}/clients/xman/buttons.c",
+          "${src}/clients/xman/help.c",
+          "${src}/clients/xman/search.c",
+          "${src}/clients/xman/globals.c",
+          "${src}/clients/xman/main.c",
+          "${src}/clients/xman/misc.c",
+          "${src}/clients/xman/tkfuncs.c"
+        ]
+      },
+      {
+        "name": "xmodmap",
+        "sources": [
+          "${src}/clients/xmodmap/xmodmap.c",
+          "${src}/clients/xmodmap/pf.c",
+          "${src}/clients/xmodmap/handle.c",
+          "${src}/clients/xmodmap/exec.c"
+        ]
+      },
+      {
+        "name": "xprop",
+        "sources": [
+          "${src}/clients/xprop/xprop.c",
+          "${src}/clients/xprop/dsimple.c"
+        ]
+      },
+      {
+        "name": "xrdb",
+        "sources": [
+          "${src}/clients/xrdb/xrdb.c"
+        ]
+      },
+      {
+        "name": "xrefresh",
+        "sources": [
+          "${src}/clients/xrefresh/xrefresh.c"
+        ]
+      },
+      {
+        "name": "xset",
+        "sources": [
+          "${src}/clients/xset/xset.c"
+        ]
+      },
+      {
+        "name": "xsetroot",
+        "sources": [
+          "${src}/clients/xsetroot/xsetroot.c"
+        ]
+      },
+      {
+        "name": "xstdcmap",
+        "sources": [
+          "${src}/clients/xstdcmap/xstdcmap.c"
+        ]
+      },
+      {
+        "name": "xterm",
+        "sources": [
+          "${src}/clients/xterm/main.c",
+          "${src}/clients/xterm/input.c",
+          "${src}/clients/xterm/charproc.c",
+          "${src}/clients/xterm/cursor.c",
+          "${src}/clients/xterm/util.c",
+          "${src}/clients/xterm/tabs.c",
+          "${src}/clients/xterm/screen.c",
+          "${src}/clients/xterm/scrollbar.c",
+          "${src}/clients/xterm/button.c",
+          "${src}/clients/xterm/Tekproc.c",
+          "${src}/clients/xterm/misc.c",
+          "${src}/clients/xterm/VTPrsTbl.c",
+          "${src}/clients/xterm/TekPrsTbl.c",
+          "${src}/clients/xterm/data.c",
+          "${src}/clients/xterm/menu.c",
+          {
+            "file": "${src}/clients/xterm/helios-pty.c",
+            "flags": [
+              "-I${compat}/include/helios-unix"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "xwd",
+        "sources": [
+          "${src}/clients/xwd/xwd.c",
+          "${src}/clients/xwd/dsimple.c"
+        ]
+      },
+      {
+        "name": "xwininfo",
+        "sources": [
+          "${src}/clients/xwininfo/xwininfo.c",
+          "${src}/clients/xwininfo/dsimple.c"
+        ]
+      },
+      {
+        "name": "xwud",
+        "sources": [
+          "${src}/clients/xwud/xwud.c"
+        ]
+      }
+    ],
+    "link": {
+      "stack": 65536,
+      "heap": 65536,
+      "libraries": [
+        "${work}/lib/libXaw.a",
+        "${work}/lib/libXmu.a",
+        "${work}/lib/libXt.a",
+        "${work}/lib/libXext.a",
+        "${work}/lib/libX11.a",
+        "${work}/lib/libXau.a",
+        "${work}/lib/libXdmcp.a",
+        "${sdk}/lib/netutils.lib",
+        "${sdk}/lib/bsd.lib",
+        "${sdk}/lib/c.lib",
+        "${sdk}/lib/helios.lib",
+        "${runtime}"
+      ]
+    },
+    "targets": [
+      {
+        "name": "Xau",
+        "type": "archive",
+        "groups": [
+          "Xau"
+        ],
+        "output": "${work}/lib/libXau.a"
+      },
+      {
+        "name": "Xdmcp",
+        "type": "archive",
+        "groups": [
+          "Xdmcp"
+        ],
+        "output": "${work}/lib/libXdmcp.a"
+      },
+      {
+        "name": "X",
+        "type": "archive",
+        "groups": [
+          "X"
+        ],
+        "output": "${work}/lib/libX11.a"
+      },
+      {
+        "name": "Xt",
+        "type": "archive",
+        "groups": [
+          "Xt"
+        ],
+        "output": "${work}/lib/libXt.a"
+      },
+      {
+        "name": "Xmu",
+        "type": "archive",
+        "groups": [
+          "Xmu"
+        ],
+        "output": "${work}/lib/libXmu.a"
+      },
+      {
+        "name": "Xaw",
+        "type": "archive",
+        "groups": [
+          "Xaw"
+        ],
+        "output": "${work}/lib/libXaw.a"
+      },
+      {
+        "name": "Xext",
+        "type": "archive",
+        "groups": [
+          "Xext"
+        ],
+        "output": "${work}/lib/libXext.a"
+      },
+      {
+        "name": "appres",
+        "type": "executable",
+        "groups": [
+          "appres"
+        ],
+        "output": "${work}/bin/appres"
+      },
+      {
+        "name": "oclock",
+        "type": "executable",
+        "groups": [
+          "oclock"
+        ],
+        "output": "${work}/bin/oclock"
+      },
+      {
+        "name": "twm",
+        "type": "executable",
+        "groups": [
+          "twm"
+        ],
+        "output": "${work}/bin/twm"
+      },
+      {
+        "name": "xauth",
+        "type": "executable",
+        "groups": [
+          "xauth"
+        ],
+        "output": "${work}/bin/xauth"
+      },
+      {
+        "name": "xbiff",
+        "type": "executable",
+        "groups": [
+          "xbiff"
+        ],
+        "output": "${work}/bin/xbiff"
+      },
+      {
+        "name": "xcalc",
+        "type": "executable",
+        "groups": [
+          "xcalc"
+        ],
+        "output": "${work}/bin/xcalc"
+      },
+      {
+        "name": "xclock",
+        "type": "executable",
+        "groups": [
+          "xclock"
+        ],
+        "output": "${work}/bin/xclock"
+      },
+      {
+        "name": "xdm",
+        "type": "executable",
+        "groups": [
+          "xdm"
+        ],
+        "libraries": [
+          "${work}/lib/libXaw.a",
+          "${work}/lib/libXmu.a",
+          "${work}/lib/libXt.a",
+          "${work}/lib/libXext.a",
+          "${work}/lib/libX11.a",
+          "${work}/lib/libXau.a",
+          "${work}/lib/libXdmcp.a",
+          "${sdk}/lib/session.lib",
+          "${sdk}/lib/RmLib.def",
+          "${sdk}/lib/netutils.lib",
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${work}/bin/xdm"
+      },
+      {
+        "name": "xdpyinfo",
+        "type": "executable",
+        "groups": [
+          "xdpyinfo"
+        ],
+        "output": "${work}/bin/xdpyinfo"
+      },
+      {
+        "name": "xedit",
+        "type": "executable",
+        "groups": [
+          "xedit"
+        ],
+        "output": "${work}/bin/xedit"
+      },
+      {
+        "name": "xfd",
+        "type": "executable",
+        "groups": [
+          "xfd"
+        ],
+        "output": "${work}/bin/xfd"
+      },
+      {
+        "name": "xfontsel",
+        "type": "executable",
+        "groups": [
+          "xfontsel"
+        ],
+        "output": "${work}/bin/xfontsel"
+      },
+      {
+        "name": "xhost",
+        "type": "executable",
+        "groups": [
+          "xhost"
+        ],
+        "output": "${work}/bin/xhost"
+      },
+      {
+        "name": "xkill",
+        "type": "executable",
+        "groups": [
+          "xkill"
+        ],
+        "output": "${work}/bin/xkill"
+      },
+      {
+        "name": "xlogo",
+        "type": "executable",
+        "groups": [
+          "xlogo"
+        ],
+        "output": "${work}/bin/xlogo"
+      },
+      {
+        "name": "xlsatoms",
+        "type": "executable",
+        "groups": [
+          "xlsatoms"
+        ],
+        "output": "${work}/bin/xlsatoms"
+      },
+      {
+        "name": "xlsclients",
+        "type": "executable",
+        "groups": [
+          "xlsclients"
+        ],
+        "output": "${work}/bin/xlsclients"
+      },
+      {
+        "name": "xlsfonts",
+        "type": "executable",
+        "groups": [
+          "xlsfonts"
+        ],
+        "output": "${work}/bin/xlsfonts"
+      },
+      {
+        "name": "xlswins",
+        "type": "executable",
+        "groups": [
+          "xlswins"
+        ],
+        "output": "${work}/bin/xlswins"
+      },
+      {
+        "name": "xmag",
+        "type": "executable",
+        "groups": [
+          "xmag"
+        ],
+        "output": "${work}/bin/xmag"
+      },
+      {
+        "name": "xman",
+        "type": "executable",
+        "groups": [
+          "xman"
+        ],
+        "output": "${work}/bin/xman"
+      },
+      {
+        "name": "xmodmap",
+        "type": "executable",
+        "groups": [
+          "xmodmap"
+        ],
+        "output": "${work}/bin/xmodmap"
+      },
+      {
+        "name": "xprop",
+        "type": "executable",
+        "groups": [
+          "xprop"
+        ],
+        "output": "${work}/bin/xprop"
+      },
+      {
+        "name": "xrdb",
+        "type": "executable",
+        "groups": [
+          "xrdb"
+        ],
+        "output": "${work}/bin/xrdb"
+      },
+      {
+        "name": "xrefresh",
+        "type": "executable",
+        "groups": [
+          "xrefresh"
+        ],
+        "output": "${work}/bin/xrefresh"
+      },
+      {
+        "name": "xset",
+        "type": "executable",
+        "groups": [
+          "xset"
+        ],
+        "output": "${work}/bin/xset"
+      },
+      {
+        "name": "xsetroot",
+        "type": "executable",
+        "groups": [
+          "xsetroot"
+        ],
+        "output": "${work}/bin/xsetroot"
+      },
+      {
+        "name": "xstdcmap",
+        "type": "executable",
+        "groups": [
+          "xstdcmap"
+        ],
+        "output": "${work}/bin/xstdcmap"
+      },
+      {
+        "name": "xterm",
+        "type": "executable",
+        "groups": [
+          "xterm"
+        ],
+        "libraries": [
+          "${work}/lib/libXaw.a",
+          "${work}/lib/libXmu.a",
+          "${work}/lib/libXt.a",
+          "${work}/lib/libXext.a",
+          "${work}/lib/libX11.a",
+          "${work}/lib/libXau.a",
+          "${work}/lib/libXdmcp.a",
+          "${compat}/lib/helios-unix.lib",
+          "${sdk}/lib/netutils.lib",
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${work}/bin/xterm"
+      },
+      {
+        "name": "xwd",
+        "type": "executable",
+        "groups": [
+          "xwd"
+        ],
+        "output": "${work}/bin/xwd"
+      },
+      {
+        "name": "xwininfo",
+        "type": "executable",
+        "groups": [
+          "xwininfo"
+        ],
+        "output": "${work}/bin/xwininfo"
+      },
+      {
+        "name": "xwud",
+        "type": "executable",
+        "groups": [
+          "xwud"
+        ],
+        "output": "${work}/bin/xwud"
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${work}/bin",
+        "destination": "${stage}/bin/x11"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/lib",
+        "destination": "${stage}/lib/x11r4"
+      }
+    ],
+    "outputs": [
+      "${work}/include"
+    ]
+  }
+}

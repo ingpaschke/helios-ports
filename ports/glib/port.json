@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "name": "glib",
+  "version": "1.2.10",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/GNOME/glib.git",
+    "revision": "1f2b1ef1092410f2b8ef0b446180ee26b8e6cd1c",
+    "subdirectory": "",
+    "tree_sha256": "a0cf76c7cfc45dd1b2c54a9847e89504c4389c6e3499a64ab7805ab8f722e07d"
+  },
+  "patches": [
+    {
+      "file": "01-helios.patch",
+      "description": "Configure GLib for Helios and adapt its native I/O hooks",
+      "sha256": "4b5d5031a5995782f97fa9665272301f23a389a7391600c9edfb37a160282ddc"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "76c7b8b7bbd3cd681571ee1920407f4c415ec03ab468b14ab69ce784689783a3",
+  "dependencies": [],
+  "build": {}
+}

@@ -1,0 +1,1574 @@
+Subject: Adapt the event loop, terminal and platform operations to Helios
+
+diff --git a/af_unix.c b/af_unix.c
+index 86001358cd74b7a07ed4492ce8a0bc3cf1c1bd42..ad2edbda587d56e99e401be84efff1ca7d0b672d 100644
+--- a/af_unix.c
++++ b/af_unix.c
+@@ -208,10 +208,10 @@ int bind_to_af_unix(unsigned char *name)
+ 		/*debug("bind: %d, %s", errno, strerror(errno));*/
+ 		if (af == PF_INET && errno == EADDRNOTAVAIL) {
+ 			/* do not try to connect if the user has not configured loopback interface */
+-			EINTRLOOP(rs, close(s_unix_fd));
++			EINTRLOOP(rs, hu_tls_fd_close(s_unix_fd));
+ 			return -1;
+ 		}
+-		EINTRLOOP(rs, close(s_unix_fd));
++		EINTRLOOP(rs, hu_tls_fd_close(s_unix_fd));
+ 		s_unix_fd = c_socket(af, SOCK_STREAM, 0);
+ 		if (s_unix_fd == -1) return -1;
+ #if defined(SOL_SOCKET) && defined(SO_REUSEADDR)
+@@ -223,14 +223,14 @@ retry:
+ 			/*debug("connect: %d, %s", errno, strerror(errno));*/
+ 			if (++cnt < MAX_BIND_TRIES) {
+ 				portable_sleep(100);
+-				EINTRLOOP(rs, close(s_unix_fd));
++				EINTRLOOP(rs, hu_tls_fd_close(s_unix_fd));
+ 				s_unix_fd = -1;
+ 				goto again;
+ 			}
+ #ifdef SOCKET_TIMEOUT_HACK
+ retry_unlink:
+ #endif
+-			EINTRLOOP(rs, close(s_unix_fd));
++			EINTRLOOP(rs, hu_tls_fd_close(s_unix_fd));
+ 			s_unix_fd = -1;
+ 			if (!u) {
+ 				unlink_unix();
+@@ -257,7 +257,7 @@ retry_unlink:
+ 	if (rs) {
+ 		error("ERROR: listen failed: %d", errno);
+ 		close_and_fail:
+-		EINTRLOOP(rs, close(s_unix_fd));
++		EINTRLOOP(rs, hu_tls_fd_close(s_unix_fd));
+ 		s_unix_fd = -1;
+ 		return -1;
+ 	}
+@@ -277,16 +277,16 @@ static void af_unix_connection(void *xxx)
+ 	ns = c_accept(s_unix_fd, &s_unix_acc.s, &l);
+ 	if (ns == -1) return;
+ 	HANDSHAKE_WRITE(ns, S2C1_HANDSHAKE_LENGTH) {
+-		EINTRLOOP(rs, close(ns));
++		EINTRLOOP(rs, hu_tls_fd_close(ns));
+ 		return;
+ 	}
+ 	HANDSHAKE_READ(ns, C2S2_HANDSHAKE_LENGTH) {
+ 		portable_sleep(100);	/* workaround for a race in previous Links version */
+-		EINTRLOOP(rs, close(ns));
++		EINTRLOOP(rs, hu_tls_fd_close(ns));
+ 		return;
+ 	}
+ 	HANDSHAKE_WRITE(ns, S2C3_HANDSHAKE_LENGTH) {
+-		EINTRLOOP(rs, close(ns));
++		EINTRLOOP(rs, hu_tls_fd_close(ns));
+ 		return;
+ 	}
+ 	if (!F) {
+diff --git a/beos.c b/beos.c
+index 20db96e26dd5985fd79cdc8a7bb1d986e6e9bb75..c2c6cdd127419f9eb9c4b199238e06e7cfede53b 100644
+--- a/beos.c
++++ b/beos.c
+@@ -33,19 +33,19 @@ int closesocket(int);
+ int be_read(int s, void *ptr, int len)
+ {
+ 	if (s >= SHS) return recv(s - SHS, ptr, len, 0);
+-	return read(s, ptr, len);
++	return hu_tls_fd_read(s, ptr, len);
+ }
+ 
+ int be_write(int s, void *ptr, int len)
+ {
+ 	if (s >= SHS) return send(s - SHS, ptr, len, 0);
+-	return write(s, ptr, len);
++	return hu_tls_fd_write(s, ptr, len);
+ }
+ 
+ int be_close(int s)
+ {
+ 	if (s >= SHS) return closesocket(s - SHS);
+-	return close(s);
++	return hu_tls_fd_close(s);
+ }
+ 
+ int be_socket(int af, int sock, int prot)
+@@ -172,7 +172,7 @@ retry:
+ 	}
+ 	FD_ZERO(&rrd);
+ 	for (i = SHS; i < n; i++) if (FD_ISSET(i, rd)) FD_SET(i - SHS, &rrd);
+-	if ((s = select(FD_SETSIZE, &rrd, &d, &d, tm)) < 0) {
++	if ((s = hu_tls_fd_select(FD_SETSIZE, &rrd, &d, &d, tm)) < 0) {
+ 		if (errno == EINTR) goto retry;
+ 		FD_ZERO(rd);
+ 		return 0;
+@@ -205,7 +205,7 @@ static void input_handle_th(void *p)
+ 	char c;
+ 	int b = 0;
+ 	setsockopt(ihpipe[1], SOL_SOCKET, SO_NONBLOCK, &b, sizeof(b));
+-	while (1) if (read(0, &c, 1) == 1) be_write(ihpipe[1], &c, 1);
++	while (1) if (hu_tls_fd_read(0, &c, 1) == 1) be_write(ihpipe[1], &c, 1);
+ }
+ 
+ int get_input_handle(void)
+@@ -241,7 +241,7 @@ static void output_handle_th(void *p)
+ 	int r, b = 0;
+ 	if (!c) return;
+ 	setsockopt(ohpipe[1], SOL_SOCKET, SO_NONBLOCK, &b, sizeof(b));
+-	while ((r = be_read(ohpipe[0], c, O_BUF)) > 0) write(1, c, r);
++	while ((r = be_read(ohpipe[0], c, O_BUF)) > 0) hu_tls_fd_write(1, c, r);
+ 	free(c);
+ }
+ 
+diff --git a/bfu.c b/bfu.c
+index 4212760437eca371885c3d36566249b8913e606e..b172b430c1761ddb7abeb0ea9af2ce452ec3649a 100644
+--- a/bfu.c
++++ b/bfu.c
+@@ -1669,7 +1669,7 @@ static int check_local_ip_address_internal(struct dialog_data *dlg, struct dialo
+ 	}
+ 	s = socket_and_bind(pf, p);
+ 	if (s != -1) {
+-		EINTRLOOP(rs, close(s));
++		EINTRLOOP(rs, hu_tls_fd_close(s));
+ 	} else {
+ 		if (1
+ #ifdef ENFILE
+diff --git a/default.c b/default.c
+index caf7b2e01234c406a1b8efa9bd09b3b4c2ec9d39..f3a9b9d1d2c35a6d3514622c57272ca1a55a58ce 100644
+--- a/default.c
++++ b/default.c
+@@ -580,7 +580,7 @@ unsigned char *read_config_file(unsigned char *name)
+ 	}
+ 	mem_free(cfg_buffer);
+ 	if (r == -1) mem_free(s), s = NULL;
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ 	return s;
+ }
+ 
+@@ -637,7 +637,7 @@ try_new_count:
+ 		err = errno;
+ 		goto close_unlink_err;
+ 	}
+-	if (do_sync) {
++	if (0) { /* No fsync on native Helios. */
+ 		EINTRLOOP(rs, fsync(h));
+ 		if (rs) {
+ 			err = errno;
+@@ -647,7 +647,7 @@ try_new_count:
+ 		_flush_disk_cache();
+ #endif
+ 	}
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ 	if (rs) {
+ 		err = errno;
+ 		goto unlink_err;
+@@ -661,7 +661,7 @@ try_new_count:
+ 		goto unlink_err;
+ 	}
+ 	mem_free(tmp_name);
+-	if (do_sync) {
++	if (0) { /* No fsync on native Helios. */
+ #if defined(DOS)
+ 		_flush_disk_cache();
+ #elif !defined(OS2) && !defined(OPENVMS)
+@@ -684,7 +684,7 @@ try_new_count:
+ 		h = c_open(*tmp_name ? tmp_name : cast_uchar ".", O_RDONLY | O_NOCTTY);
+ 		if (h != -1) {
+ 			EINTRLOOP(rs, fsync(h));
+-			EINTRLOOP(rs, close(h));
++			EINTRLOOP(rs, hu_tls_fd_close(h));
+ 		}
+ 		mem_free(tmp_name);
+ #endif
+@@ -693,7 +693,7 @@ try_new_count:
+ 	return 0;
+ 
+ 	close_unlink_err:
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ 	unlink_err:
+ 	EINTRLOOP(rs, unlink(cast_const_char tmp_name));
+ 	free_err:
+diff --git a/dos.c b/dos.c
+index b81275a3c2b3319ff4bcb5ca82ca4ab5775d6293..5a993fc024b1686dee4e59e7483624a46c1dc61c 100644
+--- a/dos.c
++++ b/dos.c
+@@ -354,7 +354,7 @@ static void ansi_write(const unsigned char *str, size_t size)
+ 			ansi_initialize();
+ 			goto process_ansi;
+ 		}
+-		write(1, str, size);
++		hu_tls_fd_write(1, str, size);
+ 		return;
+ 	}
+ process_ansi:
+@@ -535,7 +535,7 @@ int dos_read(int fd, void *buf, size_t size)
+ #ifdef DOS_EXTRA_KEYBOARD
+ 	if (fd == 0) return dos_read_keyboard(buf, size);
+ #endif
+-	return read(fd, buf, size);
++	return hu_tls_fd_read(fd, buf, size);
+ }
+ 
+ int dos_write(int fd, const void *buf, size_t size)
+@@ -549,7 +549,7 @@ int dos_write(int fd, const void *buf, size_t size)
+ 		ansi_write(buf, size);
+ 		return size;
+ 	}
+-	return write(fd, buf, size);
++	return hu_tls_fd_write(fd, buf, size);
+ }
+ 
+ int dos_close(int fd)
+@@ -557,7 +557,7 @@ int dos_close(int fd)
+ 	int r;
+ 	r = vpipe_close(fd);
+ 	if (r != -2) return r;
+-	return close(fd);
++	return hu_tls_fd_close(fd);
+ }
+ 
+ int dos_select(int n, fd_set *rs, fd_set *ws, fd_set *es, struct timeval *t, int from_main_loop)
+@@ -645,7 +645,7 @@ int dos_select(int n, fd_set *rs, fd_set *ws, fd_set *es, struct timeval *t, int
+ 		return ret_cnt;
+ 	}
+ 	/*printf("real select\n");*/
+-	/*return select(n, rs, ws, es, t);*/
++	/*return hu_tls_fd_select(n, rs, ws, es, t);*/
+ 	if (rs) rsb = *rs;
+ 	else FD_ZERO(&rsb);
+ 	if (ws) wsb = *ws;
+@@ -683,7 +683,7 @@ int dos_select(int n, fd_set *rs, fd_set *ws, fd_set *es, struct timeval *t, int
+ 			check_bottom_halves();
+ 			return 0;
+ 		}
+-		r = select(n, rs, ws, es, &zero);
++		r = hu_tls_fd_select(n, rs, ws, es, &zero);
+ 		if (r == -1 && errno == EBADF) {
+ 			/* DJGPP occasionally returns EBADF */
+ 			int re = 0;
+@@ -711,7 +711,7 @@ int dos_select(int n, fd_set *rs, fd_set *ws, fd_set *es, struct timeval *t, int
+ 				if (FD_ISSET(i, &esb)) FD_SET(i, &esx);
+ 				zero.tv_sec = 0;
+ 				zero.tv_usec = 0;
+-				x = select(i + 1, &rsx, &wsx, &esx, &zero);
++				x = hu_tls_fd_select(i + 1, &rsx, &wsx, &esx, &zero);
+ 				s = 0;
+ 				if (FD_ISSET(i, &rsb) && (x < 0 || (x > 0 && FD_ISSET(i, &rsx)))) FD_SET(i, rs), s = 1;
+ 				if (FD_ISSET(i, &wsb) && (x < 0 || (x > 0 && FD_ISSET(i, &wsx)))) FD_SET(i, ws), s = 1;
+@@ -790,7 +790,7 @@ void init_os(void)
+ 	/* preload the packet driver */
+ 	s = c_socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+ 	if (s >= 0) {
+-		EINTRLOOP(rs, close(s));
++		EINTRLOOP(rs, hu_tls_fd_close(s));
+ 	}
+ 
+ 	tcp_cbreak(1);
+diff --git a/file.c b/file.c
+index e6e63637c7a07e356213539eab820ad84858df0c..ba6e83135cd5300b32ee3c793c8ba782e7494afc 100644
+--- a/file.c
++++ b/file.c
+@@ -280,7 +280,7 @@ void file_func(struct connection *c)
+ 		struct dirent *de;
+ 		d = c_opendir(name);
+ 		er = errno;
+-		EINTRLOOP(rs, close(h));
++		EINTRLOOP(rs, hu_tls_fd_close(h));
+ 		if (!d) {
+ 			mem_free(name);
+ 			setcstate(c, get_error_from_errno(er)); abort_connection(c); return;
+@@ -425,7 +425,7 @@ void file_func(struct connection *c)
+ 		    stt.st_size < 0 ||
+ #endif
+ 		    stt.st_size > MAXINT) {
+-			EINTRLOOP(rs, close(h));
++			EINTRLOOP(rs, hu_tls_fd_close(h));
+ 			setcstate(c, S_LARGE_FILE); abort_connection(c);
+ 			return;
+ 		}
+@@ -433,7 +433,7 @@ void file_func(struct connection *c)
+ 		   -EACCES when reading 0 bytes to invalid address */
+ 		file = mem_alloc_mayfail((size_t)stt.st_size + !stt.st_size);
+ 		if (!file) {
+-			EINTRLOOP(rs, close(h));
++			EINTRLOOP(rs, hu_tls_fd_close(h));
+ 			setcstate(c, S_OUT_OF_MEM);
+ 			abort_connection(c); return;
+ 		}
+@@ -445,12 +445,12 @@ void file_func(struct connection *c)
+ #endif
+ 			) {
+ 			mem_free(file);
+-			EINTRLOOP(rs, close(h));
++			EINTRLOOP(rs, hu_tls_fd_close(h));
+ 			setcstate(c, r == -1 ? get_error_from_errno(errno) : S_FILE_ERROR);
+ 			abort_connection(c); return;
+ 		}
+ 		fl = r;
+-		EINTRLOOP(rs, close(h));
++		EINTRLOOP(rs, hu_tls_fd_close(h));
+ 		head = stracpy(cast_uchar "");
+ 	}
+ 	if (!c->cache) {
+diff --git a/framebuf.c b/framebuf.c
+index 739517038bad99fd260a0f1e33977596a6fc52f7..0859fa04a0aaae990fd932016799d6a3492431e1 100644
+--- a/framebuf.c
++++ b/framebuf.c
+@@ -1217,9 +1217,9 @@ static const unsigned char seq_show_cursor[] = "\033[10000D\033[?25h";
+ static void fb_print(const unsigned char *str)
+ {
+ 	int wr;
+-	EINTRLOOP(wr, (int)write(TTY, str, strlen(cast_const_char str)));
++	EINTRLOOP(wr, (int)hu_tls_fd_write(TTY, str, strlen(cast_const_char str)));
+ 	if (wr <= 0)
+-		EINTRLOOP(wr, (int)write(1, str, strlen(cast_const_char str)));
++		EINTRLOOP(wr, (int)hu_tls_fd_write(1, str, strlen(cast_const_char str)));
+ }
+ 
+ static void fb_hide_cursor(void)
+@@ -1664,7 +1664,7 @@ static void fb_after_fork(void)
+ {
+ 	int rs;
+ 	if (fb_handle != -1) {
+-		EINTRLOOP(rs, close(fb_handle));
++		EINTRLOOP(rs, hu_tls_fd_close(fb_handle));
+ 		fb_handle = -1;
+ 	}
+ }
+diff --git a/ftp.c b/ftp.c
+index 7a8d05d14865795788f6fe2d55fece2d497a37c9..7c5f1f7effef417e0282f2e93a679da33487236f 100644
+--- a/ftp.c
++++ b/ftp.c
+@@ -739,7 +739,7 @@ static void got_something_from_data_connection(void *c_)
+ 		ns = c_accept(c->sock2, NULL, NULL);
+ 		if (ns == -1) goto e;
+ 		set_nonblock(ns);
+-		EINTRLOOP(rs, close(c->sock2));
++		EINTRLOOP(rs, hu_tls_fd_close(c->sock2));
+ 		c->sock2 = ns;
+ 		set_handlers(ns, got_something_from_data_connection, NULL, c);
+ 		return;
+@@ -787,7 +787,7 @@ do {								\
+ 		}
+ #undef A
+ 	}
+-	EINTRLOOP(l, (int)read(c->sock2, inf->ftp_buffer + inf->buf_pos, FTP_BUF - inf->buf_pos));
++	EINTRLOOP(l, (int)hu_tls_fd_read(c->sock2, inf->ftp_buffer + inf->buf_pos, FTP_BUF - inf->buf_pos));
+ 	if (l == -1) {
+ 		e:
+ 		if (inf->conn_st != 1 && !inf->dir && !c->from) {
+diff --git a/http.c b/http.c
+index 7580827110f09ec853197750ef9948ea60199a2f..ae3288ceec0c0041e2e3e96184e26b0386e0f7e8 100644
+--- a/http.c
++++ b/http.c
+@@ -468,7 +468,7 @@ static void http_send_header(struct connection *c)
+ 		add_to_str(&hdr, &l, h);
+ 		mem_free(h);
+ 		if ((h = get_port_str(host))) {
+-			unsigned char *default_port = cast_uchar "80";
++			unsigned char *default_port = cast_uchar (!casecmp(c->url, cast_uchar "https://", 8) ? "443" : "80");
+ #ifdef HAVE_SSL
+ 			if (c->ssl) default_port = cast_uchar "443";
+ #endif
+diff --git a/kbd.c b/kbd.c
+index c7c1ee3a3993a21109e1e5b34a90e1b9be013cbd..084447b7d9b883fc3721e37e6077781b82054eb3 100644
+--- a/kbd.c
++++ b/kbd.c
+@@ -75,7 +75,7 @@ static void write_ev_queue(void *itrm_)
+ 	if (!itrm->eqlen) internal_error("event queue empty");
+ 	to_write = itrm->eqlen;
+ retry:
+-	EINTRLOOP(l, (int)write(itrm->sock_out, itrm->ev_queue, to_write));
++	EINTRLOOP(l, (int)hu_tls_fd_write(itrm->sock_out, itrm->ev_queue, to_write));
+ 	if (l <= 0) {
+ 		if (to_write > 1) {
+ 			to_write >>= 1;
+@@ -94,7 +94,7 @@ static void queue_event(struct itrm *itrm, unsigned char *data, int len)
+ 	if (!itrm->eqlen && can_write(itrm->sock_out)) {
+ 		int to_write = len;
+ retry:
+-		EINTRLOOP(w, (int)write(itrm->sock_out, data, to_write));
++		EINTRLOOP(w, (int)hu_tls_fd_write(itrm->sock_out, data, to_write));
+ 		if (w <= 0) {
+ 			if (to_write > 1) {
+ 				to_write >>= 1;
+@@ -308,7 +308,8 @@ static int setraw(int ctl, int save)
+ #ifdef TOSTOP
+ 	t.c_lflag |= TOSTOP;
+ #endif
+-	t.c_oflag |= OPOST;
++	t.c_oflag &= ~OPOST;
++	t.c_lflag &= ~(ISIG | TOSTOP);
+ #ifdef DOS
+ 	t.c_lflag &= ~(ISIG | ECHO);
+ #endif
+@@ -554,7 +555,7 @@ static void in_sock(void *itrm_)
+ 	int c, i, p;
+ 	int rs;
+ 
+-	EINTRLOOP(c, (int)read(itrm->sock_in, buf, OUT_BUF_SIZE));
++	EINTRLOOP(c, (int)hu_tls_fd_read(itrm->sock_in, buf, OUT_BUF_SIZE));
+ 	if (c <= 0) {
+ 		fr:
+ 		itrm_error(itrm);
+@@ -1332,7 +1333,7 @@ do_alt:
+ 	}
+ 	memmove(itrm->kqueue, itrm->kqueue + el, itrm->qlen -= el);
+ 	end:
+-	if (itrm->qlen < IN_BUF_SIZE && !itrm->blocked) set_handlers(itrm->std_in, in_kbd, NULL, itrm);
++	if (itrm->qlen < IN_BUF_SIZE - 1 && !itrm->blocked) set_handlers(itrm->std_in, in_kbd, NULL, itrm);
+ 	return el;
+ 	ret:
+ 	itrm->tm = install_timer(ESC_TIMEOUT, kbd_timeout, itrm);
+@@ -1345,13 +1346,13 @@ static void in_kbd(void *itrm_)
+ 	int r;
+ 	if (!can_read(itrm->std_in)) return;
+ 	if (itrm->tm != NULL) kill_timer(itrm->tm), itrm->tm = NULL;
+-	if (itrm->qlen >= IN_BUF_SIZE) {
++	if (itrm->qlen >= IN_BUF_SIZE - 1) {
+ 		set_handlers(itrm->std_in, NULL, NULL, itrm);
+ 		while (process_queue(itrm))
+ 			;
+ 		return;
+ 	}
+-	EINTRLOOP(r, (int)read(itrm->std_in, itrm->kqueue + itrm->qlen, IN_BUF_SIZE - itrm->qlen));
++	EINTRLOOP(r, (int)links_terminal_read(itrm->std_in, itrm->kqueue + itrm->qlen, IN_BUF_SIZE - itrm->qlen));
+ 	if (r <= 0) {
+ 		struct links_event ev = { EV_ABORT, 0, 0, 0 };
+ 		set_handlers(itrm->std_in, NULL, NULL, itrm);
+@@ -1363,8 +1364,8 @@ static void in_kbd(void *itrm_)
+ 		error("ERROR: too many bytes read");
+ 		itrm->qlen = IN_BUF_SIZE;
+ 	}
+-	if (itrm->qlen < IN_BUF_SIZE && can_read(itrm->std_in)) {
+-		EINTRLOOP(r, (int)read(itrm->std_in, itrm->kqueue + itrm->qlen, IN_BUF_SIZE - itrm->qlen));
++	if (itrm->qlen < IN_BUF_SIZE - 1 && can_read(itrm->std_in)) {
++		EINTRLOOP(r, (int)links_terminal_read(itrm->std_in, itrm->kqueue + itrm->qlen, IN_BUF_SIZE - itrm->qlen));
+ 		if (r > 0) goto more_data;
+ 	}
+ 	while (process_queue(itrm))
+diff --git a/links.h b/links.h
+index 3a29a082689809208f10296f8c53f0402684c26a..b058575c99f512a5e4d2c8ea097478388d8b4cf6 100644
+--- a/links.h
++++ b/links.h
+@@ -1206,6 +1206,8 @@ struct lookup_state {
+ struct dnsquery_doh;
+ 
+ struct dnsquery {
++	unsigned char helios_reply[392];
++	int helios_received;
+ #ifndef THREAD_SAFE_LOOKUP
+ 	struct dnsquery *next_in_queue;
+ #endif
+@@ -1342,6 +1344,7 @@ struct remaining_info {
+ struct conn_info;
+ 
+ struct connection {
++	struct timer *helios_tls_timer;
+ 	list_entry_1st
+ 	tcount count;
+ 	unsigned char *url;
+diff --git a/main.c b/main.c
+index bb5159454ba710a39c55bc7a3dd577b2f1de49fd..2d3c2ce8d8486ffec05374fbf5945e86426ccd14 100644
+--- a/main.c
++++ b/main.c
+@@ -59,7 +59,7 @@ void sig_tstp(void *t_)
+ 	else if (drv->block) drv->block(NULL);
+ #endif
+ #if defined(SIGCONT) && defined(SIGTTOU) && defined(HAVE_GETPID)
+-	EINTRLOOP(newpid, fork());
++	EINTRLOOP(newpid, links_no_fork());
+ 	if (!newpid) {
+ 		while (1) {
+ 			int rr;
+@@ -227,7 +227,7 @@ void gfx_connection(int h)
+ 			term->handle_to_close = h;
+ 		} else {
+ 			hard_write(h, cast_uchar "x", 1);
+-			EINTRLOOP(r, close(h));
++			EINTRLOOP(r, hu_tls_fd_close(h));
+ 		}
+ 		mem_free(info);
+ 		return;
+@@ -235,7 +235,7 @@ void gfx_connection(int h)
+ err_close_free:
+ 	mem_free(info);
+ err_close:
+-	EINTRLOOP(r, close(h));
++	EINTRLOOP(r, hu_tls_fd_close(h));
+ }
+ 
+ static void gfx_connection_terminate(void *p)
+diff --git a/menu.c b/menu.c
+index d9afc29a3099de28acee68b90e584ae9c9d4ee7d..e9cfba2872f6a611a1f87315afed8c5f0f94048c 100644
+--- a/menu.c
++++ b/menu.c
+@@ -888,7 +888,7 @@ static void save_clipboard(struct session *ses, unsigned char *file, int mode)
+ 	if (hard_write(h, clip, l) != l) {
+ 		msg_box(ses->term, NULL, TEXT_(T_SAVE_ERROR), AL_CENTER, TEXT_(T_ERROR_WRITING_TO_FILE), MSG_BOX_END, NULL, 1, TEXT_(T_CANCEL), msg_box_null, B_ENTER | B_ESC);
+ 	}
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ ret:
+ 	mem_free(clip);
+ }
+diff --git a/os_dep.c b/os_dep.c
+index e89944cb966268cdc94aab1cd0ee62e41ba84953..35a3081af588d5f222edef2743df5a1f001b9781 100644
+--- a/os_dep.c
++++ b/os_dep.c
+@@ -538,7 +538,7 @@ void os_free_clipboard(void)
+ static void (*terminal_resize_callback)(int, int);
+ #endif
+ 
+-#if (defined(OS2) && defined(X2)) || defined(WIN) || defined(OPENVMS)
++#if defined(helios) || (defined(OS2) && defined(X2)) || defined(WIN) || defined(OPENVMS)
+ 
+ #define TERMINAL_SIZE_POLLING
+ 
+@@ -660,6 +660,8 @@ void get_terminal_size(int *x, int *y)
+ void get_terminal_size(int *x, int *y)
+ {
+ 	int rs = -1;
++	unsigned rows, cols;
++	if (!hu_terminal_size(1, &rows, &cols)) { *x=cols; *y=rows; return; }
+ #ifdef TIOCGWINSZ
+ 	/* Sun Studio misoptimizes it */
+ 	sun_volatile struct winsize ws;
+@@ -777,12 +779,12 @@ int c_pipe(int fd[2])
+ 	int r;
+ 	do {
+ 		fd_lock();
+-		EINTRLOOP(r, pipe(fd));
++		EINTRLOOP(r, hu_channel(fd));
+ 		if (!r) new_fd_bin(fd[0]), new_fd_bin(fd[1]);
+ 		fd_unlock();
+ 		if (verify_handle(fd[0]) || verify_handle(fd[1])) {
+-			EINTRLOOP(r, close(fd[0]));
+-			EINTRLOOP(r, close(fd[1]));
++			EINTRLOOP(r, hu_tls_fd_close(fd[0]));
++			EINTRLOOP(r, hu_tls_fd_close(fd[1]));
+ 			r = -1;
+ #ifdef EMFILE
+ 			errno = EMFILE;
+@@ -804,7 +806,7 @@ int c_dup(int oh)
+ 		fd_unlock();
+ 		if (verify_handle(h)) {
+ 			int r;
+-			EINTRLOOP(r, close(h));
++			EINTRLOOP(r, hu_tls_fd_close(h));
+ 			h = -1;
+ #ifdef EMFILE
+ 			errno = EMFILE;
+@@ -826,7 +828,7 @@ int c_socket(int d, int t, int p)
+ 		fd_unlock();
+ 		if (verify_handle(h)) {
+ 			int r;
+-			EINTRLOOP(r, close(h));
++			EINTRLOOP(r, hu_tls_fd_close(h));
+ 			h = -1;
+ #ifdef EMFILE
+ 			errno = EMFILE;
+@@ -848,7 +850,7 @@ int c_accept(int sh, struct sockaddr *addr, socklen_t *addrlen)
+ 		fd_unlock();
+ 		if (verify_handle(h)) {
+ 			int r;
+-			EINTRLOOP(r, close(h));
++			EINTRLOOP(r, hu_tls_fd_close(h));
+ 			h = -1;
+ #ifdef EMFILE
+ 			errno = EMFILE;
+@@ -870,7 +872,7 @@ int c_open(unsigned char *path, int flags)
+ 		fd_unlock();
+ 		if (verify_handle(h)) {
+ 			int r;
+-			EINTRLOOP(r, close(h));
++			EINTRLOOP(r, hu_tls_fd_close(h));
+ 			h = -1;
+ #ifdef EMFILE
+ 			errno = EMFILE;
+@@ -892,7 +894,7 @@ int c_open3(unsigned char *path, int flags, int mode)
+ 		fd_unlock();
+ 		if (verify_handle(h)) {
+ 			int r;
+-			EINTRLOOP(r, close(h));
++			EINTRLOOP(r, hu_tls_fd_close(h));
+ 			h = -1;
+ #ifdef EMFILE
+ 			errno = EMFILE;
+@@ -1059,36 +1061,36 @@ void close_fork_tty(void)
+ 	struct list_head *lk;
+ 	int rs;
+ #ifndef NO_SIGNAL_HANDLERS
+-	if (signal_pipe[0] != -1) EINTRLOOP(rs, close(signal_pipe[0]));
++	if (signal_pipe[0] != -1) EINTRLOOP(rs, hu_tls_fd_close(signal_pipe[0]));
+ #ifndef __minix__
+-	if (signal_pipe[1] != -1) EINTRLOOP(rs, close(signal_pipe[1]));
++	if (signal_pipe[1] != -1) EINTRLOOP(rs, hu_tls_fd_close(signal_pipe[1]));
+ #endif
+ #endif
+ #if defined(__linux__) || defined(__LINUX__)
+-	if (cons_control[0] != -1) EINTRLOOP(rs, close(cons_control[0]));
+-	if (cons_control[1] != -1) EINTRLOOP(rs, close(cons_control[1]));
+-	if (cons_status[0] != -1) EINTRLOOP(rs, close(cons_status[0]));
+-	if (cons_status[1] != -1) EINTRLOOP(rs, close(cons_status[1]));
++	if (cons_control[0] != -1) EINTRLOOP(rs, hu_tls_fd_close(cons_control[0]));
++	if (cons_control[1] != -1) EINTRLOOP(rs, hu_tls_fd_close(cons_control[1]));
++	if (cons_status[0] != -1) EINTRLOOP(rs, hu_tls_fd_close(cons_status[0]));
++	if (cons_status[1] != -1) EINTRLOOP(rs, hu_tls_fd_close(cons_status[1]));
+ #endif
+ #ifdef G
+ 	if (drv && drv->after_fork) drv->after_fork();
+ #endif
+-	if (terminal_pipe[1] != -1) EINTRLOOP(rs, close(terminal_pipe[1]));
+-	if (s_unix_fd != -1) EINTRLOOP(rs, close(s_unix_fd));
++	if (terminal_pipe[1] != -1) EINTRLOOP(rs, hu_tls_fd_close(terminal_pipe[1]));
++	if (s_unix_fd != -1) EINTRLOOP(rs, hu_tls_fd_close(s_unix_fd));
+ 	foreach(struct terminal, t, lt, terminals) {
+ 		if (t->fdin > 0)
+-			EINTRLOOP(rs, close(t->fdin));
++			EINTRLOOP(rs, hu_tls_fd_close(t->fdin));
+ 		if (t->handle_to_close >= 0)
+-			EINTRLOOP(rs, close(t->handle_to_close));
++			EINTRLOOP(rs, hu_tls_fd_close(t->handle_to_close));
+ 	}
+ 	foreach(struct download, d, ld, downloads) if (d->handle > 0)
+-		EINTRLOOP(rs, close(d->handle));
++		EINTRLOOP(rs, hu_tls_fd_close(d->handle));
+ 	foreach(struct connection, c, lc, queue) {
+-		if (c->sock1 >= 0) EINTRLOOP(rs, close(c->sock1));
+-		if (c->sock2 >= 0) EINTRLOOP(rs, close(c->sock2));
++		if (c->sock1 >= 0) EINTRLOOP(rs, hu_tls_fd_close(c->sock1));
++		if (c->sock2 >= 0) EINTRLOOP(rs, hu_tls_fd_close(c->sock2));
+ 	}
+ 	foreach(struct k_conn, k, lk, keepalive_connections)
+-		EINTRLOOP(rs, close(k->conn));
++		EINTRLOOP(rs, hu_tls_fd_close(k->conn));
+ }
+ 
+ 
+@@ -1426,7 +1428,7 @@ int exe(unsigned char *path, int fg)
+ {
+ 	pid_t p, rp;
+ 	int s, rs;
+-	EINTRLOOP(p, fork());
++	EINTRLOOP(p, links_no_fork());
+ 	if (!p) {
+ 		EINTRLOOP(rs, setpgid(0, 0));
+ 		system(path);
+@@ -1543,7 +1545,7 @@ static void close_handles(int keep_output)
+ 	int i, rs;
+ 	for (i = 0; i < FD_SETSIZE; i++) {
+ 		if (keep_output && (i == 1 || i == 2)) continue;
+-		EINTRLOOP(rs, close(i));
++		EINTRLOOP(rs, hu_tls_fd_close(i));
+ 	}
+ 	EINTRLOOP(rs, open("nul", O_RDONLY));
+ 	if (!keep_output) {
+@@ -1624,7 +1626,7 @@ int exe(unsigned char *path, int fg)
+ 	} else
+ #endif
+ 	{
+-		EINTRLOOP(pid, fork());
++		EINTRLOOP(pid, links_no_fork());
+ 		if (!pid) {
+ 	/* Win98 crashes if we spawn command.com and have some sockets open */
+ 			close_handles(0);
+@@ -1719,7 +1721,7 @@ int exe_on_background(unsigned char *path, unsigned char *del, int fg)
+ 	/* We need to fork here so that we can close handles */
+ 		pid_t pid;
+ 		/*int rs;*/
+-		EINTRLOOP(pid, fork());
++		EINTRLOOP(pid, links_no_fork());
+ 		if (!pid) {
+ 			close_handles(0);
+ 			/*EINTRLOOP(rs, execlp(cast_const_char x1, cast_const_char x1, "/c", cast_const_char arg, (char *)NULL));*/
+@@ -1768,11 +1770,11 @@ unsigned char *get_clipboard_text(struct terminal *term)
+ 	/* Don't use hard_read because UWin has buggy end-of-file signalling.
+ 	   It resets the position to the beginning after signalling eof. */
+ 	while (1) {
+-		EINTRLOOP(r, (int)read(h, buffer, sizeof buffer));
++		EINTRLOOP(r, (int)hu_tls_fd_read(h, buffer, sizeof buffer));
+ 		if (r <= 0) break;
+ 		add_bytes_to_str(&str, &l, buffer, r);
+ 	}
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ 	for (s = str, d = str; *s; s++)
+ 		if (!(s[0] == '\r' && s[1] == '\n')) *d++ = *s;
+ 	*d = 0;
+@@ -1804,7 +1806,7 @@ void set_clipboard_text(struct terminal *term, unsigned char *data)
+ 	}
+ 	hard_write(h, conv_data, l);
+ 	mem_free(conv_data);
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ }
+ 
+ int clipboard_support(struct terminal *term)
+@@ -1881,7 +1883,7 @@ static void call_resize(unsigned char *x1, int x, int y)
+ 	} else
+ #endif
+ 	{
+-		EINTRLOOP(pid, fork());
++		EINTRLOOP(pid, links_no_fork());
+ 		if (!pid) {
+ 	/* Win98 crashes if we spawn command.com and have some sockets open */
+ 			close_handles(1);
+@@ -1961,9 +1963,9 @@ int exe(unsigned char *path, int fg)
+ 		old1 = c_dup(1);
+ 		old2 = c_dup(2);
+ 		fd_lock();
+-		if (old0 >= 0) EINTRLOOP(rs, close(0));
+-		if (old1 >= 0) EINTRLOOP(rs, close(1));
+-		if (old2 >= 0) EINTRLOOP(rs, close(2));
++		if (old0 >= 0) EINTRLOOP(rs, hu_tls_fd_close(0));
++		if (old1 >= 0) EINTRLOOP(rs, hu_tls_fd_close(1));
++		if (old2 >= 0) EINTRLOOP(rs, hu_tls_fd_close(2));
+ 		if (old0 >= 0) EINTRLOOP(rs, open("con", O_RDONLY));
+ 		if (old1 >= 0) EINTRLOOP(rs, open("con", O_WRONLY));
+ 		if (old2 >= 0) EINTRLOOP(rs, open("con", O_WRONLY));
+@@ -1978,9 +1980,9 @@ int exe(unsigned char *path, int fg)
+ 		if (old0 >= 0) EINTRLOOP(rs, dup2(old0, 0));
+ 		if (old1 >= 0) EINTRLOOP(rs, dup2(old1, 1));
+ 		if (old2 >= 0) EINTRLOOP(rs, dup2(old2, 2));
+-		if (old0 >= 0) EINTRLOOP(rs, close(old0));
+-		if (old1 >= 0) EINTRLOOP(rs, close(old1));
+-		if (old2 >= 0) EINTRLOOP(rs, close(old2));
++		if (old0 >= 0) EINTRLOOP(rs, hu_tls_fd_close(old0));
++		if (old1 >= 0) EINTRLOOP(rs, hu_tls_fd_close(old1));
++		if (old2 >= 0) EINTRLOOP(rs, hu_tls_fd_close(old2));
+ 	}
+ #endif
+ 	fd_unlock();
+@@ -2184,8 +2186,8 @@ static void bgt(void *t_)
+ 	int rs;
+ 	ignore_signals();
+ 	t->fn(t->data, t->h);
+-	EINTRLOOP(rs, (int)write(t->h, "x", 1));
+-	EINTRLOOP(rs, close(t->h));
++	EINTRLOOP(rs, (int)hu_tls_fd_write(t->h, "x", 1));
++	EINTRLOOP(rs, hu_tls_fd_close(t->h));
+ 	free(t);
+ }
+ 
+@@ -2311,8 +2313,8 @@ int start_thread(void (*fn)(void *, int), void *ptr, int l, int counted)
+ 	err2:
+ 	free(t);
+ 	err1:
+-	EINTRLOOP(rs, close(p[0]));
+-	EINTRLOOP(rs, close(p[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(p[0]));
++	EINTRLOOP(rs, hu_tls_fd_close(p[1]));
+ 	return -1;
+ }
+ 
+@@ -2342,8 +2344,8 @@ int start_thread(void (*fn)(void *, int), void *ptr, int l, int counted)
+ 	err2:
+ 	free(t);
+ 	err1:
+-	EINTRLOOP(rs, close(p[0]));
+-	EINTRLOOP(rs, close(p[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(p[0]));
++	EINTRLOOP(rs, hu_tls_fd_close(p[1]));
+ 	return -1;
+ }
+ 
+@@ -2366,9 +2368,9 @@ static void input_thread(void *p)
+ 		 Knowing that, I suggest we replace this call completly!
+ 	    */
+ 		*c = _read_kbd(0, 1, 1);
+-		EINTRLOOP(rs, (int)write(h, c, 1));
++		EINTRLOOP(rs, (int)hu_tls_fd_write(h, c, 1));
+ 	}
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ }
+ #endif /* #ifdef HAVE__READ_KBD */
+ 
+@@ -2493,7 +2495,7 @@ static void mouse_thread(void *p)
+ 	MouClose(*mh);
+ 	fd_unlock();
+ 	ret:
+-	EINTRLOOP(rs, close(oms->p[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(oms->p[1]));
+ 	/*free(oms);*/
+ }
+ 
+@@ -2501,7 +2503,7 @@ static void mouse_handle(void *oms_)
+ {
+ 	struct os2_mouse_spec *oms = (struct os2_mouse_spec *)oms_;
+ 	int r;
+-	EINTRLOOP(r, (int)read(oms->p[0], oms->buffer + oms->bufptr, sizeof(struct links_event) - oms->bufptr));
++	EINTRLOOP(r, (int)hu_tls_fd_read(oms->p[0], oms->buffer + oms->bufptr, sizeof(struct links_event) - oms->bufptr));
+ 	if (r <= 0) {
+ 		unhandle_mouse(oms);
+ 		return;
+@@ -2699,8 +2701,8 @@ int start_thread(void (*fn)(void *, int), void *ptr, int l, int counted)
+ 	err2:
+ 	free(t);
+ 	err1:
+-	EINTRLOOP(rs, close(p[0]));
+-	EINTRLOOP(rs, close(p[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(p[0]));
++	EINTRLOOP(rs, hu_tls_fd_close(p[1]));
+ 	return -1;
+ }
+ 
+@@ -2733,8 +2735,8 @@ int start_thread(void (*fn)(void *, int), void *ptr, int l, int counted)
+ 	err2:
+ 	free(t);
+ 	err1:
+-	EINTRLOOP(rs, close(p[0]));
+-	EINTRLOOP(rs, close(p[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(p[0]));
++	EINTRLOOP(rs, hu_tls_fd_close(p[1]));
+ 	return -1;
+ }
+ 
+@@ -2746,7 +2748,7 @@ int start_thread(void (*fn)(void *, int), void *ptr, int l, int counted)
+ 	int rs;
+ 	if (c_pipe(p) < 0) return -1;
+ 	fn(ptr, p[1]);
+-	EINTRLOOP(rs, close(p[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(p[1]));
+ 	return p[0];
+ }
+ 
+@@ -2758,21 +2760,21 @@ int start_thread(void (*fn)(void *, int), void *ptr, int l, int counted)
+ 	pid_t f;
+ 	int rs;
+ 	if (c_pipe(p) < 0) return -1;
+-	EINTRLOOP(f, fork());
++	EINTRLOOP(f, links_no_fork());
+ 	if (!f) {
+ 		close_fork_tty();
+-		EINTRLOOP(rs, close(p[0]));
++		EINTRLOOP(rs, hu_tls_fd_close(p[0]));
+ 		fn(ptr, p[1]);
+-		EINTRLOOP(rs, (int)write(p[1], "x", 1));
+-		EINTRLOOP(rs, close(p[1]));
++		EINTRLOOP(rs, (int)hu_tls_fd_write(p[1], "x", 1));
++		EINTRLOOP(rs, hu_tls_fd_close(p[1]));
+ 		_exit(0);
+ 	}
+ 	if (f == -1) {
+-		EINTRLOOP(rs, close(p[0]));
+-		EINTRLOOP(rs, close(p[1]));
++		EINTRLOOP(rs, hu_tls_fd_close(p[0]));
++		EINTRLOOP(rs, hu_tls_fd_close(p[1]));
+ 		return -1;
+ 	}
+-	EINTRLOOP(rs, close(p[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(p[1]));
+ 	return p[0];
+ }
+ 
+@@ -2805,12 +2807,12 @@ int get_input_handle(void)
+ 	int fd[2];
+ 	if (ti != -1) return ti;
+ 	if (is_xterm()) return 0;
+-	if (c_pipe(fd) < 0) return 0;
++	if (c_hu_channel(fd) < 0) return 0;
+ 	ti = fd[0];
+ 	tp = fd[1];
+ 	if (_beginthread(input_thread, NULL, 0x10000, (void *)tp) == -1) {
+-		EINTRLOOP(rs, close(fd[0]));
+-		EINTRLOOP(rs, close(fd[1]));
++		EINTRLOOP(rs, hu_tls_fd_close(fd[0]));
++		EINTRLOOP(rs, hu_tls_fd_close(fd[1]));
+ 		return 0;
+ 	}
+ /*
+@@ -3346,7 +3348,7 @@ void os_detach_console(void)
+ #if !defined(__ICC) && !defined(__PATHSCALE__)
+ 		disable_openmp = 1;
+ #endif
+-		EINTRLOOP(rp, fork());
++		EINTRLOOP(rp, links_no_fork());
+ 		if (!rp) {
+ 			reinit_child();
+ #if defined(HAVE_PTHREADS)
+@@ -3587,7 +3589,7 @@ ok:
+ 
+ 	block_signals(SIGTERM, 0);
+ 
+-	cons_pid = fork();
++	cons_pid = links_no_fork();
+ 	if (!cons_pid) {
+ 		EINTRLOOP(rs, dup2(cons_control[0], 0));
+ 		if (rs < 0) _exit(1);
+diff --git a/os_dep.h b/os_dep.h
+index c528853861e500bb8857dd2470b42107520c9842..fa174e92e3cdea770ce0c39607e2e07dd67f0994 100644
+--- a/os_dep.h
++++ b/os_dep.h
+@@ -52,15 +52,15 @@
+ 
+ static inline int dir_sep(unsigned char x) { return x == '/'; }
+ #define NEWLINE "\n"
+-#define FS_UNIX_RIGHTS
+-#define FS_UNIX_HARDLINKS
+-#define FS_UNIX_SOFTLINKS
+-#define FS_UNIX_USERS
++/* Helios capability matrices: FS_UNIX_RIGHTS */
++/* Helios capability matrices: FS_UNIX_HARDLINKS */
++/* Helios capability matrices: FS_UNIX_SOFTLINKS */
++/* Helios capability matrices: FS_UNIX_USERS */
+ #define SYSTEM_ID SYS_UNIX
+ #define SYSTEM_NAME "Unix"
+-#define DEFAULT_SHELL "/bin/sh"
++#define DEFAULT_SHELL "/helios/bin/shell"
+ #define GETSHELL getenv("SHELL")
+-#define SHARED_CONFIG_DIR "/etc/"
++#define SHARED_CONFIG_DIR "/helios/etc/"
+ #ifdef HAVE_SYS_UN_H
+ #define USE_AF_UNIX
+ #endif
+@@ -124,15 +124,15 @@ static inline int dir_sep(unsigned char x) { return x == '/' || x == '\\'; }
+ 
+ static inline int dir_sep(unsigned char x) { return x == '/'; }
+ #define NEWLINE "\n"
+-#define FS_UNIX_RIGHTS
+-#define FS_UNIX_HARDLINKS
+-#define FS_UNIX_SOFTLINKS
+-#define FS_UNIX_USERS
++/* Helios capability matrices: FS_UNIX_RIGHTS */
++/* Helios capability matrices: FS_UNIX_HARDLINKS */
++/* Helios capability matrices: FS_UNIX_SOFTLINKS */
++/* Helios capability matrices: FS_UNIX_USERS */
+ #define SYSTEM_ID SYS_INTERIX
+ #define SYSTEM_NAME "Interix"
+-#define DEFAULT_SHELL "/bin/sh"
++#define DEFAULT_SHELL "/helios/bin/shell"
+ #define GETSHELL getenv("SHELL")
+-#define SHARED_CONFIG_DIR "/etc/"
++#define SHARED_CONFIG_DIR "/helios/etc/"
+ #ifdef HAVE_SYS_UN_H
+ #define USE_AF_UNIX
+ #endif
+@@ -145,15 +145,15 @@ static inline int dir_sep(unsigned char x) { return x == '/'; }
+ static inline int dir_sep(unsigned char x) { return x == '/'; }
+ #define NEWLINE "\n"
+ #define NO_ASYNC_LOOKUP /* async lookup works on BeOS but crashes the Haiku kernel */
+-#define FS_UNIX_RIGHTS
+-#define FS_UNIX_SOFTLINKS
+-#define FS_UNIX_USERS
++/* Helios capability matrices: FS_UNIX_RIGHTS */
++/* Helios capability matrices: FS_UNIX_SOFTLINKS */
++/* Helios capability matrices: FS_UNIX_USERS */
+ #define SYSTEM_ID SYS_BEOS
+ #define SYSTEM_NAME "BeOS"
+-#define DEFAULT_SHELL "/bin/sh"
++#define DEFAULT_SHELL "/helios/bin/shell"
+ #define GETSHELL getenv("SHELL")
+ #define NO_CTRL_Z
+-#define SHARED_CONFIG_DIR "/etc/"
++#define SHARED_CONFIG_DIR "/helios/etc/"
+ #define NO_FORK_ON_EXIT
+ #define USE_AF_UNIX
+ #define ASSOC_BLOCK
+@@ -190,15 +190,15 @@ static inline int dir_sep(unsigned char x) { return x == '/' || x == '\\'; }
+ 
+ static inline int dir_sep(unsigned char x) { return x == '/'; }
+ #define NEWLINE "\n"
+-#define FS_UNIX_RIGHTS
+-#define FS_UNIX_HARDLINKS
+-#define FS_UNIX_SOFTLINKS
+-#define FS_UNIX_USERS
++/* Helios capability matrices: FS_UNIX_RIGHTS */
++/* Helios capability matrices: FS_UNIX_HARDLINKS */
++/* Helios capability matrices: FS_UNIX_SOFTLINKS */
++/* Helios capability matrices: FS_UNIX_USERS */
+ #define SYSTEM_ID SYS_ATHEOS
+ #define SYSTEM_NAME "Atheos"
+-#define DEFAULT_SHELL "/bin/sh"
++#define DEFAULT_SHELL "/helios/bin/shell"
+ #define GETSHELL getenv("SHELL")
+-#define SHARED_CONFIG_DIR "/etc/"
++#define SHARED_CONFIG_DIR "/helios/etc/"
+ #define NO_FORK_ON_EXIT
+ #define ASSOC_BLOCK
+ 
+@@ -222,12 +222,12 @@ static inline int dir_sep(unsigned char x) { return x == '/'; }
+ 
+ static inline int dir_sep(unsigned char x) { return x == '/'; }
+ #define NEWLINE "\n"
+-#define FS_UNIX_RIGHTS
++/* Helios capability matrices: FS_UNIX_RIGHTS */
+ #define SYSTEM_ID SYS_OPENVMS
+ #define SYSTEM_NAME "VMS"
+ #define DEFAULT_SHELL "/DCL"
+ #define GETSHELL NULL
+-#define SHARED_CONFIG_DIR "/etc/"
++#define SHARED_CONFIG_DIR "/helios/etc/"
+ #ifndef HAVE_PTHREADS
+ #define HAVE_PTHREADS
+ #endif
+@@ -260,16 +260,16 @@ static inline int dir_sep(unsigned char x) { return x == '/' || x == '\\'; }
+ 
+ static inline int dir_sep(unsigned char x) { return x == '/'; }
+ #define NEWLINE "\n"
+-#define FS_UNIX_RIGHTS
+-#define FS_UNIX_SOFTLINKS
+-#define FS_UNIX_USERS
++/* Helios capability matrices: FS_UNIX_RIGHTS */
++/* Helios capability matrices: FS_UNIX_SOFTLINKS */
++/* Helios capability matrices: FS_UNIX_USERS */
+ #define SYSTEM_ID SYS_HAIKU
+ #define SYSTEM_NAME "Haiku"
+-#define DEFAULT_SHELL "/bin/sh"
++#define DEFAULT_SHELL "/helios/bin/shell"
+ #define GETSHELL getenv("SHELL")
+ #define NO_CTRL_Z
+ #define SET_WINDOW_TITLE_UTF_8
+-#define SHARED_CONFIG_DIR "/etc/"
++#define SHARED_CONFIG_DIR "/helios/etc/"
+ #define USE_AF_UNIX
+ #define ASSOC_BLOCK
+ 
+diff --git a/pmshell.c b/pmshell.c
+index 6623d91a99802ef1b0cce9690f750b9e82429131..e37494075ffb98e0f30ae641aeef53c5c8f342b4 100644
+--- a/pmshell.c
++++ b/pmshell.c
+@@ -431,7 +431,7 @@ static void pm_send_event(struct pm_window *win, int t, int x1, int y1, int x2,
+ 		if (!win->in) {
+ 			if (list_empty(pm_event_windows)) {
+ 				int wr;
+-				EINTRLOOP(wr, write(pm_pipe[1], "x", 1));
++				EINTRLOOP(wr, hu_tls_fd_write(pm_pipe[1], "x", 1));
+ 			}
+ 			add_to_list(pm_event_windows, win);
+ 			win->in = 1;
+@@ -1509,7 +1509,7 @@ static void pm_handler(void *p)
+ 	if (list_empty(pm_event_windows)) {
+ 		int rd;
+ 		debug_call(("M: pm_handler: read"));
+-		EINTRLOOP(rd, read(pm_pipe[0], &c, 1));
++		EINTRLOOP(rd, hu_tls_fd_read(pm_pipe[0], &c, 1));
+ 		if (rd != 1) {
+ 			if (rd < 0)
+ 				fatal_exit("error on pm pipe: %s", strerror(errno));
+@@ -1600,9 +1600,9 @@ static void pm_setup_console(int undo)
+ 	if (rs != 1) goto fail7;
+ 	EINTRLOOP(rs, dup2(pm_ep[1], 2));
+ 	if (rs != 2) goto fail8;
+-	EINTRLOOP(rs, close(pm_ip[0]));
+-	EINTRLOOP(rs, close(pm_op[1]));
+-	EINTRLOOP(rs, close(pm_ep[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_ip[0]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_op[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_ep[1]));
+ 	pm_cons_ok = 1;
+ 	return;
+ fail9:
+@@ -1612,20 +1612,20 @@ fail8:
+ fail7:
+ 	EINTRLOOP(rs, dup2(pm_sin, 0));
+ fail6:
+-	EINTRLOOP(rs, close(pm_ep[0]));
+-	EINTRLOOP(rs, close(pm_ep[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_ep[0]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_ep[1]));
+ fail5:
+-	EINTRLOOP(rs, close(pm_op[0]));
+-	EINTRLOOP(rs, close(pm_op[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_op[0]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_op[1]));
+ fail4:
+-	EINTRLOOP(rs, close(pm_ip[0]));
+-	EINTRLOOP(rs, close(pm_ip[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_ip[0]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_ip[1]));
+ fail3:
+-	EINTRLOOP(rs, close(pm_serr));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_serr));
+ fail2:
+-	EINTRLOOP(rs, close(pm_sout));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_sout));
+ fail1:
+-	EINTRLOOP(rs, close(pm_sin));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_sin));
+ fail:	pm_cons_ok = 0;
+ }
+ 
+@@ -1649,11 +1649,11 @@ static int pm_do_console_step(int slp)
+ 	}
+ 	FD_SET(pm_op[0], &s);
+ 	FD_SET(pm_ep[0], &s);
+-	EINTRLOOP(rs, select(m, &s, NULL, NULL, slp ? NULL : &tv));
++	EINTRLOOP(rs, hu_tls_fd_select(m, &s, NULL, NULL, slp ? NULL : &tv));
+ 	if (rs <= 0) return -1;
+ #define SEL_CHK(ih, oh)							\
+ 	if (FD_ISSET(ih, &s)) {						\
+-		EINTRLOOP(r, read(ih, buffer, CONS_BUF));		\
++		EINTRLOOP(r, hu_tls_fd_read(ih, buffer, CONS_BUF));		\
+ 		if (r <= 0) return -1;					\
+ 		do {							\
+ 			if ((w = hard_write(oh, buffer, r)) <= 0) return -1;\
+@@ -1711,7 +1711,7 @@ static unsigned char *pm_spawn_subproc(void)
+ 	pm_do_console();
+ 	pm_setup_console(1);
+ 	while (1)
+-		EINTRLOOP(rs, select(1, NULL, NULL, NULL, NULL));
++		EINTRLOOP(rs, hu_tls_fd_select(1, NULL, NULL, NULL, NULL));
+ 
+ 	return cast_uchar "Not reached.\n";
+ }
+@@ -1980,8 +1980,8 @@ skip_palette:
+ 	PM_UNFLUSH();
+ 	pm_lock_close();
+ 	r2:
+-	EINTRLOOP(rs, close(pm_pipe[0]));
+-	EINTRLOOP(rs, close(pm_pipe[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_pipe[0]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_pipe[1]));
+ 	r1:
+ #ifdef OS2
+ 	if (!WinTerminate(hab))
+@@ -2022,7 +2022,7 @@ static void pm_shutdown_driver(void)
+ 	PM_UNFLUSH();
+ 	pm_lock_close();
+ 	close_socket(&pm_pipe[0]);
+-	EINTRLOOP(rs, close(pm_pipe[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(pm_pipe[1]));
+ #ifdef OS2
+ 	if (!WinTerminate(hab))
+ 		error("WinTerminate failed: %lx", WinGetLastError(hab));
+diff --git a/sched.c b/sched.c
+index ed4ba33ce62455b848931977f135de487e8638fa..02b58b3a4b57a9ee405d003c6ab25823935cb73b 100644
+--- a/sched.c
++++ b/sched.c
+@@ -213,6 +213,7 @@ static void free_connection_data(struct connection *c)
+ {
+ 	struct h_conn *h;
+ 	int rs;
++	if (c->helios_tls_timer) { kill_timer(c->helios_tls_timer); c->helios_tls_timer=NULL; }
+ 	if (c->sock1 != -1) set_handlers(c->sock1, NULL, NULL, NULL);
+ 	close_socket(&c->sock2);
+ 	if (c->pid) {
+@@ -353,7 +354,7 @@ void add_keepalive_socket(struct connection *c, uttime timeout, int protocol_dat
+ 	register_bottom_half(check_queue, NULL);
+ 	return;
+ 	clos:
+-	EINTRLOOP(rs, close(c->sock1));
++	EINTRLOOP(rs, hu_tls_fd_close(c->sock1));
+ 	check_queue_bugs();
+ 	register_bottom_half(check_queue, NULL);
+ }
+@@ -365,7 +366,7 @@ static void del_keepalive_socket(struct k_conn *kc)
+ #ifdef HAVE_SSL
+ 	freeSSL(kc->ssl);
+ #endif
+-	EINTRLOOP(rs, close(kc->conn));
++	EINTRLOOP(rs, hu_tls_fd_close(kc->conn));
+ 	mem_free(kc->host);
+ 	mem_free(kc);
+ }
+diff --git a/select.c b/select.c
+index dfa1422ed4ca26a79d4d891ee88cb97e7a13aea2..76e1686793af4252f6d8ccafae4a4251c945311f 100644
+--- a/select.c
++++ b/select.c
+@@ -62,7 +62,7 @@ void portable_sleep(unsigned msec)
+ 	block_signals(0, 0);
+ 	tv.tv_sec = msec / 1000;
+ 	tv.tv_usec = msec % 1000 * 1000;
+-	EINTRLOOP(rs, select(0, NULL, NULL, NULL, &tv));
++	EINTRLOOP(rs, hu_tls_fd_select(0, NULL, NULL, NULL, &tv));
+ 	unblock_signals();
+ }
+ #endif
+@@ -102,9 +102,9 @@ fallback:
+ 	}
+ 	FD_SET(fd, &fds);
+ 	if (!wr)
+-		EINTRLOOP(rs, select(fd + 1, &fds, NULL, NULL, tvp));
++		EINTRLOOP(rs, hu_tls_fd_select(fd + 1, &fds, NULL, NULL, tvp));
+ 	else
+-		EINTRLOOP(rs, select(fd + 1, NULL, &fds, NULL, tvp));
++		EINTRLOOP(rs, hu_tls_fd_select(fd + 1, NULL, &fds, NULL, tvp));
+ 	if (rs < 0) fatal_exit("ERROR: select for %s (%d) failed: %s", !wr ? "read" : "write", fd, strerror(errno));
+ 	return rs;
+ }
+@@ -142,13 +142,13 @@ int close_std_handle(int std)
+ 	EINTRLOOP(rs, dup2(n, std));
+ 	if (rs == -1)
+ 		goto fail3;
+-	EINTRLOOP(rs, close(n));
++	EINTRLOOP(rs, hu_tls_fd_close(n));
+ 	return h;
+ 
+ fail3:
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ fail2:
+-	EINTRLOOP(rs, close(n));
++	EINTRLOOP(rs, hu_tls_fd_close(n));
+ fail1:
+ #endif
+ 	return -1;
+@@ -165,7 +165,7 @@ void restore_std_handle(int std, int h)
+ 	if (h == -1)
+ 		return;
+ 	EINTRLOOP(rs, dup2(h, std));
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ #endif
+ }
+ 
+@@ -689,7 +689,7 @@ void clear_events(int h, int blocking)
+ 	while (blocking ? can_read(h) : 1) {
+ 		unsigned char c[64];
+ 		int rd;
+-		EINTRLOOP(rd, (int)read(h, c, sizeof c));
++		EINTRLOOP(rd, (int)hu_tls_fd_read(h, c, sizeof c));
+ 		if (rd != sizeof c) break;
+ 	}
+ }
+@@ -746,7 +746,7 @@ SIGNAL_HANDLER static void got_signal(int sig)
+ 	signal_mask[sig] = 1;
+ 	if (can_write(signal_pipe[1])) {
+ 		int wr;
+-		EINTRLOOP(wr, (int)write(signal_pipe[1], "", 1));
++		EINTRLOOP(wr, (int)hu_tls_fd_write(signal_pipe[1], "", 1));
+ 	}
+ 	ret:
+ 	errno = sv_errno;
+diff --git a/session.c b/session.c
+index ad2281da50b9a7caead4f061992e0e83dc19161e..113b165e88f1025cfafcaf41fb46fd94ade04512 100644
+--- a/session.c
++++ b/session.c
+@@ -418,7 +418,7 @@ static int close_download_file(struct download *down)
+ 	   and ftruncate + close is executed */
+ 		EINTRLOOP(rs, ftruncate(down->handle, down->last_pos - down->file_shift));
+ #endif
+-		EINTRLOOP(rs, close(down->handle));
++		EINTRLOOP(rs, hu_tls_fd_close(down->handle));
+ 		down->handle = -1;
+ 		if (rs) return -1;
+ 	}
+@@ -1046,7 +1046,7 @@ static int create_or_append_download_file(struct session *ses, unsigned char *cw
+ 			mem_free(f);
+ 			goto ret_0;
+ 		}
+-		EINTRLOOP(rs, close(*hp));
++		EINTRLOOP(rs, hu_tls_fd_close(*hp));
+ 		mem_free(*xl_file);
+ 		*xl_file = f;
+ 		*file_shift = *last_pos;
+@@ -1057,7 +1057,7 @@ static int create_or_append_download_file(struct session *ses, unsigned char *cw
+ 	return 0;
+ 
+ 	err_close:
+-	EINTRLOOP(rs, close(*hp));
++	EINTRLOOP(rs, hu_tls_fd_close(*hp));
+ 	err_free:
+ 	mem_free(*xl_file);
+ 	return -1;
+diff --git a/smb.c b/smb.c
+index 47383f1f98fafa980e78cbf65e868d23d835c72d..7507c80641412fee62cfa98cb4bd7a385becdf71 100644
+--- a/smb.c
++++ b/smb.c
+@@ -113,14 +113,14 @@ void smb_func(struct connection *c)
+ 		mem_free(pass);
+ 		mem_free(share);
+ 		mem_free(data);
+-		EINTRLOOP(rs, close(po[0]));
+-		EINTRLOOP(rs, close(po[1]));
++		EINTRLOOP(rs, hu_tls_fd_close(po[0]));
++		EINTRLOOP(rs, hu_tls_fd_close(po[1]));
+ 		setcstate(c, get_error_from_errno(err));
+ 		abort_connection(c);
+ 		return;
+ 	}
+ 	c->from = 0;
+-	EINTRLOOP(r, fork());
++	EINTRLOOP(r, links_no_fork());
+ 	if (r == -1) {
+ 		int err = errno;
+ 		mem_free(host);
+@@ -129,10 +129,10 @@ void smb_func(struct connection *c)
+ 		mem_free(pass);
+ 		mem_free(share);
+ 		mem_free(data);
+-		EINTRLOOP(rs, close(po[0]));
+-		EINTRLOOP(rs, close(po[1]));
+-		EINTRLOOP(rs, close(pe[0]));
+-		EINTRLOOP(rs, close(pe[1]));
++		EINTRLOOP(rs, hu_tls_fd_close(po[0]));
++		EINTRLOOP(rs, hu_tls_fd_close(po[1]));
++		EINTRLOOP(rs, hu_tls_fd_close(pe[0]));
++		EINTRLOOP(rs, hu_tls_fd_close(pe[1]));
+ 		setcstate(c, get_error_from_errno(err));
+ 		retry_connection(c);
+ 		return;
+@@ -142,19 +142,19 @@ void smb_func(struct connection *c)
+ 		unsigned char *v[32];
+ 		unsigned char *uphp;
+ 		close_fork_tty();
+-		EINTRLOOP(rs, close(1));
++		EINTRLOOP(rs, hu_tls_fd_close(1));
+ 		if (si->list)
+ 			EINTRLOOP(rs, dup2(pe[1], 1));
+ 		else
+ 			EINTRLOOP(rs, dup2(po[1], 1));
+-		EINTRLOOP(rs, close(2));
++		EINTRLOOP(rs, hu_tls_fd_close(2));
+ 		EINTRLOOP(rs, dup2(pe[1], 2));
+-		EINTRLOOP(rs, close(0));
++		EINTRLOOP(rs, hu_tls_fd_close(0));
+ 		EINTRLOOP(rs, open("/dev/null", O_RDONLY));
+-		EINTRLOOP(rs, close(po[0]));
+-		EINTRLOOP(rs, close(pe[0]));
+-		EINTRLOOP(rs, close(po[1]));
+-		EINTRLOOP(rs, close(pe[1]));
++		EINTRLOOP(rs, hu_tls_fd_close(po[0]));
++		EINTRLOOP(rs, hu_tls_fd_close(pe[0]));
++		EINTRLOOP(rs, hu_tls_fd_close(po[1]));
++		EINTRLOOP(rs, hu_tls_fd_close(pe[1]));
+ 		n = 0;
+ 		switch (si->client) {
+ 		case SMBCLIENT:
+@@ -269,8 +269,8 @@ void smb_func(struct connection *c)
+ 	mem_free(data);
+ 	c->sock1 = po[0];
+ 	c->sock2 = pe[0];
+-	EINTRLOOP(rs, close(po[1]));
+-	EINTRLOOP(rs, close(pe[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(po[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(pe[1]));
+ 	set_handlers(po[0], smb_got_data, NULL, c);
+ 	set_handlers(pe[0], smb_got_text, NULL, c);
+ 	setcstate(c, S_CONN);
+@@ -325,7 +325,7 @@ static void smb_read_text(struct connection *c, int sock)
+ 	if ((size_t)sizeof(struct smb_connection_info) + si->ntext + page_size + 2 > (size_t)MAXINT) overalloc();
+ 	si = mem_realloc(si, sizeof(struct smb_connection_info) + si->ntext + page_size + 2);
+ 	c->info = si;
+-	EINTRLOOP(r, (int)read(sock, si->text + si->ntext, page_size));
++	EINTRLOOP(r, (int)hu_tls_fd_read(sock, si->text + si->ntext, page_size));
+ 	if (r == -1) {
+ 		setcstate(c, get_error_from_errno(errno));
+ 		retry_connection(c);
+@@ -390,7 +390,7 @@ static void smb_got_data(void *c_)
+ 		mem_free(buffer);
+ 		return;
+ 	}
+-	EINTRLOOP(r, (int)read(c->sock1, buffer, page_size));
++	EINTRLOOP(r, (int)hu_tls_fd_read(c->sock1, buffer, page_size));
+ 	if (r == -1) {
+ 		setcstate(c, get_error_from_errno(errno));
+ 		retry_connection(c);
+diff --git a/svgalib.c b/svgalib.c
+index 4c0c772c8f877f350020c77fca10743d05abf28a..d1a8b56ef73baa0a430fec9283ef80bf3bc38007 100644
+--- a/svgalib.c
++++ b/svgalib.c
+@@ -2325,7 +2325,7 @@ int vga_select(int n, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, stru
+ {
+ 	int retval,i;
+ 
+-	if (drv != &svga_driver) return select(n, readfds, writefds, exceptfds, timeout);
++	if (drv != &svga_driver) return hu_tls_fd_select(n, readfds, writefds, exceptfds, timeout);
+ 
+ 	/* The second flag here is to suppress mouse wait
+ 	 * in blocked state */
+diff --git a/terminal.c b/terminal.c
+index 6e58484bad643c5fbcf9b240746984788c569f18..98e92e36e1891112d22435b481834176e6cb89e7 100644
+--- a/terminal.c
++++ b/terminal.c
+@@ -13,7 +13,7 @@ int hard_write(int fd, const unsigned char *p, int l)
+ 	int t = 0;
+ 	while (l > 0) {
+ 		int w;
+-		EINTRLOOP(w, (int)write(fd, p, l));
++		EINTRLOOP(w, (int)hu_tls_fd_write(fd, p, l));
+ 		if (w < 0)
+ 			return -1;
+ 		if (!w) {
+@@ -32,7 +32,7 @@ int hard_read(int fd, unsigned char *p, int l)
+ 	int r = 1;
+ 	int t = 0;
+ 	while (l > 0 && r) {
+-		EINTRLOOP(r, (int)read(fd, p, l));
++		EINTRLOOP(r, (int)hu_tls_fd_read(fd, p, l));
+ 		if (r < 0)
+ 			return -1;
+ 		t += r;
+@@ -725,7 +725,7 @@ static void in_term(void *term_)
+ 	if ((unsigned)term->qlen + ALLOC_GR > MAXINT) overalloc();
+ 	iq = mem_realloc(term->input_queue, term->qlen + ALLOC_GR);
+ 	term->input_queue = iq;
+-	EINTRLOOP(r, (int)read(term->fdin, iq + term->qlen, ALLOC_GR));
++	EINTRLOOP(r, (int)hu_tls_fd_read(term->fdin, iq + term->qlen, ALLOC_GR));
+ 	if (r <= 0) {
+ 		if (r == -1 && errno != ECONNRESET) error("ERROR: error %d on terminal: could not read event", errno);
+ 		destroy_terminal(term);
+@@ -1108,10 +1108,10 @@ void destroy_terminal(void *term_)
+ 		mem_free(term->last_screen);
+ 		mem_free(term->input_queue);
+ 		set_handlers(term->fdin, NULL, NULL, NULL);
+-		EINTRLOOP(rs, close(term->fdin));
++		EINTRLOOP(rs, hu_tls_fd_close(term->fdin));
+ 		if (!term->master) {
+ 			if (term->fdout != term->fdin)
+-				EINTRLOOP(rs, close(term->fdout));
++				EINTRLOOP(rs, hu_tls_fd_close(term->fdout));
+ 		} else {
+ 			unhandle_terminal_signals(term);
+ 			free_all_itrms();
+diff --git a/view.c b/view.c
+index 14018058eb85b59f7e147ba3458cbcfea3efc955..2297298fb6e3f5a3bd121230fd1783bbea3b4564 100644
+--- a/view.c
++++ b/view.c
+@@ -2143,12 +2143,12 @@ static void encode_multipart(struct session *ses, struct list_head *l, unsigned
+ 				do {
+ 					if ((rd = hard_read(fh, buffer, F_BUFLEN)) == -1) {
+ 						errn = errno;
+-						EINTRLOOP(rs, close(fh));
++						EINTRLOOP(rs, hu_tls_fd_close(fh));
+ 						goto error;
+ 					}
+ 					if (rd) add_bytes_to_str(data, len, buffer, rd);
+ 				} while (rd);
+-				EINTRLOOP(rs, close(fh));
++				EINTRLOOP(rs, hu_tls_fd_close(fh));
+ 			}
+ 		}
+ 		add_to_str(data, len, cast_uchar "\r\n");
+@@ -4143,7 +4143,7 @@ static void save_formatted(struct session *ses, unsigned char *file, int mode)
+ 	if ((err = dump_to_file(f->f_data, h))) {
+ 		msg_box(ses->term, NULL, TEXT_(T_SAVE_ERROR), AL_CENTER, TEXT_(T_ERROR_WRITING_TO_FILE), cast_uchar ": ", get_err_msg(err, ses->term), MSG_BOX_END, NULL, 1, TEXT_(T_CANCEL), msg_box_null, B_ENTER | B_ESC);
+ 	}
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ }
+ 
+ void menu_save_formatted(struct terminal *term, void *xxx, void *ses_)
+diff --git a/vms.c b/vms.c
+index a89763283764ac2190339623cc5c8382ea9ed6a0..30e9567eec6336206b03f72a8fa8b9bf7b397bd9 100644
+--- a/vms.c
++++ b/vms.c
+@@ -464,14 +464,14 @@ static int vms_socketpair(int *fd)
+ 		errno = EINVAL;
+ 		goto err2;
+ 	}
+-	EINTRLOOP(rs, close(s1));
++	EINTRLOOP(rs, hu_tls_fd_close(s1));
+ 	fd[0] = s2;
+ 	fd[1] = s3;
+ 	return 0;
+ 	err2:
+-	EINTRLOOP(rs, close(s2));
++	EINTRLOOP(rs, hu_tls_fd_close(s2));
+ 	err1:
+-	EINTRLOOP(rs, close(s1));
++	EINTRLOOP(rs, hu_tls_fd_close(s1));
+ 	err0:
+ 	if (++retry_count > PIPE_RETRIES) return -1;
+ 	portable_sleep(100);
+@@ -580,7 +580,7 @@ static int check_fd(int fd, int what)
+ 	int rs;
+ 	FD_ZERO(&fds);
+ 	FD_SET(fd, &fds);
+-	EINTRLOOP(rs, select(fd + 1,
++	EINTRLOOP(rs, hu_tls_fd_select(fd + 1,
+ 		what == 0 ? &fds : NULL,
+ 		what == 1 ? &fds : NULL,
+ 		what == 2 ? &fds : NULL,
+@@ -708,7 +708,7 @@ static void vms_select_thread(void *p, int n)
+ #ifdef TEST_WAKE_BUG
+ 			fprintf(stderr, "wake 3. ");
+ #endif
+-			EINTRLOOP(r, select(select_set_max, &rs, &ws, &es, NULL));
++			EINTRLOOP(r, hu_tls_fd_select(select_set_max, &rs, &ws, &es, NULL));
+ #ifdef TEST_WAKE_BUG
+ 			fprintf(stderr, "wake 4. ");
+ #endif
+@@ -744,7 +744,7 @@ static void vms_select_thread(void *p, int n)
+ static void select_thread_wake(void)
+ {
+ 	int r;
+-	EINTRLOOP(r, (int)write(select_thread_signal[1], "", 1));
++	EINTRLOOP(r, (int)hu_tls_fd_write(select_thread_signal[1], "", 1));
+ 	pipe_wake_cond(&select_cond);
+ }
+ 
+@@ -786,7 +786,7 @@ int vms_select(int n, fd_set *rs, fd_set *ws, fd_set *es, struct timeval *t)
+ 	int dynamically_waited = 0;
+ #endif
+ 	/*if (!rs && !ws && !es)
+-		return select(0, NULL, NULL, NULL, t);*/
++		return hu_tls_fd_select(0, NULL, NULL, NULL, t);*/
+ 	if (t) {
+ 		if (!t->tv_sec && !t->tv_usec) {
+ 			last_pass = 1;
+@@ -931,7 +931,7 @@ full_wait:
+ 
+ int vms_select(int n, fd_set *rs, fd_set *ws, fd_set *es, struct timeval *t)
+ {
+-	return select(n, rs, ws, es, t);
++	return hu_tls_fd_select(n, rs, ws, es, t);
+ }
+ 
+ #endif
+@@ -967,7 +967,7 @@ int vms_close(int fd)
+ 	pipe_unlock();
+ #endif
+ #endif
+-	return close(fd);
++	return hu_tls_fd_close(fd);
+ }
+ 
+ int vms_pipe(int fd[2])
+@@ -1014,14 +1014,14 @@ int vms_read(int fd, void *buf, size_t size)
+ 			bounce_buffer = static_buffer;
+ 			if (size > BOUNCE_BUFFER_SIZE) size = BOUNCE_BUFFER_SIZE;
+ 		}
+-		r = read(fd, bounce_buffer, size);
++		r = hu_tls_fd_read(fd, bounce_buffer, size);
+ 		if (r > 0) memcpy(buf, bounce_buffer, r);
+ 		if (bounce_buffer != static_buffer)
+ 			free(bounce_buffer);
+ 		return r;
+ 	}
+ #endif
+-	return read(fd, buf, size);
++	return hu_tls_fd_read(fd, buf, size);
+ }
+ 
+ int vms_write(int fd, const void *buf, size_t size)
+@@ -1042,13 +1042,13 @@ int vms_write(int fd, const void *buf, size_t size)
+ 			if (size > BOUNCE_BUFFER_SIZE) size = BOUNCE_BUFFER_SIZE;
+ 		}
+ 		memcpy(bounce_buffer, buf, size);
+-		r = write(fd, bounce_buffer, size);
++		r = hu_tls_fd_write(fd, bounce_buffer, size);
+ 		if (bounce_buffer != static_buffer)
+ 			free(bounce_buffer);
+ 		return r;
+ 	}
+ #endif
+-	return write(fd, buf, size);
++	return hu_tls_fd_write(fd, buf, size);
+ }
+ 
+ #ifdef VMS_ADVANCED_HEAP
+@@ -1309,7 +1309,7 @@ void os_seed_random(unsigned char **pool, int *pool_size)
+ 		r = hard_read(h, buffer, (int)sizeof buffer);
+ 		if (r >= 0)
+ 			add_bytes_to_str(pool, pool_size, buffer, r);
+-		EINTRLOOP(r, close(h));
++		EINTRLOOP(r, hu_tls_fd_close(h));
+ 	}
+ }
+ 
+diff --git a/x.c b/x.c
+index 2feeb03f6d86277eaada94e8e7e8ea1ccdf03fa1..762136fdc5af8b6c0f8b7d8bdd3dd0a640605810 100644
+--- a/x.c
++++ b/x.c
+@@ -1576,7 +1576,7 @@ static void x_after_fork(void)
+ {
+ 	int rs;
+ 	if (x_fd != -1) {
+-		EINTRLOOP(rs, close(x_fd));
++		EINTRLOOP(rs, hu_tls_fd_close(x_fd));
+ 		x_fd = -1;
+ 	}
+ }

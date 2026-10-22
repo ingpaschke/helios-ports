@@ -1,0 +1,225 @@
+{
+  "format": 1,
+  "name": "fvwm",
+  "version": "1.24r",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/fvwmorg/fvwm1.git",
+    "revision": "6ce28fab50591d21a3a78ed05a5fdde8e50ddfd7",
+    "subdirectory": "",
+    "tree_sha256": "34b7b46d3d64abe0fab848bafde8e244e86d710231dc949c2cae5c15fd49a9ac"
+  },
+  "patches": [
+    {
+      "file": "01-runtime.patch",
+      "description": "Adapt window-manager tasks, input handling and session lifetime to Helios",
+      "sha256": "57250bfaa2fa456f7a5102c5b74d15423afe3769e4d7e8f65f8192b2ad5b3047"
+    },
+    {
+      "file": "02-module-ipc.patch",
+      "description": "Use native local channels for FVWM modules and check their protocol",
+      "sha256": "903001a66126c9e24d4e3eea05a52c49a217bbc23c5df95e72f16e378471e917"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "9512afcefda125743777c65390de580c01abe40882e3bf842bde2364cf5f73ca",
+  "dependencies": [
+    "x11"
+  ],
+  "requires_compat": true,
+  "build": {
+    "prepare": [
+      {
+        "type": "copy",
+        "source": "${src:x11}/helios/x11-platform.h",
+        "destination": "${src}/helios/x11-platform.h"
+      }
+    ],
+    "compile": {
+      "flags": [
+        "-std=gnu89",
+        "-Dhelios",
+        "-D_BSD",
+        "-DTCPCONN",
+        "-DNO_TCP_H",
+        "-DNeedFunctionPrototypes=0",
+        "-DNeedWidePrototypes=0",
+        "-DNO_ALLOCA",
+        "-Wno-error=implicit-function-declaration",
+        "-Wno-error=int-conversion",
+        "-Wno-error=incompatible-pointer-types",
+        "-Wno-error=return-mismatch",
+        "-I${compat}/include/helios-unix",
+        "-I${dep:x11}/include",
+        "-I${dep:x11}/include/X11",
+        "-I${dep:x11}/include/X11/extensions",
+        "-I${src}",
+        "-I${source_dir}",
+        "-I${src}/helios",
+        "-include",
+        "${src}/helios/platform.h"
+      ]
+    },
+    "groups": [
+      {
+        "name": "common",
+        "sources": [
+          "${src}/libs/CatString3.c",
+          "${src}/libs/SendInfo.c",
+          "${src}/libs/SendText.c",
+          "${src}/libs/wild.c",
+          "${src}/libs/safemalloc.c",
+          "${src}/libs/findIconFile.c",
+          "${src}/libs/mystrcasecmp.c",
+          "${src}/libs/strncmp.c",
+          "${src}/libs/hostname.c",
+          "${src}/libs/ReadPacket.c",
+          "${src}/libs/sleep.c",
+          "${src}/libs/CopyString.c",
+          "${src}/libs/mygetostype.c",
+          "${src}/libs/GetFdWidth.c",
+          "${src}/helios/platform.c"
+        ]
+      },
+      {
+        "name": "fvwm",
+        "sources": [
+          "${src}/fvwm/fvwm.c",
+          "${src}/fvwm/configure.c",
+          "${src}/fvwm/events.c",
+          "${src}/fvwm/borders.c",
+          "${src}/fvwm/menus.c",
+          "${src}/fvwm/functions.c",
+          "${src}/fvwm/resize.c",
+          "${src}/fvwm/add_window.c",
+          "${src}/fvwm/pager.c",
+          "${src}/fvwm/move.c",
+          "${src}/fvwm/icons.c",
+          "${src}/fvwm/windows.c",
+          "${src}/fvwm/module.c",
+          "${src}/fvwm/placement.c",
+          "${src}/fvwm/decorations.c",
+          "${src}/fvwm/colormaps.c",
+          "${src}/fvwm/misc.c",
+          "${src}/fvwm/style.c"
+        ]
+      },
+      {
+        "name": "GoodStuff",
+        "sources": [
+          "${src}/modules/GoodStuff/GoodStuff.c",
+          "${src}/modules/GoodStuff/icons.c"
+        ]
+      },
+      {
+        "name": "FvwmPager",
+        "sources": [
+          "${src}/modules/FvwmPager/FvwmPager.c",
+          "${src}/modules/FvwmPager/x_pager.c"
+        ]
+      },
+      {
+        "name": "helios-backdrop",
+        "sources": [
+          "${src}/helios/backdrop.c"
+        ]
+      },
+      {
+        "name": "fvwm-session",
+        "sources": [
+          "${src}/helios/session.c"
+        ]
+      },
+      {
+        "name": "fvwm-protocol-test",
+        "sources": [
+          "${src}/helios/protocol-test.c"
+        ]
+      }
+    ],
+    "link": {
+      "libraries": [
+        "${work}/libfvwmlib.a",
+        "${compat}/lib/helios-unix.lib",
+        "${dep:x11}/lib/libXext.a",
+        "${dep:x11}/lib/libX11.a",
+        "${sdk}/lib/bsd.lib",
+        "${sdk}/lib/c.lib",
+        "${sdk}/lib/helios.lib",
+        "${runtime}"
+      ],
+      "stack": 65536,
+      "heap": 131072
+    },
+    "targets": [
+      {
+        "name": "fvwmlib",
+        "type": "archive",
+        "groups": [
+          "common"
+        ],
+        "output": "${work}/libfvwmlib.a"
+      },
+      {
+        "name": "fvwm",
+        "type": "executable",
+        "groups": [
+          "fvwm"
+        ],
+        "output": "${stage}/bin/x11/fvwm"
+      },
+      {
+        "name": "GoodStuff",
+        "type": "executable",
+        "groups": [
+          "GoodStuff"
+        ],
+        "output": "${stage}/lib/fvwm/GoodStuff"
+      },
+      {
+        "name": "FvwmPager",
+        "type": "executable",
+        "groups": [
+          "FvwmPager"
+        ],
+        "output": "${stage}/lib/fvwm/FvwmPager"
+      },
+      {
+        "name": "helios-backdrop",
+        "type": "executable",
+        "groups": [
+          "helios-backdrop"
+        ],
+        "output": "${stage}/bin/x11/helios-backdrop"
+      },
+      {
+        "name": "fvwm-session",
+        "type": "executable",
+        "groups": [
+          "fvwm-session"
+        ],
+        "output": "${stage}/bin/x11/fvwm-session"
+      },
+      {
+        "name": "fvwm-protocol-test",
+        "type": "executable",
+        "groups": [
+          "fvwm-protocol-test"
+        ],
+        "output": "${stage}/local/libexec/fvwm-protocol-test"
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/helios/icons",
+        "destination": "${stage}/lib/fvwm/icons"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/fvwm/fvwm.man",
+        "destination": "${stage}/local/share/fvwm/fvwm.1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,338 @@
+Subject: Adapt DNS and HTTPS to the helios-unix resolver and TLS provider
+
+diff --git a/connect.c b/connect.c
+index f12483226d64e2b6faa9760f1f03225b62af552c..3f653bec31a328b6738773df2edb5adbdf0efcc0 100644
+--- a/connect.c
++++ b/connect.c
+@@ -26,12 +26,12 @@ static void log_data(unsigned char *data, int len)
+ 	fd = c_open3(cast_uchar LOG_TRANSFER, O_WRONLY | O_APPEND | O_CREAT, 0600);
+ 	if (fd != -1) {
+ 		int rw;
+-		EINTRLOOP(rw, write(fd, data, len));
+-		EINTRLOOP(rw, close(fd));
++		EINTRLOOP(rw, hu_tls_fd_write(fd, data, len));
++		EINTRLOOP(rw, hu_tls_fd_close(fd));
+ 	}
+ #else
+ 	int rw;
+-	EINTRLOOP(rw, write(2, data, len));
++	EINTRLOOP(rw, hu_tls_fd_write(2, data, len));
+ #endif
+ }
+ 
+@@ -119,7 +119,7 @@ int socket_and_bind(int pf, unsigned char *address)
+ 			EINTRLOOP(rs, bind(s, (struct sockaddr *)(void *)&sa, sizeof sa));
+ 			if (rs) {
+ 				int sv_errno = errno;
+-				EINTRLOOP(rs, close(s));
++				EINTRLOOP(rs, hu_tls_fd_close(s));
+ 				errno = sv_errno;
+ 				return -1;
+ 			}
+@@ -143,7 +143,7 @@ int socket_and_bind(int pf, unsigned char *address)
+ 			EINTRLOOP(rs, bind(s, (struct sockaddr *)(void *)&sa, sizeof sa));
+ 			if (rs) {
+ 				int sv_errno = errno;
+-				EINTRLOOP(rs, close(s));
++				EINTRLOOP(rs, hu_tls_fd_close(s));
+ 				errno = sv_errno;
+ 				return -1;
+ 			}
+@@ -151,7 +151,7 @@ int socket_and_bind(int pf, unsigned char *address)
+ 		}
+ #endif
+ 		default: {
+-			EINTRLOOP(rs, close(s));
++			EINTRLOOP(rs, hu_tls_fd_close(s));
+ 			errno = EINVAL;
+ 			return -1;
+ 		}
+@@ -166,7 +166,7 @@ bind_to_iface:
+ 		return s;
+ 	}
+ #endif
+-	EINTRLOOP(rs, close(s));
++	EINTRLOOP(rs, hu_tls_fd_close(s));
+ 	return -1;
+ }
+ 
+@@ -175,7 +175,7 @@ void close_socket(int *s)
+ 	int rs;
+ 	if (*s == -1) return;
+ 	set_handlers(*s, NULL, NULL, NULL);
+-	EINTRLOOP(rs, close(*s));
++	EINTRLOOP(rs, hu_tls_fd_close(*s));
+ 	*s = -1;
+ }
+ 
+@@ -528,7 +528,7 @@ static void handle_socks(void *c_)
+ 		log_data(command, len);
+ 		log_string(cast_uchar "\n");
+ 	}
+-	EINTRLOOP(wr, (int)write(*b->sock, command + b->socks_byte_count, len - b->socks_byte_count));
++	EINTRLOOP(wr, (int)hu_tls_fd_write(*b->sock, command + b->socks_byte_count, len - b->socks_byte_count));
+ 	mem_free(command);
+ 	if (wr <= 0) {
+ 		setcstate(c, wr ? get_error_from_errno(errno) : S_CANT_WRITE);
+@@ -552,7 +552,7 @@ static void handle_socks_reply(void *c_)
+ 	struct conn_info *b = c->newconn;
+ 	int rd;
+ 	set_connection_timeout(c);
+-	EINTRLOOP(rd, (int)read(*b->sock, b->socks_reply + b->socks_byte_count, sizeof b->socks_reply - b->socks_byte_count));
++	EINTRLOOP(rd, (int)hu_tls_fd_read(*b->sock, b->socks_reply + b->socks_byte_count, sizeof b->socks_reply - b->socks_byte_count));
+ 	if (rd <= 0) {
+ 		setcstate(c, rd ? get_error_from_errno(errno) : S_CANT_READ);
+ 		retry_connection(c);
+@@ -732,6 +732,29 @@ void continue_connection(struct connection *c, int *sock, void (*func)(struct co
+ }
+ #endif
+ 
++/* The selected TLS backend performs the handshake. Poll status using a
++ * Links timer; never block the terminal's event loop or retry in plaintext.
++ * free_connection_data cancels this timer before freeing the connection. */
++static void helios_tls_poll(void *arg)
++{
++    struct connection *c=arg;
++    struct conn_info *b=c->newconn;
++    struct hu_tls_info info;
++    int result;
++    c->helios_tls_timer=NULL;
++    result=hu_tls_fd_handshake(*b->sock, &info);
++    if (result==0) {
++        c->helios_tls_timer=install_timer(25, helios_tls_poll, c);
++        return;
++    }
++    if (result<0) {
++        setcstate(c, S_SSL_ERROR);
++        abort_connection(c);
++        return;
++    }
++    connected_callback(c);
++}
++
+ static void connected(void *c_)
+ {
+ 	struct connection *c = (struct connection *)c_;
+@@ -844,6 +867,16 @@ skip_numeric_address:
+ 		}
+ 	}
+ #endif
++    if (!casecmp(c->url, cast_uchar "https://", 8)) {
++        unsigned char *peer=get_host_name(c->url);
++        int result=peer ? hu_tls_fd_start(*b->sock, cast_const_char peer, 30000) : -1;
++        if (peer) mem_free(peer);
++        if (result<0) { setcstate(c, S_SSL_ERROR); abort_connection(c); return; }
++        set_handlers(*b->sock, NULL, NULL, NULL);
++        setcstate(c, S_SSL_NEG);
++        c->helios_tls_timer=install_timer(25, helios_tls_poll, c);
++        return;
++    }
+ 	connected_callback(c);
+ }
+ 
+@@ -980,9 +1013,9 @@ static void write_select(void *c_)
+ 	} else
+ #endif
+ 	{
+-		EINTRLOOP(wr, (int)write(wb->sock, wb->data + wb->pos, wb->len - wb->pos));
++		EINTRLOOP(wr, (int)hu_tls_fd_write(wb->sock, wb->data + wb->pos, wb->len - wb->pos));
+ 		if (wr <= 0) {
+-#if defined(ATHEOS) || defined(DOS)
++#if defined(helios) || defined(ATHEOS) || defined(DOS)
+ 	/* Workaround for a bug in Syllable */
+ 			if (wr && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+ 				return;
+@@ -1070,9 +1103,12 @@ read_more:
+ 	} else
+ #endif
+ 	{
+-		EINTRLOOP(rd, (int)read(rb->sock, rb->data + rb->len, READ_SIZE));
++		EINTRLOOP(rd, (int)hu_tls_fd_read(rb->sock, rb->data + rb->len, READ_SIZE));
+ 		if (rd <= 0) {
+ 			if (total_read) goto success;
++            if (rd<0 && (errno==EAGAIN || errno==EWOULDBLOCK)) {
++                set_handlers(rb->sock, read_select, NULL, c); return;
++            }
+ 			if (rb->close && !rd) {
+ 				rb->close = 2;
+ 				rb->done(c, rb);
+diff --git a/dns.c b/dns.c
+index bb8ac779682ecfb16bcb0f20b6881b6ac836fc58..4f7d7928b524cd971791f685e67b22c2a7e795b4 100644
+--- a/dns.c
++++ b/dns.c
+@@ -172,10 +172,10 @@ static int do_external_lookup(unsigned char *name, unsigned char *host)
+ 	int rs;
+ 	if (c_pipe(pi) == -1)
+ 		return -1;
+-	EINTRLOOP(f, fork());
++	EINTRLOOP(f, links_no_fork());
+ 	if (f == -1) {
+-		EINTRLOOP(rs, close(pi[0]));
+-		EINTRLOOP(rs, close(pi[1]));
++		EINTRLOOP(rs, hu_tls_fd_close(pi[0]));
++		EINTRLOOP(rs, hu_tls_fd_close(pi[1]));
+ 		return -1;
+ 	}
+ 	if (!f) {
+@@ -183,23 +183,23 @@ static int do_external_lookup(unsigned char *name, unsigned char *host)
+ 		/* without setsid it gets stuck when on background */
+ 		EINTRLOOP(rs, setsid());
+ #endif
+-		EINTRLOOP(rs, close(pi[0]));
++		EINTRLOOP(rs, hu_tls_fd_close(pi[0]));
+ 		EINTRLOOP(rs, dup2(pi[1], 1));
+ 		if (rs == -1) _exit(1);
+ 		EINTRLOOP(rs, dup2(pi[1], 2));
+ 		if (rs == -1) _exit(1);
+-		EINTRLOOP(rs, close(pi[1]));
++		EINTRLOOP(rs, hu_tls_fd_close(pi[1]));
+ 		EINTRLOOP(rs, execlp("host", "host", cast_const_char name, (char *)NULL));
+ 		EINTRLOOP(rs, execl("/usr/sbin/host", "host", cast_const_char name, (char *)NULL));
+ 		_exit(1);
+ 	}
+-	EINTRLOOP(rs, close(pi[1]));
++	EINTRLOOP(rs, hu_tls_fd_close(pi[1]));
+ 	rd = hard_read(pi[0], buffer, sizeof buffer - 1);
+ 	if (rd >= 0) buffer[rd] = 0;
+ 	if (rd > 0) {
+ 		while (hard_read(pi[0], sink, sizeof sink) > 0);
+ 	}
+-	EINTRLOOP(rs, close(pi[0]));
++	EINTRLOOP(rs, hu_tls_fd_close(pi[0]));
+ 	/* Don't wait for the process, we already have sigchld handler that
+ 	 * does cleanup.
+ 	 * waitpid(f, NULL, 0); */
+@@ -423,55 +423,52 @@ ret:
+ 	return;
+ }
+ 
+-#ifndef NO_ASYNC_LOOKUP
+-static void lookup_fn(void *q_, int h)
+-{
+-	struct dnsquery *q = (struct dnsquery *)q_;
+-	struct lookup_result host;
+-	do_real_lookup(q->name, q->addr_preference, &host);
+-	/*{
+-		int i;
+-		for (i = 0; i < sizeof(struct lookup_result); i++) {
+-			if (i == 1) portable_sleep(1000);
+-			hard_write(h, (unsigned char *)&host + i, 1);
+-		}
+-	}*/
+-	hard_write(h, (unsigned char *)&host, sizeof(struct lookup_result));
+-}
+-
+-static void end_real_lookup(void *q_)
+-{
+-	struct dnsquery *q = (struct dnsquery *)q_;
+-	int r = 1;
+-	int rs;
+-	if (!q->addr || hard_read(q->h, (unsigned char *)q->addr, sizeof(struct lookup_result)) != sizeof(struct lookup_result) || !q->addr->n) goto end;
+-	r = 0;
+-
+-	end:
+-	set_handlers(q->h, NULL, NULL, NULL);
+-	EINTRLOOP(rs, close(q->h));
+-	end_dns_lookup(q, r, -1);
+-}
+-#endif
+-
+-static void do_lookup(struct dnsquery *q, int force_async)
+-{
+-	/*debug("starting lookup for %s", q->name);*/
+-#ifndef NO_ASYNC_LOOKUP
+-	if (!async_lookup && !force_async) {
+-#endif
+-#ifndef NO_ASYNC_LOOKUP
+-		sync_lookup:
+-#endif
+-		do_real_lookup(q->name, q->addr_preference, q->addr);
+-		end_dns_lookup(q, !q->addr->n, -1);
+-#ifndef NO_ASYNC_LOOKUP
+-	} else {
+-		q->h = start_thread(lookup_fn, q, (int)((unsigned char *)strchr(cast_const_char q->name, 0) + 1 - (unsigned char *)q), 1);
+-		if (q->h == -1) goto sync_lookup;
+-		set_handlers(q->h, end_real_lookup, NULL, q);
+-	}
+-#endif
++/* An independent Helios resolver task writes a bounded HUR1 frame. The UI
++ * only reads available bytes: a slow DNS lookup must never stop keyboard I/O.
++ * Links' existing SIGCHLD handler reaps these children. */
++static void end_real_lookup(void *data)
++{
++    struct dnsquery *q=data;
++    int n, i, error=1;
++    unsigned char *w=q->helios_reply;
++    n=hu_tls_fd_read(q->h,(char *)w+q->helios_received,392-q->helios_received);
++    if(n<0 && (errno==EINTR || errno==EAGAIN || errno==EWOULDBLOCK)) return;
++    if(n>0) {
++        q->helios_received+=n;
++        if(q->helios_received<392) return;
++        if(q->addr && !memcmp(w,"HUR1",4) && !w[4] && w[5]>0 &&
++           w[5]<=32 && !w[6] && !w[7] && !w[391]) {
++            memset(q->addr,0,sizeof(*q->addr));
++            for(i=0;i<w[5];i++)
++                add_address(q->addr,AF_INET,w+8+4*i,0,q->addr_preference);
++            error=!q->addr->n;
++        }
++    }
++    set_handlers(q->h,NULL,NULL,NULL);
++    hu_tls_fd_close(q->h);
++    end_dns_lookup(q,error,-1);
++}
++
++static void do_lookup(struct dnsquery *q,int force_async)
++{
++    int fds[2], error;
++    pid_t pid;
++    unsigned char numeric[4];
++    if(!q->addr) { end_dns_lookup(q,1,-1);return; }
++    if(!numeric_ip_address(q->name,numeric)) {
++        memset(q->addr,0,sizeof(*q->addr));
++        add_address(q->addr,AF_INET,numeric,0,q->addr_preference);
++        end_dns_lookup(q,0,-1);
++        return;
++    }
++    if(hu_channel(fds)<0) { end_dns_lookup(q,1,-1);return; }
++    error=hu_resolve_launch(&pid,fds[1],(char *)q->name,0,NULL);
++    hu_tls_fd_close(fds[1]);
++    if(error || hu_set_nonblock(fds[0],1)<0) {
++        hu_tls_fd_close(fds[0]);end_dns_lookup(q,1,-1);return;
++    }
++    q->h=fds[0];q->helios_received=0;
++    set_handlers(q->h,end_real_lookup,NULL,q);
+ }
+ 
+ static void do_queued_lookup(struct dnsquery *q)
+@@ -767,7 +764,7 @@ int ipv6_full_access(void)
+ 	sin6.sin6_port = htons(1024);
+ 	memcpy(&sin6.sin6_addr.s6_addr, "\052\001\004\060\000\015\000\000\002\314\236\377\376\044\176\032", 16);
+ 	EINTRLOOP(c, connect(h, (struct sockaddr *)(void *)&sin6, sizeof sin6));
+-	EINTRLOOP(rs, close(h));
++	EINTRLOOP(rs, hu_tls_fd_close(h));
+ 	if (!c) return 1;
+ #endif
+ 	return 0;
+@@ -824,7 +821,7 @@ void init_dns(void)
+ 		if (h == -1) {
+ 			support_ipv6 = 0;
+ 		} else {
+-			EINTRLOOP(rs, close(h));
++			EINTRLOOP(rs, hu_tls_fd_close(h));
+ 			support_ipv6 = 1;
+ 		}
+ 	}
+diff --git a/https.c b/https.c
+index ffe81676019aa9751fb1c287ab15fd304d24ccbd..8607b1c545fa40723db34e48f16bb5023027732f 100644
+--- a/https.c
++++ b/https.c
+@@ -897,8 +897,7 @@ void init_session_cache(void)
+ 
+ void https_func(struct connection *c)
+ {
+-	setcstate(c, S_NO_SSL);
+-	abort_connection(c);
++	http_func(c); /* TLS is handled by the portable TLS adapter. */
+ }
+ 
+ #endif

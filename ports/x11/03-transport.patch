@@ -1,0 +1,155 @@
+Subject: Adapt Xlib transport and authorization to Helios
+
+diff --git a/lib/X/XlibInt.c b/lib/X/XlibInt.c
+index dc97170b998b7e5c7685fb543dd3e1a324361fe6..4b595775eb0de21211689a07df36a95294bd5301 100644
+--- a/lib/X/XlibInt.c
++++ b/lib/X/XlibInt.c
+@@ -15,6 +15,7 @@
+ #include <stdio.h>
+ #include "Xlibint.h"
+ #include "Xos.h"
++#include <sys/socket.h>
+ 
+ static void _EatData32();
+ 
+@@ -83,7 +84,7 @@ _XFlush (dpy)
+ 		todo = size;
+ 		bufindex += write_stat;
+ #ifdef EWOULDBLOCK
+-	    } else if (errno == EWOULDBLOCK) {
++	    } else if ((errno == EWOULDBLOCK || errno == EAGAIN)) {
+ 		_XWaitForWritable(dpy);
+ #endif
+ #ifdef SUNSYSV
+@@ -125,6 +126,21 @@ _XEventsQueued (dpy, mode)
+ 	if (dpy->flags & XlibDisplayIOError) return(dpy->qlen);
+ 	if (BytesReadable(dpy->fd, (char *) &pend) < 0)
+ 	    _XIOError(dpy);
++
++        if (pend == 0) {
++            char byte;
++            int n, saved_errno = errno;
++            do {
++                n = recv(dpy->fd, &byte, 1, MSG_PEEK);
++            } while (n < 0 && errno == EINTR);
++            if (n == 0) {
++                errno = EPIPE;
++                _XIOError(dpy);
++            } else if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
++                _XIOError(dpy);
++            }
++            errno = saved_errno;
++        }
+ 	if ((len = pend) < SIZEOF(xReply))
+ 	    return(dpy->qlen);	/* _XFlush can enqueue events */
+ 	else if (len > BUFSIZE)
+@@ -217,7 +233,7 @@ _XRead (dpy, data, size)
+ 		    data += bytes_read;
+ 		    }
+ #ifdef EWOULDBLOCK
+-		else if (errno == EWOULDBLOCK) {
++		else if ((errno == EWOULDBLOCK || errno == EAGAIN)) {
+ 		    _XWaitForReadable(dpy);
+ 		    errno = 0;
+ 		}
+@@ -408,7 +424,7 @@ _XReadPad (dpy, data, size)
+ 	    	    iov[0].iov_base += bytes_read;
+ 	    	}
+ #ifdef EWOULDBLOCK
+-	    else if (errno == EWOULDBLOCK) {
++	    else if ((errno == EWOULDBLOCK || errno == EAGAIN)) {
+ 		_XWaitForReadable(dpy);
+ 		errno = 0;
+ 	    }
+@@ -508,7 +524,7 @@ _XSend (dpy, data, size)
+ 		total -= len;
+ 		todo = total;
+ #ifdef EWOULDBLOCK
+-	    } else if (errno == EWOULDBLOCK) {
++	    } else if ((errno == EWOULDBLOCK || errno == EAGAIN)) {
+ #ifdef apollo /* stupid sr10.1 UDS bug - supposedly fixed in sr10.2 */
+ 		if (todo > 4096)
+ 		    todo = 4096;
+@@ -1693,7 +1709,7 @@ int iovcnt;
+ /*
+ 	END USER STAMP AREA
+ */
+-extern char * malloc();
++
+ extern char _XsTypeOfStream[];
+ extern Xstream _XsStream[];
+ 
+diff --git a/lib/X/Xlibos.h b/lib/X/Xlibos.h
+index d43dcc51407cd15fbc3101e91527272a9f38cb99..db23327659a64bd657b449b6439d0f1ed5f45e7f 100644
+--- a/lib/X/Xlibos.h
++++ b/lib/X/Xlibos.h
+@@ -144,7 +144,7 @@
+ #include <malloc.h>
+ #include <string.h>
+ #else
+-char *malloc(), *realloc(), *calloc();
++
+ void free();
+ char *strncpy(), *strncat();
+ void perror();
+diff --git a/lib/Xau/AuFileName.c b/lib/Xau/AuFileName.c
+index 02104746461348c1356647fe2c4f2392669f7d7a..0320c94682f4b6631d394fcf355cfaf55a5683ae 100644
+--- a/lib/Xau/AuFileName.c
++++ b/lib/Xau/AuFileName.c
+@@ -23,7 +23,7 @@
+ char *
+ XauFileName ()
+ {
+-    char    *name, *malloc (), *getenv ();
++    char    *name, *getenv ();
+     char    *strcat (), *strcpy ();
+     static char	*buf;
+     static int	bsize;
+diff --git a/lib/Xau/AuRead.c b/lib/Xau/AuRead.c
+index 6ce58f81b38c81614ea15700ac2af14a0dbf4dff..7551243a886b1ee1da275862e29dd74f8905c856 100644
+--- a/lib/Xau/AuRead.c
++++ b/lib/Xau/AuRead.c
+@@ -40,7 +40,7 @@ char	**stringp;
+ FILE	*file;
+ {
+     unsigned short  len;
+-    char	    *data, *malloc ();
++    char	    *data;
+ 
+     if (read_short (&len, file) == 0)
+ 	return 0;
+@@ -66,7 +66,7 @@ FILE	*auth_file;
+ {
+     Xauth   local;
+     Xauth   *ret;
+-    char    *malloc ();
++    
+ 
+     if (read_short (&local.family, auth_file) == 0)
+ 	return 0;
+diff --git a/lib/Xau/AuWrite.c b/lib/Xau/AuWrite.c
+index 867e00bebb566aec0c6773676b00cc16f04fcfcf..37d15076edee366559c1718914458e299016cfbc 100644
+--- a/lib/Xau/AuWrite.c
++++ b/lib/Xau/AuWrite.c
+@@ -51,7 +51,7 @@ XauWriteAuth (auth_file, auth)
+ FILE	*auth_file;
+ Xauth	*auth;
+ {
+-    char    *malloc ();
++    
+ 
+     if (write_short (auth->family, auth_file) == 0)
+ 	return 0;
+diff --git a/lib/Xdmcp/Alloc.c b/lib/Xdmcp/Alloc.c
+index db09d1ea8e2b8cc81963bb071a3ef1b8764454c5..2d2f8a36998865daca1fe7ee58f4fb60df62f0d5 100644
+--- a/lib/Xdmcp/Alloc.c
++++ b/lib/Xdmcp/Alloc.c
+@@ -25,7 +25,7 @@
+ 
+ /* stubs for use when Xalloc, Xrealloc and Xfree are not defined */
+ 
+-extern char	*malloc (), *realloc ();
++
+ 
+ long *
+ Xalloc (amount)

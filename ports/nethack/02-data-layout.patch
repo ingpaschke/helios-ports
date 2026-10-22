@@ -1,0 +1,276 @@
+Subject: Keep generated game data and level serialization consistent with the target ABI
+
+diff --git a/include/sp_lev.h b/include/sp_lev.h
+index c6b73ab4c23e0dcf7e5f998d1ef0528cb3c0e0c1..a689cbf97e4ada1a7634d6c3924aec0791926a8f 100644
+--- a/include/sp_lev.h
++++ b/include/sp_lev.h
+@@ -1,3 +1,4 @@
++/* Modified for the Helios port, 2026-10-09. See sys/helios/README.txt. */
+ /*	SCCS Id: @(#)sp_lev.h	3.1	92/04/19	*/
+ /* Copyright (c) 1989 by Jean-Christophe Collet			  */
+ /* NetHack may be freely redistributed.  See license for details. */
+@@ -5,6 +6,14 @@
+ #ifndef SP_LEV_H
+ #define SP_LEV_H
+ 
++/* Helios rounds every structure to a word, including nested char-only
++ * structures. Match that ABI in the i386 host level compiler. */
++#ifdef HELIOS_HOST_TOOLS
++# define SPLEV_ALIGN __attribute__((aligned(4)))
++#else
++# define SPLEV_ALIGN
++#endif
++
+     /* wall directions */
+ #define W_NORTH     1
+ #define W_SOUTH     2
+@@ -30,26 +39,26 @@
+  * Structures manipulated by the special levels loader & compiler
+  */
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	boolean	init_present;
+ 	char	fg, bg;
+ 	boolean	smoothed, joined;
+ 	xchar   lit, walled;
+ } lev_init;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x, y, mask;
+ } door;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar wall, pos, secret, mask;
+ } room_door;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x, y, type;
+ } trap;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x, y, class, appear;
+ 	schar peaceful, asleep;
+ 	aligntyp	align;
+@@ -58,7 +67,7 @@ typedef struct {
+ 	char  *appear_as;
+ } monster;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x, y, class;
+ 	xchar curse_state;
+ 	short id;
+@@ -69,52 +78,52 @@ typedef struct {
+ 
+ #include "align.h"
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar		x, y;
+ 	aligntyp	align;
+ 	xchar		shrine;
+ } altar;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x, y, dir, db_open;
+ } drawbridge;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x, y, dir;
+ } walk;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x1, y1, x2, y2;
+ } digpos;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x, y, up;
+ } lad;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x, y, up;
+ } stair;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x1, y1, x2, y2;
+ 	xchar rtype, rlit, rirreg;
+ } region;
+ 
+ /* values for rtype are defined in dungeon.h */
+-typedef struct {
+-	struct { xchar x1, y1, x2, y2; } inarea;
+-	struct { xchar x1, y1, x2, y2; } delarea;
++typedef struct SPLEV_ALIGN {
++	struct SPLEV_ALIGN { xchar x1, y1, x2, y2; } inarea;
++	struct SPLEV_ALIGN { xchar x1, y1, x2, y2; } delarea;
+ 	boolean in_islev, del_islev;
+ 	xchar rtype;
+ 	char *rname;
+ } lev_region;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x, y;
+ 	int   amount;
+ } gold;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x, y;
+     union {
+ 	int length;
+@@ -123,19 +132,19 @@ typedef struct {
+ 	xchar etype;
+ } engraving;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x,y;
+ } fountain;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x,y;
+ } sink;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	xchar x,y;
+ } pool;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	char halign, valign;
+ 	char xsize, ysize;
+ 	char **map;
+@@ -180,7 +189,7 @@ typedef struct {
+ 	fountain **fountains;
+ } mazepart;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	long flags;
+ 	lev_init init_lev;
+ 	short filling;
+@@ -188,7 +197,7 @@ typedef struct {
+ 	mazepart **parts;
+ } specialmaze;
+ 
+-typedef struct _room {
++typedef struct SPLEV_ALIGN _room {
+ 	char  *name;
+ 	char  *parent;
+ 	xchar x, y, w, h;
+@@ -222,15 +231,15 @@ typedef struct _room {
+ 	struct mkroom *mkr;
+ } room;
+ 
+-typedef struct {
+-	struct {
++typedef struct SPLEV_ALIGN {
++	struct SPLEV_ALIGN {
+ 		xchar room;
+ 		xchar wall;
+ 		xchar door;
+ 	} src, dest;
+ } corridor;
+ 
+-typedef struct {
++typedef struct SPLEV_ALIGN {
+ 	long flags;
+ 	lev_init init_lev;
+ 	char nrobjects;
+diff --git a/src/dungeon.c b/src/dungeon.c
+index 00d8509fa0f76e2ceefa4961763b249cbd560c10..f702682f2610da425e73244e28fb310b718bfd7f 100644
+--- a/src/dungeon.c
++++ b/src/dungeon.c
+@@ -8,7 +8,7 @@
+ #ifdef OVL1
+ 
+ #define	DUNGEON_FILE	"dungeon"
+-#if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C)
++#if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C) || defined(HELIOS)
+ # define RDMODE "rb"
+ #else
+ # define RDMODE "r"
+diff --git a/src/questpgr.c b/src/questpgr.c
+index 1cf8efd8478f2eea3e2cc0be3ba5b412af49fcd8..16420f9407f6e5eeb7e3e033c52d6145b187fdf9 100644
+--- a/src/questpgr.c
++++ b/src/questpgr.c
+@@ -10,7 +10,7 @@
+ #include "qtext.h"
+ 
+ #define QTEXT_FILE	"quest.dat"
+-#if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C)
++#if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C) || defined(HELIOS)
+ # define RDMODE "rb"
+ #else
+ # define RDMODE "r"
+diff --git a/src/save.c b/src/save.c
+index 053fe6558a4c907c8b4be4bda9215a4df72af6e6..1e92d7a615c93597e9ab20f2cf22ab4292f41a2b 100644
+--- a/src/save.c
++++ b/src/save.c
+@@ -384,7 +384,12 @@ int mode;
+ 	tlev=lev; tlev &= 0x00ff;
+ 	bwrite(fd,(genericptr_t) &tlev,sizeof(tlev));
+ #else
+-	bwrite(fd,(genericptr_t) &lev,sizeof(lev));
++	/* Helios widens narrow parameters to int, including sizeof(lev).
++	 * Serialize a local xchar to match getlev's one-byte dlvl. */
++	{
++	    xchar disklev = lev;
++	    bwrite(fd,(genericptr_t) &disklev,sizeof(disklev));
++	}
+ #endif
+ #ifdef RLECOMP
+ 	{
+diff --git a/src/sp_lev.c b/src/sp_lev.c
+index aedfd45dce945b3f4f32460efef279acb121bdfc..9e08f7d01ed522fb14d8eaa1cf2ec7ee19e372cc 100644
+--- a/src/sp_lev.c
++++ b/src/sp_lev.c
+@@ -42,7 +42,7 @@ static void FDECL(create_corridor, (corridor *));
+ static boolean FDECL(create_subroom, (struct mkroom *, XCHAR_P, XCHAR_P,
+ 					XCHAR_P, XCHAR_P, XCHAR_P, XCHAR_P));
+ 
+-#if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C)
++#if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C) || defined(HELIOS)
+ # define RDMODE "rb"
+ #else
+ # define RDMODE "r"
+diff --git a/util/dgn_main.c b/util/dgn_main.c
+index 89e4d1f79c8ea9525e35a3b1be418d8d48bb568f..11d6a3dc36e3d9cf528b7dfb2c4bc0dd991e23ec 100644
+--- a/util/dgn_main.c
++++ b/util/dgn_main.c
+@@ -17,7 +17,7 @@ extern void FDECL(exit, (int));
+ # endif
+ #endif
+ 
+-#if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C)
++#if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C) || defined(HELIOS)
+ # define WRMODE "w+b"
+ #else
+ # define WRMODE "w+"
+diff --git a/util/makedefs.c b/util/makedefs.c
+index 42bef39b8ccce09b567015b515c25ba0e8836b31..7d42e17cdf53327862b8bd0201594ae4f886a07d 100644
+--- a/util/makedefs.c
++++ b/util/makedefs.c
+@@ -59,7 +59,7 @@ extern void FDECL(exit, (int));
+ #define WRMODE  "w+"
+ #define RDMODE  "r"
+ /* the quest.dat file is binary, while everything else is text... */
+-#if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C)
++#if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C) || defined(HELIOS)
+ # define WRBMODE "w+b"
+ #else
+ # define WRBMODE "w+"

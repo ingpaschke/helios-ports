@@ -1,0 +1,84 @@
+# Makefile.helios -- cross build of Frotz for Helios (transputer) with
+# clang's Helios mode (--target=t800-unknown-helios) and the Helios asm.
+#
+#   make -f Makefile.helios            dfrotz (dumb) and frotz (curses)
+#   make -f Makefile.helios dfrotz     dumb interface only
+#
+# Variables (override on the command line):
+#   CLANG    clang with the T800 backend and Helios mode (default: the
+#            llvm-t800 package's). The llvm-t800-helios add-on puts asm
+#            beside it and the Helios headers and libraries where clang
+#            looks by default (<prefix>/sysroots/helios).
+#   SYSROOT  another Helios tree (include/, lib/): --sysroot=$(SYSROOT)
+#   HASMDIR  a directory with asm, if it is not beside clang
+#   OPT      optimisation level (default -Os)
+#   STACK, HEAP  initial stack and heap of the program in words; both grow
+#            at run time (the Helios `c` driver defaults are 5000)
+
+CLANG  ?= /opt/llvm-t800/bin/clang
+OPT    ?= -Os
+STACK  ?= 5000
+HEAP   ?= 5000
+
+ifneq ($(HASMDIR),)
+export PATH := $(HASMDIR):$(PATH)
+endif
+
+B := build-helios
+CFLAGS := --target=t800-helios $(if $(SYSROOT),--sysroot=$(SYSROOT)) $(OPT) \
+	-DHELIOS_PORT -Isrc/helios -Isrc/helios/include
+LDFLAGS := --target=t800-helios $(if $(SYSROOT),--sysroot=$(SYSROOT)) \
+	-Wl,-s$(STACK) -Wl,-h$(HEAP)
+
+COMMON_SRC := buffer.c err.c fastmem.c files.c getopt.c hotkey.c input.c \
+	main.c math.c missing.c object.c process.c quetzal.c random.c \
+	redirect.c screen.c sound.c stream.c table.c text.c variable.c
+DUMB_SRC := dblorb.c dinit.c dinput.c doutput.c dpic.c
+CURSES_SRC := ux_audio_none.c ux_blorb.c ux_init.c ux_input.c ux_pic.c \
+	ux_screen.c ux_text.c
+
+COMMON_OBJ := $(COMMON_SRC:%.c=$(B)/common/%.o) $(B)/helios/hcompat.o
+DUMB_OBJ := $(DUMB_SRC:%.c=$(B)/dumb/%.o)
+CURSES_OBJ := $(CURSES_SRC:%.c=$(B)/curses/%.o) $(B)/curses/hcurses.o
+
+.PHONY: all dfrotz frotz clean
+all: dfrotz frotz
+dfrotz: $(B)/dfrotz
+frotz: $(B)/frotz
+
+$(B)/dfrotz: $(COMMON_OBJ) $(DUMB_OBJ)
+	$(CLANG) $(LDFLAGS) $^ -o $@
+
+$(B)/frotz: $(COMMON_OBJ) $(CURSES_OBJ)
+	$(CLANG) $(LDFLAGS) $^ -lcurses -ltermcap -lbsd -o $@
+
+# The sources include "defs.h" and "../common/defs.h": the Unix Makefile
+# generates them in src/common, here they are copied from src/helios.
+GEN := src/common/defs.h src/common/hash.h
+src/common/%.h: src/helios/%.h
+	cp $< $@
+
+$(COMMON_OBJ) $(DUMB_OBJ) $(CURSES_OBJ): $(GEN)
+
+$(B)/common/%.o: src/common/%.c
+	@mkdir -p $(dir $@)
+	$(CLANG) $(CFLAGS) -c $< -o $@
+
+$(B)/dumb/%.o: src/dumb/%.c
+	@mkdir -p $(dir $@)
+	$(CLANG) $(CFLAGS) -c $< -o $@
+
+$(B)/curses/%.o: src/curses/%.c
+	@mkdir -p $(dir $@)
+	$(CLANG) $(CFLAGS) -c $< -o $@
+
+$(B)/helios/hcompat.o: src/helios/hcompat.c
+	@mkdir -p $(dir $@)
+	$(CLANG) $(CFLAGS) -c $< -o $@
+
+$(B)/curses/hcurses.o: src/helios/hcurses.c
+	@mkdir -p $(dir $@)
+	$(CLANG) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(B) $(GEN)

@@ -1,0 +1,414 @@
+Subject: Use asynchronous Helios DNS and portable TLS connections
+
+diff --git a/src/core/net-nonblock.c b/src/core/net-nonblock.c
+index 5eaae8d89352518451bfcbe68e0fd8c9b2664932..96e6db298fbe4ee5988fcd5c7bd2be355fe19b43 100644
+--- a/src/core/net-nonblock.c
++++ b/src/core/net-nonblock.c
+@@ -1,3 +1,4 @@
++#include <helios/unix/channel.h>
+ /*
+  net-nonblock.c : Nonblocking net_connect()
+ 
+@@ -19,6 +20,8 @@
+ */
+ 
+ #include "module.h"
++#include <helios/unix/resolve.h>
++#include <helios/unix/netdb.h>
+ 
+ #include <signal.h>
+ 
+@@ -73,119 +76,33 @@ static int g_io_channel_read_block(GIOChannel *channel, void *data, int len)
+ 
+ /* nonblocking gethostbyname(), ip (IPADDR) + error (int, 0 = not error) is
+    written to pipe when found PID of the resolver child is returned */
+-int net_gethostbyname_nonblock(const char *addr, GIOChannel *pipe,
+-			       int reverse_lookup)
++/* Resolver runs as an independent Helios task. Only a bounded HUR1 value
++ * message crosses the /internet-backed channel; GLib stays in this task. */
++int net_gethostbyname_nonblock(const char *addr,GIOChannel *channel,int reverse_lookup)
+ {
+-	RESOLVED_IP_REC rec;
+-	const char *errorstr;
+-#ifndef WIN32
+-	int pid;
+-#endif
+-	int len;
+-
+-	g_return_val_if_fail(addr != NULL, FALSE);
+-
+-#ifndef WIN32
+-	pid = fork();
+-	if (pid > 0) {
+-		/* parent */
+-		pidwait_add(pid);
+-		return pid;
+-	}
+-
+-	if (pid != 0) {
+-		/* failed! */
+-		g_warning("net_connect_thread(): fork() failed! "
+-			  "Using blocking resolving");
+-	}
+-#endif
+-
+-	/* child */
+-        memset(&rec, 0, sizeof(rec));
+-	rec.error = net_gethostbyname(addr, &rec.ip4, &rec.ip6);
+-	if (rec.error == 0) {
+-		errorstr = NULL;
+-		if (reverse_lookup) {
+-			/* reverse lookup the IP, ignore any error */
+-			if (rec.ip4.family != 0)
+-				net_gethostbyaddr(&rec.ip4, &rec.host4);
+-			if (rec.ip6.family != 0)
+-				net_gethostbyaddr(&rec.ip6, &rec.host6);
+-		}
+-	} else {
+-		errorstr = net_gethosterror(rec.error);
+-		rec.errlen = errorstr == NULL ? 0 : strlen(errorstr)+1;
+-	}
+-
+-        g_io_channel_write_block(pipe, &rec, sizeof(rec));
+-	if (rec.errlen != 0)
+-		g_io_channel_write_block(pipe, (void *) errorstr, rec.errlen);
+-	else {
+-		if (rec.host4) {
+-			len = strlen(rec.host4) + 1;
+-			g_io_channel_write_block(pipe, (void *) &len, 
+-						       sizeof(int));
+-			g_io_channel_write_block(pipe, (void *) rec.host4,
+-						       len);
+-		}
+-		if (rec.host6) {
+-			len = strlen(rec.host6) + 1;
+-			g_io_channel_write_block(pipe, (void *) &len,
+-						       sizeof(int));
+-			g_io_channel_write_block(pipe, (void *) rec.host6,
+-						       len);
+-		}
+-	}
+-
+-#ifndef WIN32
+-	if (pid == 0)
+-		_exit(99);
+-#endif
+-
+-	/* we used blocking lookup */
+-	return 0;
++    pid_t pid;int fd=g_io_channel_unix_get_fd(channel);
++    int error=hu_resolve_launch(&pid,fd,addr,reverse_lookup,NULL);
++    g_io_channel_close(channel); /* child now owns the only writer */
++    if(error) {
++        /* Closing the write direction wakes the reader, which reports failure.
++         * Do not leave a lookup hanging because a child could not start. */
++        errno=error;return -1;
++    }
++    pidwait_add(pid);return pid;
+ }
+-
+-/* get the resolved IP address */
+-int net_gethostbyname_return(GIOChannel *pipe, RESOLVED_IP_REC *rec)
++int net_gethostbyname_return(GIOChannel *channel,RESOLVED_IP_REC *rec)
+ {
+-	int len;
+-
+-	rec->error = -1;
+-	rec->errorstr = NULL;
+-	rec->host4 = NULL;
+-	rec->host6 = NULL;
+-
+-#ifndef WIN32
+-	fcntl(g_io_channel_unix_get_fd(pipe), F_SETFL, O_NONBLOCK);
+-#endif
+-
+-	/* get ip+error */
+-	if (g_io_channel_read_block(pipe, rec, sizeof(*rec)) == -1) {
+-		rec->errorstr = g_strdup_printf("Host name lookup: %s",
+-						g_strerror(errno));
+-		return -1;
+-	}
+-
+-	if (rec->error) {
+-		/* read error string, if we can't read everything for some
+-		   reason, just ignore it. */
+-		rec->errorstr = g_malloc0(rec->errlen+1);
+-                g_io_channel_read_block(pipe, rec->errorstr, rec->errlen);
+-	} else {
+-		if (rec->host4) {
+-			g_io_channel_read_block(pipe, &len, sizeof(int));
+-			rec->host4 = g_malloc0(len);
+-			g_io_channel_read_block(pipe, rec->host4, len);
+-		}
+-		if (rec->host6) {
+-			g_io_channel_read_block(pipe, &len, sizeof(int));
+-			rec->host6 = g_malloc0(len);
+-			g_io_channel_read_block(pipe, rec->host6, len);
+-		}
+-	}
+-
+-	return 0;
++    struct hu_resolve_result result;
++    memset(rec,0,sizeof(*rec));
++    if(hu_resolve_receive(g_io_channel_unix_get_fd(channel),&result)<0) {
++        rec->error=-1;rec->errorstr=g_strdup_printf("Host name lookup: %s",g_strerror(errno));return -1;
++    }
++    if(result.error) {
++        rec->error=-1;rec->errorstr=g_strdup(gai_strerror(result.error));return 0;
++    }
++    rec->ip4.family=AF_INET;memcpy(&rec->ip4.ip,result.addresses[0],4);
++    if(result.canonical[0])rec->host4=g_strdup(result.canonical);
++    return 0;
+ }
+ 
+ /* Get host name, call func when finished */
+@@ -237,7 +154,7 @@ static void simple_readpipe(SIMPLE_THREAD_REC *rec, GIOChannel *pipe)
+ 
+ 	g_io_channel_close(rec->pipes[0]);
+ 	g_io_channel_unref(rec->pipes[0]);
+-	g_io_channel_close(rec->pipes[1]);
++	/* resolver launch closed the parent writer */
+ 	g_io_channel_unref(rec->pipes[1]);
+ 
+ 	ip = iprec.ip4.family != 0 ? &iprec.ip4 : &iprec.ip6;
+@@ -267,7 +184,7 @@ int net_connect_nonblock(const char *server, int port, const IPADDR *my_ip,
+ 	g_return_val_if_fail(server != NULL, FALSE);
+ 	g_return_val_if_fail(func != NULL, FALSE);
+ 
+-	if (pipe(fd) != 0) {
++	if (hu_channel(fd) != 0) {
+ 		g_warning("net_connect_nonblock(): pipe() failed.");
+ 		return FALSE;
+ 	}
+diff --git a/src/core/net-sendbuffer.c b/src/core/net-sendbuffer.c
+index f8aac80ce2e95212a0aa1a63387e543f5d574e07..4b9cde788e1e22017ac3dd3defda7546e2e08ac8 100644
+--- a/src/core/net-sendbuffer.c
++++ b/src/core/net-sendbuffer.c
+@@ -1,3 +1,5 @@
++#include <helios/unix/api.h>
++#include <helios/unix/tls_fd.h>
+ /*
+  net-sendbuffer.c : Buffered send()
+ 
+@@ -141,12 +143,21 @@ void net_sendbuffer_flush(NET_SENDBUF_REC *rec)
+ 
+         /* set the socket blocking while doing this */
+ 	handle = g_io_channel_unix_get_fd(rec->handle);
++    if (hu_tls_fd_get(handle)) {
++        struct timeval start,now;
++        gettimeofday(&start,NULL);
++        while (!buffer_send(rec)) {
++            gettimeofday(&now,NULL);
++            if (now.tv_sec-start.tv_sec>=5 || hu_tls_wait(hu_tls_fd_get(handle),HU_TLS_WRITE,100)<0) break;
++        }
++        return;
++    }
+ #ifndef WIN32
+-	fcntl(handle, F_SETFL, 0);
++	hu_set_nonblock(handle,0);
+ #endif
+ 	while (!buffer_send(rec)) ;
+ #ifndef WIN32
+-	fcntl(handle, F_SETFL, O_NONBLOCK);
++	hu_set_nonblock(handle,1);
+ #endif
+ }
+ 
+diff --git a/src/core/network.c b/src/core/network.c
+index 21235b2af8380470aac142452fa4e56993d81411..79d12ee091b3346030b91f7a17d75372af6a83e5 100644
+--- a/src/core/network.c
++++ b/src/core/network.c
+@@ -1,3 +1,5 @@
++#include <helios/unix/api.h>
++#include <helios/unix/tls_fd.h>
+ /*
+  network.c : Network stuff
+ 
+@@ -180,7 +182,7 @@ GIOChannel *net_connect_ip(IPADDR *ip, int port, IPADDR *my_ip)
+ 
+ 	/* set socket options */
+ #ifndef WIN32
+-	fcntl(handle, F_SETFL, O_NONBLOCK);
++	hu_set_nonblock(handle,1);
+ #endif
+ 	setsockopt(handle, SOL_SOCKET, SO_REUSEADDR,
+ 		   (char *) &opt, sizeof(opt));
+@@ -232,7 +234,7 @@ GIOChannel *net_connect_unix(const char *path)
+ 
+ 	/* set socket options */
+ #ifndef WIN32
+-	fcntl(handle, F_SETFL, O_NONBLOCK);
++	hu_set_nonblock(handle,1);
+ #endif
+ 
+ 	/* connect */
+@@ -291,7 +293,7 @@ GIOChannel *net_listen(IPADDR *my_ip, int *port)
+ 
+ 	/* set socket options */
+ #ifndef WIN32
+-	fcntl(handle, F_SETFL, O_NONBLOCK);
++	hu_set_nonblock(handle,1);
+ #endif
+ 	setsockopt(handle, SOL_SOCKET, SO_REUSEADDR,
+ 		   (char *) &opt, sizeof(opt));
+@@ -338,7 +340,7 @@ GIOChannel *net_accept(GIOChannel *handle, IPADDR *addr, int *port)
+ 	if (port != NULL) *port = sin_get_port(&so);
+ 
+ #ifndef WIN32
+-	fcntl(ret, F_SETFL, O_NONBLOCK);
++	hu_set_nonblock(ret,1);
+ #endif
+ 	return g_io_channel_new(ret);
+ }
+diff --git a/src/core/servers.c b/src/core/servers.c
+index ca18914ae79259994f62faaf00f3f6e4cab23ee6..9cbb441358fa55a0ca32c1733fea9591cf9fd77a 100644
+--- a/src/core/servers.c
++++ b/src/core/servers.c
+@@ -1,3 +1,4 @@
++#include <helios/unix/channel.h>
+ /*
+  server.c : irssi
+ 
+@@ -58,7 +59,7 @@ void server_connect_failed(SERVER_REC *server, const char *msg)
+ 	if (server->connect_pipe[0] != NULL) {
+ 		g_io_channel_close(server->connect_pipe[0]);
+ 		g_io_channel_unref(server->connect_pipe[0]);
+-		g_io_channel_close(server->connect_pipe[1]);
++		/* resolver launch closed the parent writer */
+ 		g_io_channel_unref(server->connect_pipe[1]);
+ 		server->connect_pipe[0] = NULL;
+ 		server->connect_pipe[1] = NULL;
+@@ -147,6 +148,62 @@ void server_connect_finished(SERVER_REC *server)
+ 	signal_emit("server connected", 1, server);
+ }
+ 
++/* TLS owns encryption and readiness. The GLib Unix-channel adapter routes
++ * read/write/select/close through hu_tls_fd, including buffered plaintext and
++ * opposite-direction waits. connect_tag still owns cancellation of this timer. */
++#include <helios/unix/tls_fd.h>
++
++static int helios_tls_poll(void *data)
++{
++    SERVER_REC *server = data;
++    struct hu_tls_info info;
++    int fd = g_io_channel_unix_get_fd(server->handle->handle);
++    int result = hu_tls_fd_handshake(fd, &info);
++    char *message;
++
++    if (result == 0) return TRUE;
++    /* GLib removes the current timer when we return FALSE. Clear the tag
++     * before callbacks can destroy the server or try removing it again. */
++    server->connect_tag = -1;
++    if (result < 0 || info.state != HU_TLS_READY) {
++        message = g_strdup_printf("TLS: %s", info.message[0] ? info.message :
++            (result < 0 ? g_strerror(errno) : "peer closed during handshake"));
++        server->connection_lost = TRUE;
++        server_connect_failed(server, message);
++        g_free(message);
++    } else {
++        lookup_servers = g_slist_remove(lookup_servers, server);
++        server_connect_finished(server);
++    }
++    return FALSE;
++}
++
++static void helios_tls_begin(SERVER_REC *server, GIOChannel *handle)
++{
++    int fd = g_io_channel_unix_get_fd(handle);
++    char *message;
++    if (hu_tls_fd_start(fd, server->connrec->address, 30000) == 0) {
++        server->connect_tag = g_timeout_add(50, helios_tls_poll, server);
++        return;
++    }
++    message = g_strdup_printf("TLS: %s", g_strerror(errno));
++    server->connection_lost = TRUE;
++    server->no_reconnect = TRUE;
++    server_connect_failed(server, message);
++    g_free(message);
++}
++
++static const char *helios_tls_options(SERVER_CONNECT_REC *conn)
++{
++    if (!conn->use_ssl) return NULL;
++    if (conn->proxy != NULL || conn->unix_socket)
++        return "TLS: use a direct TCP connection (no IRC proxy or Unix socket)";
++    if ((conn->ssl_cert && *conn->ssl_cert) || (conn->ssl_pkey && *conn->ssl_pkey) ||
++        (conn->ssl_cafile && *conn->ssl_cafile) || (conn->ssl_capath && *conn->ssl_capath))
++        return "TLS: certificates use the TLS backend trust store; client certificates and per-server CA files are unsupported";
++    return NULL;
++}
++
+ static void server_connect_callback_init(SERVER_REC *server, GIOChannel *handle)
+ {
+ 	int error;
+@@ -160,10 +217,13 @@ static void server_connect_callback_init(SERVER_REC *server, GIOChannel *handle)
+ 		return;
+ 	}
+ 
+-	lookup_servers = g_slist_remove(lookup_servers, server);
+ 	g_source_remove(server->connect_tag);
+ 	server->connect_tag = -1;
+-
++	if (server->connrec->use_ssl) {
++		helios_tls_begin(server, handle);
++		return;
++	}
++	lookup_servers = g_slist_remove(lookup_servers, server);
+ 	server_connect_finished(server);
+ }
+ 
+@@ -190,10 +250,7 @@ static void server_real_connect(SERVER_REC *server, IPADDR *ip,
+ 			 server->connrec->own_ip4);
+ 		port = server->connrec->proxy != NULL ?
+ 			server->connrec->proxy_port : server->connrec->port;
+-		handle = server->connrec->use_ssl ?
+-			net_connect_ip_ssl(ip, port, own_ip, server->connrec->ssl_cert, server->connrec->ssl_pkey,
+-server->connrec->ssl_cafile, server->connrec->ssl_capath, server->connrec->ssl_verify) :
+-			net_connect_ip(ip, port, own_ip);
++		handle = net_connect_ip(ip, port, own_ip);
+ 	} else {
+ 		handle = net_connect_unix(unix_socket);
+ 	}
+@@ -240,7 +297,7 @@ static void server_connect_callback_readpipe(SERVER_REC *server)
+ 
+ 	g_io_channel_close(server->connect_pipe[0]);
+ 	g_io_channel_unref(server->connect_pipe[0]);
+-	g_io_channel_close(server->connect_pipe[1]);
++	/* resolver launch closed the parent writer */
+ 	g_io_channel_unref(server->connect_pipe[1]);
+ 
+ 	server->connect_pipe[0] = NULL;
+@@ -274,7 +331,7 @@ static void server_connect_callback_readpipe(SERVER_REC *server)
+ 
+ 	if (ip != NULL) {
+ 		/* host lookup ok */
+-		if (servername) {
++		if (servername && !server->connrec->use_ssl) {
+ 			g_free(server->connrec->address);
+ 			server->connrec->address = g_strdup(servername);
+ 		}
+@@ -361,6 +418,15 @@ int server_start_connect(SERVER_REC *server)
+ 		return FALSE;
+ 
+ 	server->rawlog = rawlog_create();
++    {
++        const char *error = helios_tls_options(server->connrec);
++        if (error != NULL) {
++            server->connection_lost = TRUE;
++            server->no_reconnect = TRUE;
++            server_connect_failed(server, error);
++            return TRUE;
++        }
++    }
+ 
+ 	if (server->connrec->connect_handle != NULL) {
+ 		/* already connected */
+@@ -374,7 +440,7 @@ int server_start_connect(SERVER_REC *server)
+ 		server_real_connect(server, NULL, server->connrec->address);
+ 	} else {
+ 		/* resolve host name */
+-		if (pipe(fd) != 0) {
++		if (hu_channel(fd) != 0) {
+ 			g_warning("server_connect(): pipe() failed.");
+ 			g_free(server->tag);
+ 			g_free(server->nick);

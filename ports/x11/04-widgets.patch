@@ -1,0 +1,125 @@
+Subject: Adapt Xt and Xmu to the Helios compiler and runtime
+
+diff --git a/lib/Xmu/CloseHook.c b/lib/Xmu/CloseHook.c
+index 7736fc4fbd51d59c69c2d3ccac02a19e49bd8126..979b2f49991e2def4ddaf27f0afe890f24fcd7ad 100644
+--- a/lib/Xmu/CloseHook.c
++++ b/lib/Xmu/CloseHook.c
+@@ -51,7 +51,7 @@
+ #include <X11/Xlib.h>
+ #include <X11/Xmu/CloseHook.h>
+ 
+-extern char *malloc();					/* should be void * */
++					/* should be void * */
+ 
+ /*
+  *				 Private data
+diff --git a/lib/Xmu/CrCmap.c b/lib/Xmu/CrCmap.c
+index 7aac0c0c549d6e57516dd3d04e1c4db2fac6c98c..fbb39fe4dc64308dd60e1e489af1f63a355bcdd8 100644
+--- a/lib/Xmu/CrCmap.c
++++ b/lib/Xmu/CrCmap.c
+@@ -28,7 +28,7 @@
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h>
+ 
+-extern char	*calloc();
++
+ 
+ static int	ROmap();		/* allocate entire map Read Only */
+ static Status	ROorRWcell();		/* allocate a cell, prefer Read Only */
+diff --git a/lib/Xmu/CvtCache.c b/lib/Xmu/CvtCache.c
+index e54b4f26b3d9cd800d6173fa934130d963c39110..6e65d80a7c1ff2dd242520cd1ded74a724d9590d 100644
+--- a/lib/Xmu/CvtCache.c
++++ b/lib/Xmu/CvtCache.c
+@@ -28,7 +28,7 @@
+ #include <X11/Xos.h>
+ #include <X11/Xmu/CvtCache.h>
+ 
+-extern char *malloc();
++
+ 
+ static XmuDisplayQueue *dq = NULL;
+ static int _CloseDisplay(), _FreeCCDQ();
+diff --git a/lib/Xmu/LookupCmap.c b/lib/Xmu/LookupCmap.c
+index e7534c78eb28eb161aa133c2f90c7ecf43c50a45..3831827ab95b7c06135186f9296cd2d49aab9f05 100644
+--- a/lib/Xmu/LookupCmap.c
++++ b/lib/Xmu/LookupCmap.c
+@@ -28,7 +28,7 @@
+ #include <X11/Xutil.h>
+ #include <X11/Xmu/StdCmap.h>
+ 
+-extern char *malloc();
++
+ static Status lookup();
+ 
+ /*
+diff --git a/lib/Xmu/Xct.c b/lib/Xmu/Xct.c
+index 29c04c17f887a897256e64cd8ee996be92d648da..4f05993545a171ee183c75746b2a2fe937b2b69a 100644
+--- a/lib/Xmu/Xct.c
++++ b/lib/Xmu/Xct.c
+@@ -35,8 +35,8 @@ typedef struct _XctPriv {
+ #define IsMore(priv) ((priv)->ptr != (priv)->ptrend)
+ #define AmountLeft(priv) ((priv)->ptrend - (priv)->ptr)
+ 
+-char *malloc();
+-char *realloc();
++
++
+ 
+ #define HT	0x09
+ #define NL	0x0a
+diff --git a/lib/Xt/TMstate.c b/lib/Xt/TMstate.c
+index bd5fd31aad1d1eb9af24fa89f5005482df0f3220..50341b1f1c55ec75a28e7b488768f8550bdbbd7c 100644
+--- a/lib/Xt/TMstate.c
++++ b/lib/Xt/TMstate.c
+@@ -2711,11 +2711,15 @@ static void RegisterGrab(widget, stateTable, index, grabP)
+ 		event = &stateTable->eventObjTbl[state->index].event;
+ 		switch (event->eventType) {
+ 		    case ButtonPress:
+-		    case ButtonRelease:
++		    case ButtonRelease: {
++                unsigned ignored = (LockMask|Mod2Mask) & ~event->modifierMask;
++                unsigned extra;
++                if(event->modifiers == AnyModifier) ignored=0;
++                for(extra=ignored;;extra=(extra-1)&ignored) {
+ 			XtGrabButton(
+ 			    widget,
+ 			    (unsigned) event->eventCode,
+-			    (unsigned) event->modifiers,
++			    (unsigned) event->modifiers | extra,
+ 			    grabP->owner_events,
+ 			    grabP->event_mask,
+ 			    grabP->pointer_mode,
+@@ -2723,7 +2727,10 @@ static void RegisterGrab(widget, stateTable, index, grabP)
+ 			    None,
+ 			    None
+ 			);
+-			break;
++                if(extra==0) break;
++                }
++                break;
++            }
+ 
+ 		    case KeyPress:
+ 		    case KeyRelease:
+diff --git a/lib/Xt/VarCreate.c b/lib/Xt/VarCreate.c
+index f6a76c80b4df03b83a238c6283f62b6aea86dcc0..bd49f3db530583bd0e3b7f9deaa2f3d2fd567f3e 100644
+--- a/lib/Xt/VarCreate.c
++++ b/lib/Xt/VarCreate.c
+@@ -310,7 +310,7 @@ Widget _XtVaAppInitialize(app_context_return, application_class, options,
+ 	XtErrorMsg("invalidDisplay","xtInitialize","XtToolkitError",
+                    "Can't Open display", (String *) NULL, (Cardinal *)NULL);
+ 
+-    var = var_args;
++    memcpy(var, var_args, sizeof(va_list));
+     for(attr = va_arg(var,String); attr != NULL; attr = va_arg(var,String)) {
+         ++count;
+         if (strcmp(attr, XtVaTypedArg) == 0) {
+@@ -324,7 +324,7 @@ Widget _XtVaAppInitialize(app_context_return, application_class, options,
+     }
+     va_end(var);
+ 
+-    var = var_args;
++    memcpy(var, var_args, sizeof(va_list));
+     typed_args = _XtVaCreateTypedArgList(var, count);
+     va_end(var);
+ 

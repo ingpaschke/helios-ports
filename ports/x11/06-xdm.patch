@@ -1,0 +1,834 @@
+Subject: Run XDM logins and display sessions as native Helios tasks
+
+diff --git a/clients/xdm/Login.c b/clients/xdm/Login.c
+index 48f45ff08cbc9ffdc456eaa4c3a133405df2b035..3ae95c23b4b6a595abadae20656aa86830cdaf13 100644
+--- a/clients/xdm/Login.c
++++ b/clients/xdm/Login.c
+@@ -52,15 +52,15 @@ static XtResource resources[] = {
+     {XtNfailColor, XtCForeground, XtRPixel, sizeof (Pixel),
+ 	offset(failpixel), XtRString,	"Black"},
+     {XtNfont, XtCFont, XtRFontStruct, sizeof (XFontStruct *),
+-    	offset (font), XtRString,	"*-new century schoolbook-medium-r-normal-*-180-*"},
++    	offset (font), XtRString,	"fixed"},
+     {XtNpromptFont, XtCFont, XtRFontStruct, sizeof (XFontStruct *),
+-    	offset (promptFont), XtRString, "*-new century schoolbook-bold-r-normal-*-180-*"},
++    	offset (promptFont), XtRString, "fixed"},
+     {XtNgreetFont, XtCFont, XtRFontStruct, sizeof (XFontStruct *),
+-    	offset (greetFont), XtRString,	"*-new century schoolbook-bold-i-normal-*-240-*"},
++    	offset (greetFont), XtRString,	"fixed"},
+     {XtNfailFont, XtCFont, XtRFontStruct, sizeof (XFontStruct *),
+-	offset (failFont), XtRString,	"*-new century schoolbook-bold-r-normal-*-180-*"},
++	offset (failFont), XtRString,	"fixed"},
+     {XtNgreeting, XtCGreeting, XtRString, sizeof (char *),
+-    	offset(greeting), XtRString, "Welcome to the X Window System"},
++    	offset(greeting), XtRString, "Helios 1.31-SP1 on KTM/Kria"},
+     {XtNunsecureGreeting, XtCGreeting, XtRString, sizeof (char *),
+ 	offset(unsecure_greet), XtRString, "This is an unsecure session"},
+     {XtNnamePrompt, XtCNamePrompt, XtRString, sizeof (char *),
+diff --git a/clients/xdm/Makefile b/clients/xdm/Makefile
+index 737cbb421b578dcd35b0985b3e66110b3c3d96af..7d71486336116117c360b185c3bf44d376cae91d 100644
+--- a/clients/xdm/Makefile
++++ b/clients/xdm/Makefile
+@@ -227,7 +227,7 @@ LOCAL_LIBRARIES = $(XAWLIB) $(XMULIB) $(XTOOLLIB) \
+ 		  file.c greet.c reset.c resource.c protodpy.c policy.c \
+ 		  session.c socket.c util.c verify.c Login.c mitauth.c \
+ 		  cryptokey.c $(DESSRCS)
+-          OBJS1 = auth.o daemon.o server.o dpylist.o dm.o error.o \
++          OBJS1 = ktm-session.o  ktm.o  auth.o daemon.o server.o dpylist.o dm.o error.o \
+ 		  file.o greet.o reset.o resource.o protodpy.o policy.o \
+ 		  session.o socket.o util.o verify.o Login.o mitauth.o \
+ 		  cryptokey.o $(DESOBJS)
+diff --git a/clients/xdm/auth.c b/clients/xdm/auth.c
+index 00cf61431e0eb5bbd9d9fcff5107f9f3c47cef12..043540f9b42e383ff4bcc92a2e50ac0cffbacaf0 100644
+--- a/clients/xdm/auth.c
++++ b/clients/xdm/auth.c
+@@ -329,7 +329,7 @@ unsigned short	address_length, number_length;
+ char	*address, *number;
+ {
+ 	struct addrList	*new;
+-	char		*malloc ();
++	
+ 
+ 	if (checkAddr (family, address_length, address, number_length, number))
+ 		return;
+@@ -575,7 +575,7 @@ setAuthNumber (auth, name)
+     Xauth   *auth;
+     char    *name;
+ {
+-    char	*colon, *malloc ();
++    char	*colon;
+     char	*dot, *number;
+ 
+     Debug ("setAuthNumber %s\n", name);
+@@ -670,112 +670,3 @@ writeRemoteAuth (file, auth, peer, peerlen, name)
+     }
+ }
+ 
+-SetUserAuthorization (d, verify)
+-struct display		*d;
+-struct verify_info	*verify;
+-{
+-    FILE	*old, *new;
+-    char	home_name[1024], backup_name[1024], new_name[1024];
+-    char	*name;
+-    char	*home;
+-    char	*envname = 0;
+-    int	lockStatus;
+-    Xauth	*entry, *auth;
+-    int	setenv;
+-    char	**setEnv (), *getEnv ();
+-    struct stat	statb;
+-
+-    Debug ("SetUserAuthorization\n");
+-    if (auth = d->authorization) {
+-	home = getEnv (verify->userEnviron, "HOME");
+-	lockStatus = LOCK_ERROR;
+-	if (home) {
+-	    sprintf (home_name, "%s/.Xauthority", home);
+-	    Debug ("XauLockAuth %s\n", home_name);
+-	    lockStatus = XauLockAuth (home_name, 1, 2, 10);
+-	    Debug ("Lock is %d\n", lockStatus);
+-	    if (lockStatus == LOCK_SUCCESS) {
+-		if (openFiles (home_name, new_name, &old, &new)) {
+-		    name = home_name;
+-		    setenv = 0;
+-		} else {
+-		    Debug ("openFiles failed\n");
+-		    XauUnlockAuth (home_name);
+-		    lockStatus = LOCK_ERROR;
+-		}	
+-	    }
+-	}
+-	if (lockStatus != LOCK_SUCCESS) {
+-	    sprintf (backup_name, "%s/.XauthXXXXXX", d->userAuthDir);
+-	    mktemp (backup_name);
+-	    lockStatus = XauLockAuth (backup_name, 1, 2, 10);
+-	    Debug ("backup lock is %d\n", lockStatus);
+-	    if (lockStatus == LOCK_SUCCESS) {
+-		if (openFiles (backup_name, new_name, &old, &new)) {
+-		    name = backup_name;
+-		    setenv = 1;
+-		} else {
+-		    XauUnlockAuth (backup_name);
+-		    lockStatus = LOCK_ERROR;
+-		}	
+-	    }
+-	}
+-	if (lockStatus != LOCK_SUCCESS) {
+-	    Debug ("can't lock auth file %s or backup %s\n",
+-			    home_name, backup_name);
+-	    LogError ("can't lock authorization file %s or backup %s\n",
+-			    home_name, backup_name);
+-	    return;
+-	}
+-	initAddrs ();
+-	if (d->displayType.location == Local)
+-	    writeLocalAuth (new, auth, d->name);
+-	else
+-	    writeRemoteAuth (new, auth, d->peer, d->peerlen, d->name);
+-	if (old) {
+-	    if (fstat (fileno (old), &statb) != -1)
+-		chmod (new_name, (int) (statb.st_mode & 0777));
+-	    while (entry = XauReadAuth (old)) {
+-		if (!checkAddr (entry->family,
+-			       entry->address_length, entry->address,
+-			       entry->number_length, entry->number))
+-		{
+-		    Debug ("Saving an entry\n");
+-		    dumpAuth (entry);
+-		    writeAuth (new, entry);
+-		}
+-		XauDisposeAuth (entry);
+-	    }
+-	    fclose (old);
+-	}
+-	doneAddrs ();
+-	fclose (new);
+-	if (unlink (name) == -1)
+-	    Debug ("unlink %s failed\n", name);
+-	envname = name;
+-	if (link (new_name, name) == -1) {
+-	    Debug ("link failed %s %s\n", new_name, name);
+-	    LogError ("Can't move authorization into place\n");
+-	    setenv = 1;
+-	    envname = new_name;
+-	} else {
+-	    Debug ("new is in place, go for it!\n");
+-	    unlink (new_name);
+-	}
+-	if (setenv) {
+-	    verify->userEnviron = setEnv (verify->userEnviron,
+-				    "XAUTHORITY", envname);
+-	    verify->systemEnviron = setEnv (verify->systemEnviron,
+-				    "XAUTHORITY", envname);
+-	}
+-	XauUnlockAuth (name);
+-	if (envname) {
+-#ifdef NGROUPS
+-	    chown (envname, verify->uid, verify->groups[0]);
+-#else
+-	    chown (envname, verify->uid, verify->gid);
+-#endif
+-	}
+-    }
+-    Debug ("done SetUserAuthorization\n");
+-}
+diff --git a/clients/xdm/cryptokey.c b/clients/xdm/cryptokey.c
+index 5086841e2f256ce65849c588102bfa6b6bf3bb86..a590477ae38fba3d26b691211438ac6bf96dec3c 100644
+--- a/clients/xdm/cryptokey.c
++++ b/clients/xdm/cryptokey.c
+@@ -1,211 +1,10 @@
+-/*
+- * xdm - display manager daemon
+- *
+- * $XConsortium: cryptokey.c,v 1.2 90/02/07 18:47:29 keith Exp $
+- *
+- * Copyright 1988 Massachusetts Institute of Technology
+- *
+- * Permission to use, copy, modify, and distribute this software and its
+- * documentation for any purpose and without fee is hereby granted, provided
+- * that the above copyright notice appear in all copies and that both that
+- * copyright notice and this permission notice appear in supporting
+- * documentation, and that the name of M.I.T. not be used in advertising or
+- * publicity pertaining to distribution of the software without specific,
+- * written prior permission.  M.I.T. makes no representations about the
+- * suitability of this software for any purpose.  It is provided "as is"
+- * without express or implied warranty.
+- *
+- * Author:  Keith Packard, MIT X Consortium
+- */
+-
+-# include   <X11/Xauth.h>
+-# include   <X11/Xos.h>
+-
+-/*
+- * crypto key.  Generate cryptographically secure random numbers
+- */
+-
+-static long	key[2];
+-
+-#ifndef DONT_USE_DES
+-# ifndef USE_CRYPT
+-#  ifdef ultrix
+-#   define USE_CRYPT
+-#  endif
+-#  ifdef hpux
+-#   define USE_CRYPT
+-#  endif
+-#  ifdef macII
+-#   define USE_CRYPT
+-#  endif
+-#  ifdef sun
+-#   define USE_CRYPT
+-#   if (OSMAJORVERSION >= 4)
+-     /* avoid strange sun crypt hackery */
+-#    define crypt _crypt
+-#   endif
+-#  endif
+-# endif
+-#endif
+-
+-#if !defined (DONT_USE_DES) && !defined (USE_CRYPT)
+-# define USE_ENCRYPT
+-#endif
+-
+-#ifdef USE_ENCRYPT
+-static
+-bitsToBytes (bits, bytes)
+-unsigned long	bits[2];
+-char	bytes[64];
+-{
+-    int	bit, byte;
+-    int	i;
+-
+-    i = 0;
+-    for (byte = 0; byte < 2; byte++)
+-	for (bit = 0; bit < 32; bit++)
+-	    bytes[i++] = ((bits[byte] & (1 << bit)) != 0);
+-}
+-#endif
+-
+-GenerateCryptoKey (auth, len)
+-char	*auth;
+-int	len;
+-{
+-    long    data[2];
+-
+-#ifdef ITIMER_REAL
+-    {
+-	struct timeval  now;
+-	struct timezone zone;
+-	gettimeofday (&now, &zone);
+-	data[0] = now.tv_sec;
+-	data[1] = now.tv_usec;
+-    }
+-#else
+-    {
+-	long    time ();
+-
+-	data[0] = time ((long *) 0);
+-	data[1] = getpid ();
+-    }
+-#endif
+-#ifdef DONT_USE_DES
+-    {
+-    	int	    seed;
+-    	int	    value;
+-    	int	    i;
+-    
+-    	seed = (data[0] + key[0]) +
+-	      ((data[1] + key[1]) << 16);
+-    	srand (seed);
+-    	for (i = 0; i < len; i++)
+-    	{
+-	    value = rand ();
+-	    auth[i] = value & 0xff;
+-    	}
+-	value = len;
+-	if (value > sizeof (key))
+-	    value = sizeof (key);
+-    	bcopy (auth, (char *) key, value);
+-    }
+-#else
+-#ifndef USE_ENCRYPT
+-    {
+-    	int	    i, j, k;
+-    	char    *result, *crypt ();
+-	char	cdata[9];
+-	long	sdata;
+-    
+-	for (j = 0; j < 2; j++)
+-	{
+-	    sdata = data[j];
+-	    for (i = 0; i < 4; i++)
+-	    {
+-		k = j * 4 + i;
+-		cdata[k] = sdata & 0xff;
+-		if (cdata[k] == 0)
+-		    cdata[k] = 1;
+-		sdata >>= 8;
+-	    }
+-	}
+-	cdata[8] = '\0';
+-	for (i = 0; i < len; i += 4)
+-	{
+-	    result = crypt (cdata, key);
+-	    k = 4;
+-	    if (i + k > len)
+-		k = len - i;
+-	    for (j = 0; j < k; j++)
+-		auth[i + j] = result[2 + j];
+-	    for (j = 0; j < 8; j++)
+-		cdata[j] = result[2 + j];
+-	}
+-    }
+-#else
+-    {
+-    	char    key_bits[64];
+-    	char    data_bits[64];
+-    	int	    bit;
+-    	int	    i;
+-    
+-    	bitsToBytes (key, key_bits);
+-    	bitsToBytes (data, data_bits);
+-    	setkey (key_bits);
+-    	for (i = 0; i < len; i++) {
+-	    auth[i] = 0;
+-	    for (bit = 1; bit < 256; bit <<= 1) {
+-	    	encrypt (data_bits, 0);
+-	    	if (data[0])
+-		    auth[i] |= bit;
+-	    }
+-    	}
+-    }
+-#endif
+-#endif
+-}
+-
+-# define FILE_LIMIT	1024	/* no more than this many buffers */
+-
+-static
+-sumFile (name, sum)
+-char	*name;
+-long	sum[2];
+-{
+-    long    data[2];
+-    long    buf[1024*2];
+-    int	    cnt;
+-    int	    fd;
+-    int	    loops;
+-    int	    reads;
+-    int	    i;
+-
+-    fd = open (name, 0);
+-    if (!fd)
+-	return 0;
+-    reads = FILE_LIMIT;
+-    while ((cnt = read (fd, buf, sizeof (buf))) > 0 && --reads > 0) {
+-	loops = cnt / sizeof (data);
+-	for (i = 0; i < loops; i+= 2) {
+-	    sum[0] += buf[i];
+-	    sum[1] += buf[i+1];
+-	}
+-    }
+-    return 1;
+-}
+-
+-static int  cryptoInited = 0;
+-
+-InitCryptoKey ()
+-{
+-    char    *key_file = "/dev/mem";
+-    
+-    if (cryptoInited)
+-	return;
+-    if (!sumFile (key_file, key)) {
+-	key[0] = time ((long *) 0);
+-	key[1] = time ((long *) 0);
++#include <stdio.h>
++#include <stdlib.h>
++void InitCryptoKey(void) {}
++void GenerateCryptoKey(char *auth, int len) {
++    FILE *f=fopen("/helios/etc/xdm/random", "rb");
++    if (!f || fread(auth,1,len,f)!=len) {
++        fprintf(stderr,"xdm: cannot read Kria random source\n"); exit(1);
+     }
+-    cryptoInited = 1;
++    fclose(f);
+ }
+-
+diff --git a/clients/xdm/daemon.c b/clients/xdm/daemon.c
+index 6eaf2e7184b89f504b61c4eced7c83ecdbdc8209..cf1c7be114c850fcc4b27de53f1bfc00af9e7a8a 100644
+--- a/clients/xdm/daemon.c
++++ b/clients/xdm/daemon.c
+@@ -1,72 +1 @@
+-/*
+- * xdm - display manager daemon
+- *
+- * $XConsortium: daemon.c,v 1.5 89/01/20 10:43:49 jim Exp $
+- *
+- * Copyright 1988 Massachusetts Institute of Technology
+- *
+- * Permission to use, copy, modify, and distribute this software and its
+- * documentation for any purpose and without fee is hereby granted, provided
+- * that the above copyright notice appear in all copies and that both that
+- * copyright notice and this permission notice appear in supporting
+- * documentation, and that the name of M.I.T. not be used in advertising or
+- * publicity pertaining to distribution of the software without specific,
+- * written prior permission.  M.I.T. makes no representations about the
+- * suitability of this software for any purpose.  It is provided "as is"
+- * without express or implied warranty.
+- *
+- * Author:  Keith Packard, MIT X Consortium
+- */
+-
+-#include <X11/Xos.h>
+-#include <sys/ioctl.h>
+-#ifdef hpux
+-#include <sys/ptyio.h>
+-#endif
+-
+-extern void exit ();
+-
+-BecomeDaemon ()
+-{
+-    register int i;
+-
+-    /*
+-     * fork so that the process goes into the background automatically. Also
+-     * has a nice side effect of having the child process get inherited by
+-     * init (pid 1).
+-     */
+-
+-    if (fork ())			/* if parent */
+-      exit (0);				/* then no more work to do */
+-
+-    /*
+-     * Close standard file descriptors and get rid of controlling tty
+-     */
+-
+-#ifdef SYSV
+-    setpgrp ();
+-#else
+-    setpgrp (0, getpid());
+-#endif
+-
+-    close (0); 
+-    close (1);
+-    close (2);
+-
+-    if ((i = open ("/dev/tty", O_RDWR)) >= 0) {	/* did open succeed? */
+-#if defined(SYSV) && defined(TIOCTTY)
+-	int zero = 0;
+-	(void) ioctl (i, TIOCTTY, &zero);
+-#else
+-	(void) ioctl (i, TIOCNOTTY, (char *) 0);    /* detach, BSD style */
+-#endif
+-	(void) close (i);
+-    }
+-
+-    /*
+-     * Set up the standard file descriptors.
+-     */
+-    (void) open ("/", O_RDONLY);	/* root inode already in core */
+-    (void) dup2 (0, 1);
+-    (void) dup2 (0, 2);
+-}
++void BecomeDaemon(void) {}
+diff --git a/clients/xdm/dm.c b/clients/xdm/dm.c
+index 58e9fa6fadd5879aadcad20823a9743718196d28..ffc6cdb7a1f04e629a2a70460da1665e95278165 100644
+--- a/clients/xdm/dm.c
++++ b/clients/xdm/dm.c
+@@ -75,6 +75,8 @@ char	**argv;
+     /*
+      * Step 1 - load configuration parameters
+      */
++    if (argc > 1 && !strcmp(argv[1], "--ktm-session"))
++        return KtmSessionWorker(argc, argv);
+     InitResources (argc, argv);
+     SetConfigFileTime ();
+     LoadDMResources ();
+@@ -460,18 +462,14 @@ struct display	*d;
+ 	if (d->authorization && d->authFile)
+ 	    SaveServerAuthorization (d, d->authorization);
+     }
+-    switch (pid = fork ())
++    switch (pid = vfork ())
+     {
+     case 0:
+-	CleanUpChild ();
+-	signal (SIGPIPE, SIG_IGN);
+-	if (!ResourcesLoaded)
+-	    LoadDisplayResources (d);
+-	SetAuthorization (d);
+-	if (!WaitForServer (d))
+-	    exit (OPENFAILED_DISPLAY);
+-	ManageSession (d);
+-	exit (REMANAGE_DISPLAY);
++        CleanUpChild ();
++        execl("/helios/bin/x11/xdm", "xdm", "--ktm-session", d->name,
++              d->class ? d->class : "", d->authFile ? d->authFile : "",
++              config, (char *)0);
++        _exit(OPENFAILED_DISPLAY);
+     case -1:
+ 	break;
+     default:
+@@ -558,69 +556,14 @@ CloseOnFork ()
+     for (fd = 0; fd <= max; fd++)
+ 	if (FD_ISSET (fd, &CloseMask))
+ 	    close (fd);
+-    FD_ZERO (&CloseMask);
+-    max = 0;
++
+ }
+ 
+ static int  pidFd;
+ static FILE *pidFilePtr;
+ 
+-StorePid ()
+-{
+-    int		oldpid;
+-
+-    if (pidFile[0] != '\0') {
+-	pidFd = open (pidFile, 2);
+-	if (pidFd == -1 && errno == ENOENT)
+-	    pidFd = creat (pidFile, 0666);
+-	if (pidFd == -1 || !(pidFilePtr = fdopen (pidFd, "r+")))
+-	{
+-	    LogError ("process-id file %s cannot be opened\n",
+-		      pidFile);
+-	    return -1;
+-	}
+-	if (fscanf (pidFilePtr, "%d", &oldpid) != 1)
+-	    oldpid = -1;
+-	fseek (pidFilePtr, 0l, 0);
+-	if (lockPidFile)
+-	{
+-#ifdef SYSV
+-	    if (lockf (pidFd, F_TLOCK, 0) == -1)
+-	    {
+-		if (errno == EACCES)
+-		    return oldpid;
+-		else
+-		    return -1;
+-	    }
+-#else
+-	    if (flock (pidFd, LOCK_EX|LOCK_NB) == -1)
+-	    {
+-		if (errno == EWOULDBLOCK)
+-		    return oldpid;
+-		else
+-		    return -1;
+-	    }
+-#endif
+-	}
+-	close(creat(pidFile, 0666));
+-	fprintf (pidFilePtr, "%d\n", getpid ());
+-	(void) fflush (pidFilePtr);
+-	RegisterCloseOnFork (pidFd);
+-    }
+-    return 0;
+-}
+-
+-UnlockPidFile ()
+-{
+-    if (lockPidFile)
+-#ifdef SYSV
+-	lockf (pidFd, F_ULOCK, 0);
+-#else
+-	flock (pidFd, LOCK_UN);
+-#endif
+-    close (pidFd);
+-    fclose (pidFilePtr);
+-}
++StorePid () { return 0; }
++UnlockPidFile () {}
+ 
+ /*VARARGS*/
+ SetTitle (va_alist)
+diff --git a/clients/xdm/dm.h b/clients/xdm/dm.h
+index 7722c27887e0f61d792257eb4bb7625d98680575..7326bea26b36387120a1a54f9de97737907bed45 100644
+--- a/clients/xdm/dm.h
++++ b/clients/xdm/dm.h
+@@ -31,6 +31,7 @@
+ 
+ # include	<sys/param.h>	/* for NGROUPS */
+ 
++#undef NGROUPS /* Helios has a primary gid, no BSD group enumeration. */
+ #ifdef pegasus
+ #undef dirty		/* Some bozo put a macro called dirty in sys/param.h */
+ #endif /* pegasus */
+@@ -41,9 +42,9 @@
+ typedef int		waitType;
+ #else
+ # include	<sys/wait.h>
+-# define waitCode(w)	((w).w_T.w_Retcode)
+-# define waitSig(w)	((w).w_T.w_Termsig)
+-typedef union wait	waitType;
++# define waitCode(w)	WEXITSTATUS(w)
++# define waitSig(w)	(WIFSIGNALED(w) ? WTERMSIG(w) : 0)
++typedef int		waitType;
+ #endif
+ 
+ #ifdef UDP_SOCKET
+@@ -215,7 +216,7 @@ extern struct protoDisplay	*FindProtoDisplay (),
+ # define CLOSE_ALWAYS	    0
+ # define LEAVE_FOR_DISPLAY  1
+ 
+-extern char	*malloc (), *realloc (), *strcpy ();
++extern char	 *strcpy ();
+ 
+ #ifdef SIGNALRETURNSINT
+ #define SIGVAL int
+diff --git a/clients/xdm/file.c b/clients/xdm/file.c
+index 53c46ff76d5bec213e7b0cccf7a01909d48d35a8..b17a6eb36ce2afbb85cc33c472ae05947666e64f 100644
+--- a/clients/xdm/file.c
++++ b/clients/xdm/file.c
+@@ -27,7 +27,7 @@
+ # include	<signal.h>
+ 
+ extern void	free ();
+-extern char	*malloc (), *realloc ();
++
+ 
+ DisplayTypeMatch (d1, d2)
+ DisplayType	d1, d2;
+diff --git a/clients/xdm/greet.c b/clients/xdm/greet.c
+index 0c0d7836dc53e499d48a7f3d74b2c0aafd491311..b9d1d9262a62c3a3ca4b320aa09167d892d4b9bf 100644
+--- a/clients/xdm/greet.c
++++ b/clients/xdm/greet.c
+@@ -102,6 +102,7 @@ struct display	*d;
+ 			    &argc, argv);
+ 
+     SecureDisplay (d, dpy);
++    if (dpy) KtmLoginKeymap(dpy);
+ 
+     i = 0;
+     scrn = DefaultScreenOfDisplay(dpy);
+diff --git a/clients/xdm/policy.c b/clients/xdm/policy.c
+index 6c3e3cf807ead4c0ce6c8373d89a8e15c41948d2..3704f06d9acb6dd454a03e3aebfcced410f3fe94 100644
+--- a/clients/xdm/policy.c
++++ b/clients/xdm/policy.c
+@@ -104,14 +104,14 @@ Willing (addr, addrlen, authenticationName, status)
+     static char	statusBuf[256];
+     extern char	*localHostname ();
+ 
+-    sprintf (statusBuf, "host %s", localHostname());
++    sprintf (statusBuf, "Helios KTM: %s", KtmAllowed(addr) ? "ready" : "display not allowed");
+     status->length = strlen (statusBuf);
+     status->data = (CARD8Ptr) malloc (status->length);
+     if (!status->data)
+ 	status->length = 0;
+     else
+ 	bcopy (statusBuf, status->data, status->length);
+-    return 1;
++    return KtmAllowed(addr);
+ }
+ 
+ ARRAY8Ptr
+@@ -120,7 +120,8 @@ Accept (from, fromlen, displayNumber)
+     int		    fromlen;
+     CARD16	    displayNumber;
+ {
+-    return 0;
++    static ARRAY8 denied = {19, (CARD8 *)"Display not allowed"};
++    return KtmAllowed(from) ? 0 : &denied;
+ }
+ 
+ int
+diff --git a/clients/xdm/resource.c b/clients/xdm/resource.c
+index aa096be54fd8d34598c0203c20b98cb44229d2c7..7c07fb16ed98712da859ae81606660c7639a7921 100644
+--- a/clients/xdm/resource.c
++++ b/clients/xdm/resource.c
+@@ -202,7 +202,7 @@ GetResource (name, class, valueType, valuep, default_value)
+ {
+     char	*type;
+     XrmValue	value;
+-    char	*string, *new_string, *strncpy (), *malloc ();
++    char	*string, *new_string, *strncpy ();
+     char	str_buf[50];
+     int	len;
+ 
+diff --git a/clients/xdm/session.c b/clients/xdm/session.c
+index 58f375061fc60903ae504f28559144c15ff94945..6663c8bc07cdb825bb90d7200e251bc749ccbf8e 100644
+--- a/clients/xdm/session.c
++++ b/clients/xdm/session.c
+@@ -280,6 +280,8 @@ Display		*dpy;
+ SessionExit (d, status)
+     struct display  *d;
+ {
++    KtmCloseNativeSession();
++    KtmRemoveUserAuthorization();
+     /* make sure the server gets reset after the session is over */
+     if (d->serverPid >= 2)
+ 	kill (d->serverPid, SIGHUP);
+@@ -308,9 +310,11 @@ int			*pidp;
+ 		Debug ("%s ", *f);
+ 	Debug ("\n");
+     }
++    SetUserAuthorization (d, verify);
+     switch (pid = fork ()) {
+     case 0:
+ 	CleanUpChild ();
++	KtmNativeSessionStreams();
+ #ifdef NGROUPS
+ 
+ 	setgid (verify->groups[0]);
+@@ -319,7 +323,7 @@ int			*pidp;
+ 	setgid (verify->gid);
+ #endif
+ 	setuid (verify->uid);
+-	SetUserAuthorization (d, verify);
++
+ 	home = getEnv (verify->userEnviron, "HOME");
+ 	if (home)
+ 		if (chdir (home) == -1) {
+@@ -374,7 +378,7 @@ int	pid;
+ #endif
+     int	retId;
+     for (i = 0; i < 4; i++) {
+-	if (killpg (pid, sig) == -1) {
++	if (KtmKillGroup (pid, sig) == -1) {
+ 	    switch (errno) {
+ 	    case EPERM:
+ 		LogError ("xdm can't kill client\n");
+diff --git a/clients/xdm/util.c b/clients/xdm/util.c
+index 202767591cafaf28ba8d224a4ef8acc4272a5e88..38ab4b6aa6d32769010d2d69bad888d72fad4c2a 100644
+--- a/clients/xdm/util.c
++++ b/clients/xdm/util.c
+@@ -40,7 +40,7 @@ makeEnv (name, value)
+ char	*name;
+ char	*value;
+ {
+-	char	*result, *malloc (), *sprintf ();
++	char	*result, *sprintf ();
+ 
+ 	result = malloc ((unsigned) (strlen (name) + strlen (value) + 2));
+ 	if (!result) {
+@@ -77,7 +77,7 @@ setEnv (e, name, value)
+ 	char	*newe;
+ 	int	envsize;
+ 	int	l;
+-	char	*malloc (), *realloc ();
++	
+ 
+ 	l = strlen (name);
+ 	newe = makeEnv (name, value);
+@@ -122,7 +122,7 @@ char	*string;
+ 	char	*word;
+ 	char	*save;
+ 	int	i;
+-	char	*malloc (), *realloc (), *strcpy (), *strncpy ();
++	char	 *strcpy (), *strncpy ();
+ 
+ 	i = 0;
+ 	while (argv && argv[i])
+@@ -168,16 +168,16 @@ CleanUpChild ()
+ #ifdef SYSV
+ 	setpgrp ();
+ #else
+-	setpgrp (0, getpid ());
++	setpgid (0, getpid());
+ 	sigsetmask (0);
+ #endif
+ #ifdef SIGCHLD
+-	(void) signal (SIGCHLD, SIG_DFL);
++	
+ #endif
+-	(void) signal (SIGTERM, SIG_DFL);
+-	(void) signal (SIGPIPE, SIG_DFL);
+-	(void) signal (SIGALRM, SIG_DFL);
+-	(void) signal (SIGHUP, SIG_DFL);
++	
++	
++	
++	
+ 	CloseOnFork ();
+ }
+ 
+diff --git a/clients/xdm/verify.c b/clients/xdm/verify.c
+index 1ad893c271e9fcdf4fa303de1ef892c28b88ae56..d614f7790e39d02ca43b82bdc67efe498c2f1dba 100644
+--- a/clients/xdm/verify.c
++++ b/clients/xdm/verify.c
+@@ -41,21 +41,29 @@ struct greet_info	*greet;
+ struct verify_info	*verify;
+ {
+ 	struct passwd	*p;
+-	char		*crypt ();
++	char encoded[32];
++	extern void EncodePassword(char *, char *);
+ 	char		**userEnv (), **systemEnv (), **parseArgs ();
+ 	char		*shell, *home;
+ 	char		**argv;
++	extern char *KtmNativeSessionName(void);
++	extern char **setEnv();
+ 
+ 	p = getpwnam (greet->name);
+ 	if (!p || strlen (greet->name) == 0)
+ 		p = &joeblow;
+-	Debug ("Verify %s %s\n", greet->name, greet->password);
+-	if (strcmp (crypt (greet->password, p->pw_passwd), p->pw_passwd)) {
++	Debug ("Verify %s\n", greet->name);
++	EncodePassword(greet->password, encoded);
++	if (p == &joeblow || (*p->pw_passwd ? strcmp(encoded, p->pw_passwd) : *greet->password)) {
+ 		Debug ("verify failed\n");
+ 		bzero(greet->password, strlen(greet->password));
+ 		return 0;
+ 	}
+-	Debug ("verify succeeded\n");
++	if (!KtmCreateNativeSession(greet->name,greet->password,p->pw_dir)) {
++            bzero(greet->password,strlen(greet->password));
++            return 0;
++        }
++        Debug ("verify succeeded\n");
+ 	bzero(greet->password, strlen(greet->password));
+ 	verify->uid = p->pw_uid;
+ #ifdef NGROUPS
+@@ -74,6 +82,7 @@ struct verify_info	*verify;
+ 		argv = parseArgs (argv, "xsession");
+ 	verify->argv = argv;
+ 	verify->userEnviron = userEnv (d, greet->name, home, shell);
++	verify->userEnviron = setEnv(verify->userEnviron,"SESSION",KtmNativeSessionName());
+ 	Debug ("user environment:\n");
+ 	printEnv (verify->userEnviron);
+ 	verify->systemEnviron = systemEnv (d, greet->name, home);

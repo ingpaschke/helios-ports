@@ -1,0 +1,8 @@
+#!/bin/sh
+# Private i386 musl toolchain, bootstrapped by bootstrap-host.sh.
+nh_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+nh_sdk="$nh_root/build/host-sdk"
+nh_builtins=${HOST_BUILTINS:-/usr/lib/llvm-21/lib/clang/21/lib/linux/libclang_rt.builtins-i386.a}
+exec gcc -m32 -static -no-pie -nostdinc -isystem "$nh_sdk/include" -nostdlib \
+    "$nh_sdk/lib/crt1.o" "$nh_sdk/lib/crti.o" "$@" \
+    -L"$nh_sdk/lib" -lc "$nh_builtins" -lc "$nh_sdk/lib/crtn.o"

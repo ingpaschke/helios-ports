@@ -1,0 +1,154 @@
+Subject: Configure GLib for Helios and adapt its native I/O hooks
+
+diff --git a/giounix.c b/giounix.c
+index 10852751657ab33c822936b76852dd54ce68a066..32b210468552fdd587d29868bc28e755c5a535a4 100644
+--- a/giounix.c
++++ b/giounix.c
+@@ -1,3 +1,4 @@
++#include <helios/unix/tls_fd.h>
+ /* GLIB - Library of useful routines for C programming
+  * Copyright (C) 1995-1997  Peter Mattis, Spencer Kimball and Josh MacDonald
+  *
+@@ -156,7 +157,7 @@ g_io_unix_read (GIOChannel *channel,
+   GIOUnixChannel *unix_channel = (GIOUnixChannel *)channel;
+   gint result;
+ 
+-  result = read (unix_channel->fd, buf, count);
++  result = hu_tls_fd_read(unix_channel->fd, buf, count);
+ 
+   if (result < 0)
+     {
+@@ -166,6 +167,7 @@ g_io_unix_read (GIOChannel *channel,
+ 	case EINVAL:
+ 	  return G_IO_ERROR_INVAL;
+ 	case EAGAIN:
++        case EWOULDBLOCK:
+ 	  return G_IO_ERROR_AGAIN;
+ 	default:
+ 	  return G_IO_ERROR_UNKNOWN;
+@@ -187,7 +189,7 @@ g_io_unix_write(GIOChannel *channel,
+   GIOUnixChannel *unix_channel = (GIOUnixChannel *)channel;
+   gint result;
+ 
+-  result = write (unix_channel->fd, buf, count);
++  result = hu_tls_fd_write(unix_channel->fd, buf, count);
+ 
+   if (result < 0)
+     {
+@@ -197,6 +199,7 @@ g_io_unix_write(GIOChannel *channel,
+ 	case EINVAL:
+ 	  return G_IO_ERROR_INVAL;
+ 	case EAGAIN:
++        case EWOULDBLOCK:
+ 	  return G_IO_ERROR_AGAIN;
+ 	default:
+ 	  return G_IO_ERROR_UNKNOWN;
+@@ -256,7 +259,7 @@ g_io_unix_close (GIOChannel *channel)
+ {
+   GIOUnixChannel *unix_channel = (GIOUnixChannel *)channel;
+ 
+-  close (unix_channel->fd);
++  hu_tls_fd_close(unix_channel->fd);
+ }
+ 
+ static void 
+diff --git a/glib.h b/glib.h
+index b83cf5db3504ff42caa03c740eaeb9409438d84c..f38dbb91e4fbdb813635805057236b422efe0a40 100644
+--- a/glib.h
++++ b/glib.h
+@@ -269,12 +269,12 @@ extern "C" {
+ #endif	/* !__GNUC__ */
+ 
+ 
+-/* Wrap the gcc __PRETTY_FUNCTION__ and __FUNCTION__ variables with
++/* Wrap the gcc "GLib" and __FUNCTION__ variables with
+  * macros, so we can refer to them as strings unconditionally.
+  */
+ #ifdef	__GNUC__
+ #define	G_GNUC_FUNCTION		__FUNCTION__
+-#define	G_GNUC_PRETTY_FUNCTION	__PRETTY_FUNCTION__
++#define	G_GNUC_PRETTY_FUNCTION	"GLib"
+ #else	/* !__GNUC__ */
+ #define	G_GNUC_FUNCTION		""
+ #define	G_GNUC_PRETTY_FUNCTION	""
+@@ -344,7 +344,7 @@ extern "C" {
+  *  exit on failure. The "return" macros will exit the current
+  *  function. Two different definitions are given for the macros
+  *  if G_DISABLE_ASSERT is not defined, in order to support gcc's
+- *  __PRETTY_FUNCTION__ capability.
++ *  "GLib" capability.
+  */
+ 
+ #ifdef G_DISABLE_ASSERT
+@@ -363,7 +363,7 @@ extern "C" {
+ 	      "file %s: line %d (%s): assertion failed: (%s)",	\
+ 	      __FILE__,						\
+ 	      __LINE__,						\
+-	      __PRETTY_FUNCTION__,				\
++	      "GLib",				\
+ 	      #expr);			}G_STMT_END
+ 
+ #define g_assert_not_reached()		G_STMT_START{		\
+@@ -372,7 +372,7 @@ extern "C" {
+ 	    "file %s: line %d (%s): should not be reached",	\
+ 	    __FILE__,						\
+ 	    __LINE__,						\
+-	    __PRETTY_FUNCTION__);	}G_STMT_END
++	    "GLib");	}G_STMT_END
+ 
+ #else /* !__GNUC__ */
+ 
+@@ -414,7 +414,7 @@ extern "C" {
+ 		"file %s: line %d (%s): assertion `%s' failed.",	\
+ 		__FILE__,						\
+ 		__LINE__,						\
+-		__PRETTY_FUNCTION__,					\
++		"GLib",					\
+ 		#expr);							\
+ 	 return;							\
+        };				}G_STMT_END
+@@ -427,7 +427,7 @@ extern "C" {
+ 		"file %s: line %d (%s): assertion `%s' failed.",	\
+ 		__FILE__,						\
+ 		__LINE__,						\
+-		__PRETTY_FUNCTION__,					\
++		"GLib",					\
+ 		#expr);							\
+ 	 return val;							\
+        };				}G_STMT_END
+diff --git a/gmain.c b/gmain.c
+index 8ead8a017471ba087a6e5f2ae88357be0b9673c0..db0958cd68ed1315d28edc299e6eb0e8621b1c63 100644
+--- a/gmain.c
++++ b/gmain.c
+@@ -1,3 +1,4 @@
++#include <helios/unix/tls_fd.h>
+ /* GLIB - Library of useful routines for C programming
+  * Copyright (C) 1995-1997  Peter Mattis, Spencer Kimball and Josh MacDonald
+  *
+@@ -384,7 +385,7 @@ g_poll (GPollFD *fds,
+   tv.tv_sec = timeout / 1000;
+   tv.tv_usec = (timeout % 1000) * 1000;
+ 
+-  ready = select (maxfd + 1, &rset, &wset, &xset,
++  ready = hu_tls_fd_select(maxfd + 1, &rset, &wset, &xset,
+ 		  timeout == -1 ? NULL : &tv);
+   if (ready > 0)
+     for (f = fds; f < &fds[nfds]; ++f)
+@@ -1076,7 +1077,7 @@ g_main_poll (gint     timeout,
+     {
+ #ifndef NATIVE_WIN32
+       gchar c;
+-      read (wake_up_pipe[0], &c, 1);
++      hu_tls_fd_read(wake_up_pipe[0], &c, 1);
+ #endif
+     }
+   else
+@@ -1225,7 +1226,7 @@ g_main_wakeup (void)
+     {
+       poll_waiting = FALSE;
+ #ifndef NATIVE_WIN32
+-      write (wake_up_pipe[1], "A", 1);
++      hu_tls_fd_write(wake_up_pipe[1], "A", 1);
+ #else
+       ReleaseSemaphore (wake_up_semaphore, 1, NULL);
+ #endif

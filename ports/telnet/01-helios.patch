@@ -1,0 +1,133 @@
+Subject: Translate terminal input and negotiate the current window dimensions
+
+diff --git a/sys_bsd.c b/sys_bsd.c
+index bc2e5ecd69a57f1c336e4139d67b3f5876e39fef..919fdfb625b0fa9d28a530e7d5f6f5d3b0ebde91 100644
+--- a/sys_bsd.c
++++ b/sys_bsd.c
+@@ -44,6 +44,7 @@ static char sccsid[] = "@(#)sys_bsd.c	1.14 (Berkeley) 8/28/88";
+ 
+ #ifdef __HELIOS
+ #include <syslib.h>
++#include <attrib.h>
+ #include <nonansi.h>
+ #endif
+ 
+@@ -112,7 +113,24 @@ TerminalRead(buf, n)
+ char	*buf;
+ int	n;
+ {
+-    return read(tin, buf, n);
++#ifdef __HELIOS
++    /* ttyserv normalizes terminal keys to Helios CSI sequences. Network
++     * terminals expect their seven-bit forms, even when input is raw. */
++    unsigned char input[256];
++    int count, i, used=0;
++    if (n<2) return read(tin,buf,n);
++    count=read(tin,input,n/2>sizeof(input)?sizeof(input):n/2);
++    if (count<=0) return count;
++    for (i=0;i<count;++i) {
++        if (input[i]==0x9b || input[i]==0x8f) {
++            buf[used++]=0x1b;
++            buf[used++]=input[i]==0x9b?'[':'O';
++        } else buf[used++]=input[i];
++    }
++    return used;
++#else
++    return read(tin,buf,n);
++#endif
+ }
+ 
+ /*
+@@ -323,6 +341,18 @@ register int f;
+     ioctl(tin, TIOCSLTC, (char *)ltc);
+     ioctl(tin, TIOCSETC, (char *)tc);
+     ioctl(tin, TIOCSETP, (char *)&sb);
++#ifdef __HELIOS
++    /* CBREAK leaves OPOST enabled in BSD emulation. On Helios this means
++     * parsing ANSI sequences, not just newline processing. Remote terminal
++     * output must reach xterm intact. Mode 0 restores the saved local mode. */
++    if (f!=0) {
++        Attributes attributes;
++        if (GetAttributes(fdstream(tin),&attributes)>=0) {
++            AddAttribute(&attributes,ConsoleRawOutput);
++            SetAttributes(fdstream(tin),&attributes);
++        }
++    }
++#endif
+ #if	(!defined(TN3270)) || ((!defined(NOT43)) || defined(PUTCHAR))
+     ioctl(tin, FIONBIO, (char *)&onoff);
+     ioctl(tout, FIONBIO, (char *)&onoff);
+@@ -505,8 +535,9 @@ process_rings(netin, netout, netex, ttyin, ttyout, poll)
+ 	FD_SET(net, &xbits);
+     }
+ 
++    TimeValue.tv_sec=0; TimeValue.tv_usec=poll?0:500000;
+     if ((c = select(16, (int *)&ibits, (int *)&obits, (int *)&xbits,
+-			(poll == 0)? (struct timeval *)0 : &TimeValue)) < 0) {
++			&TimeValue)) < 0) {
+ 	if (c == -1) {
+ 		    /*
+ 		     * we can get EINTR if we are in line mode,
+diff --git a/telnet.c b/telnet.c
+index 5c64e6e1f74b320bca2b1d49fb94fa839845b83f..b52ad373d5335dfd77eca1b95c5a5fa9622dbe84 100644
+--- a/telnet.c
++++ b/telnet.c
+@@ -46,6 +46,10 @@ static char sccsid[] = "%W% (Berkeley) %G%";
+ #include "externs.h"
+ #include "types.h"
+ #include "general.h"
++#include <syslib.h>
++#include <attrib.h>
++#define TELOPT_NAWS 31
++#include "telnet-naws.h"
+ 
+ 
+ #define	strip(x)	((x)&0x7f)
+@@ -342,6 +346,23 @@ wontoption(option, reply)
+ 		printoption("<SENT", fmt, option, reply);
+ }
+ 
++static void
++KtmWindowSize(int force)
++{
++    static int cols=-1, rows=-1;
++    Attributes a;
++    extern int tin;
++    unsigned char packet[13];
++    int n;
++    if (!myopts[TELOPT_NAWS] || GetAttributes(fdstream(tin),&a)<0 ||
++        a.Time<1 || a.Min<1) return;
++    if (!force && cols==a.Time && rows==a.Min) return;
++    n=ktm_naws(packet,a.Time,a.Min);
++    if (ring_empty_count(&netoring)<n) return;
++    ring_supply_data(&netoring,packet,n);
++    cols=a.Time; rows=a.Min; flushline=1;
++}
++
+ static void
+ dooption(option)
+ 	int option;
+@@ -358,6 +379,7 @@ dooption(option)
+ 	case TELOPT_EOR:
+ 	case TELOPT_BINARY:
+ #	endif	/* defined(TN3270) */
++	case TELOPT_NAWS:
+ 	case TELOPT_TTYPE:		/* terminal type option */
+ 	case TELOPT_SGA:		/* no big deal */
+ 		fmt = will;
+@@ -371,6 +393,7 @@ dooption(option)
+ 	}
+ 	printring(&netoring, fmt, option);
+ 	printoption(">SENT", fmt, option, 0);
++	if (option==TELOPT_NAWS) KtmWindowSize(1);
+ }
+ 
+ /*
+@@ -813,6 +836,7 @@ int	block;			/* should we block in the select ? */
+     int returnValue;
+     int netin, netout, netex, ttyin, ttyout;
+ 
++    KtmWindowSize(0);
+     /* Decide which rings should be processed */
+ 
+     netout = ring_full_count(&netoring) &&

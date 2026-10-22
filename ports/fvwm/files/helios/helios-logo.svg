@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="84" height="42" viewBox="-1 -1 42 21">
+  <!-- Vector reconstruction of the original Helios wordmark and oval. -->
+  <g fill="none" stroke="white" stroke-width="0.65" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="16.5" cy="9" rx="8.5" ry="9"/>
+    <path d="M0 12 H3 V2 M3 8 C3 5.3 7 5.3 7 8 V10.7 Q7 12 8.5 12"/>
+    <path d="M9.5 9 H13.5 V8 C13.5 5.3 9.5 5.3 9.5 8 V10 C9.5 12.7 13.5 12.7 13.5 10.8"/>
+    <path d="M15.5 2 V12 M17.5 6 V12"/>
+    <ellipse cx="21.5" cy="9" rx="2.3" ry="3.2"/>
+    <path d="M29 7 C28.5 5.3 25 5.3 25 7.4 C25 9.4 29 8.4 29 10.5 C29 12.7 25.5 12.7 25 11 M28 12 H40"/>
+  </g>
+  <circle cx="17.5" cy="2.2" r="0.42" fill="white"/>
+</svg>

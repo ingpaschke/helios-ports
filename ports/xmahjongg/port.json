@@ -1,0 +1,156 @@
+{
+  "format": 1,
+  "name": "xmahjongg",
+  "version": "3.7",
+  "upstream": {
+    "kind": "archive",
+    "url": "https://deb.debian.org/debian/pool/main/x/xmahjongg/xmahjongg_3.7.orig.tar.gz",
+    "filename": "xmahjongg-3.7.tar.gz",
+    "sha256": "243d63681cc25b97b30fee76aac98f1923f4734e772c57335b911f4c8647ffcf",
+    "subdirectory": "xmahjongg-3.7",
+    "tree_sha256": "13a71b61e620012b6d8c40f4f50c5182b96511dbea4e46b54d478a296a98b11c"
+  },
+  "patches": [
+    {
+      "file": "01-helios.patch",
+      "description": "Adapt event timing, configuration and diagnostics to native Helios X11",
+      "sha256": "7a9abe4791138e628b4a1ce61533d675955e9fe123c3e81bcf2b9ab393cee756"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "554ee9f76e6c4136c1fe8e747322c644b40fc077f8efb1173b85e98737c64a5a",
+  "dependencies": [
+    "x11"
+  ],
+  "cxx": true,
+  "build": {
+    "compile": {
+      "flags": [
+        "-DHAVE_CONFIG_H",
+        "-Dhelios",
+        "-D_BSD",
+        "-DNeedFunctionPrototypes=1",
+        "-DNeedWidePrototypes=1",
+        "-I${src}",
+        "-I${src}/include",
+        "-I${dep:x11}/include"
+      ]
+    },
+    "groups": [
+      {
+        "name": "cxx",
+        "flags": [
+          "-std=gnu++11",
+          "-fno-exceptions",
+          "-fno-rtti",
+          "-isystem",
+          "${tools}/include/c++",
+          "-isystem",
+          "${tools}/include/c++/externc"
+        ],
+        "sources": [
+          "${src}/src/alarm.cc",
+          "${src}/src/board.cc",
+          "${src}/src/button.cc",
+          "${src}/src/counter.cc",
+          "${src}/src/game.cc",
+          "${src}/src/gmjts.cc",
+          "${src}/src/hint.cc",
+          "${src}/src/kdets.cc",
+          "${src}/src/kmjts.cc",
+          "${src}/src/main.cc",
+          "${src}/src/matches.cc",
+          "${src}/src/moment.cc",
+          "${src}/src/panel.cc",
+          "${src}/src/random.cc",
+          "${src}/src/solution.cc",
+          "${src}/src/solvable.cc",
+          "${src}/src/swgeneral.cc",
+          "${src}/src/swwidget.cc",
+          "${src}/src/tile.cc",
+          "${src}/src/tileset.cc",
+          "${src}/src/traverse.cc",
+          "${src}/src/xmj3ts.cc",
+          "${src}/liblcdf/permstr.cc",
+          "${src}/liblcdf/straccum.cc",
+          "${src}/liblcdf/string.cc",
+          "${src}/liblcdf/vectorv.cc"
+        ]
+      },
+      {
+        "name": "c",
+        "flags": [
+          "-std=gnu99"
+        ],
+        "sources": [
+          "${src}/src/images.c",
+          "${src}/liblcdf/clp.c",
+          "${src}/liblcdf/fmalloc.c",
+          "${src}/liblcdf/giffunc.c",
+          "${src}/liblcdf/gifread.c",
+          "${src}/liblcdf/gifx.c"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "xmahjongg",
+        "type": "executable",
+        "groups": [
+          "cxx",
+          "c"
+        ],
+        "libraries": [
+          "${dep:x11}/lib/libX11.a",
+          "${sdk}/lib/netutils.lib",
+          "${sdk}/lib/bsd.lib",
+          "${tools}/lib/llvmcxx-generic.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${stage}/bin/x11/xmahjongg",
+        "stack": 131072,
+        "heap": 524288,
+        "start": "${tools}/lib/cxx0.o"
+      }
+    ],
+    "install": [
+      {
+        "type": "symlink",
+        "source": "xmahjongg",
+        "destination": "${stage}/bin/x11/xshanghai"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/share",
+        "destination": "${stage}/local/share/xmahjongg"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/README",
+        "destination": "${stage}/local/share/xmahjongg/README"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/NEWS",
+        "destination": "${stage}/local/share/xmahjongg/NEWS"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYING",
+        "destination": "${stage}/local/share/xmahjongg/COPYING"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/xmahjongg.6",
+        "destination": "${stage}/local/share/xmahjongg/xmahjongg.6"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/helios/README.helios",
+        "destination": "${stage}/local/share/xmahjongg/README.helios"
+      }
+    ]
+  }
+}

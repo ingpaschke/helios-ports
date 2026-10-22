@@ -1,0 +1,6 @@
+% Helios defaults. Personal overrides belong in ~/.slrnrc.
+set editor_command "/helios/local/bin/stevie '%s'"
+set generate_message_id 0
+set mouse 0
+% Set username, hostname and realname in ~/.slrnrc before posting.
+% For authenticated servers, add: nnrpaccess "news.example.org" "user" "password"

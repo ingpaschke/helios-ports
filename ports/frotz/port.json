@@ -1,0 +1,78 @@
+{
+  "format": 1,
+  "name": "frotz",
+  "version": "2.55",
+  "upstream": {
+    "kind": "archive",
+    "url": "https://www.ifarchive.org/if-archive/infocom/interpreters/frotz/frotz-2.55.tar.gz",
+    "filename": "frotz-2.55.tar.gz",
+    "sha256": "e3d6912ff94bca724759fe59aa222c1ee23aa4d35ffa15a0b40f72f97887d871",
+    "subdirectory": "frotz-2.55",
+    "tree_sha256": "62999fed5369e98ee1112ce62a083d3e6bfc0d562addd777b675c1d15c0f2ea4"
+  },
+  "patches": [
+    {
+      "file": "01-build.patch",
+      "description": "Build the native interpreters with explicit toolchain and portability settings",
+      "sha256": "5d0dbc54d4fc290a5a0e1b076c084adf481847fba3cb65277e20542b179b298c"
+    },
+    {
+      "file": "02-terminal.patch",
+      "description": "Provide the Helios terminal and curses adapter",
+      "sha256": "c381739d80e194b0124fbd154c96658ec39f7bbafc51c1be16da7dd98fb11860"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "4f4e1d9a26b79c31fcf1eef48932e47d88da407cb1092a67749c29646525367f",
+  "dependencies": [],
+  "host_tools": [
+    "make"
+  ],
+  "build": {
+    "prepare": [
+      {
+        "type": "run",
+        "command": [
+          "make",
+          "-f",
+          "Makefile.helios",
+          "-j${jobs}",
+          "CLANG=${clang}",
+          "SYSROOT=${sdk}",
+          "HASMDIR=${asm_dir}"
+        ],
+        "cwd": "${src}"
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/build-helios/frotz",
+        "destination": "${stage}/local/bin/frotz"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/build-helios/dfrotz",
+        "destination": "${stage}/local/bin/dfrotz"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYING",
+        "destination": "${stage}/local/games/frotz/COPYING"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/AUTHORS",
+        "destination": "${stage}/local/games/frotz/AUTHORS"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/README",
+        "destination": "${stage}/local/games/frotz/README"
+      }
+    ],
+    "outputs": [
+      "${src}/doc/frotz.6"
+    ]
+  }
+}

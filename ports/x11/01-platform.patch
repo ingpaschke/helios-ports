@@ -1,0 +1,533 @@
+Subject: Use Helios platform declarations in X clients and utilities
+
+diff --git a/clients/bitmap/atobm.c b/clients/bitmap/atobm.c
+index 7e7c1943d4ab03e21fb0a996bb5e9867cf960297..6fb7664f7d96aac0f43f6c886a80b48ba93cc292 100644
+--- a/clients/bitmap/atobm.c
++++ b/clients/bitmap/atobm.c
+@@ -22,7 +22,7 @@
+ #include <ctype.h>
+ #include <X11/Xos.h>
+ 
+-extern char *malloc(), *calloc();
++
+ 
+ char *ProgramName;
+ 
+diff --git a/clients/bitmap/bitmap.c b/clients/bitmap/bitmap.c
+index de6d69fde238b4eacb8b6d6e07a6de776c363e0b..bb8f1d6c161aeb7da5120dcf1654ade644bc55a4 100644
+--- a/clients/bitmap/bitmap.c
++++ b/clients/bitmap/bitmap.c
+@@ -160,7 +160,7 @@ static boolean changed = FALSE;
+ 
+ enum RepaintGridType {e_AgainstBackground, e_AgainstForeground, e_Invert};
+ 
+-extern char *malloc();
++
+ 
+ static char *yes_answers[] = { "y", "yes", "on", "all", "true", NULL };
+ static char *no_answers[] = { "n", "no", "off", "none", "false", NULL };
+diff --git a/clients/bitmap/bmtoa.c b/clients/bitmap/bmtoa.c
+index dcd5e9cdcb30390c03203cd77e47f87b37cb2ba2..531ddfcb7e4c4e07f5249c941673057bac402462 100644
+--- a/clients/bitmap/bmtoa.c
++++ b/clients/bitmap/bmtoa.c
+@@ -24,7 +24,7 @@
+ 
+ #include <X11/Xmu/Drawing.h>
+ 
+-extern char *malloc();
++
+ 
+ char *ProgramName;
+ 
+diff --git a/clients/bitmap/dialog.c b/clients/bitmap/dialog.c
+index 051bdf648d988873c8c61d978e40c5446a78bfb3..4ff0be0750ddef0bb82dc5ce7d76585969803b0b 100644
+--- a/clients/bitmap/dialog.c
++++ b/clients/bitmap/dialog.c
+@@ -6,7 +6,7 @@
+ static char *rcsid_dialog_c = "$XConsortium: dialog.c,v 1.6 89/12/10 15:54:07 rws Exp $";
+ #endif
+ 
+-char *malloc();
++
+ 
+ extern Display *d;
+ extern int screen;
+diff --git a/clients/twm/twm.h b/clients/twm/twm.h
+index e561aa47f2ce2a974f7185d74debc8763c1831f8..19b26fad1f250582897d54ccf87003bbe951623c 100644
+--- a/clients/twm/twm.h
++++ b/clients/twm/twm.h
+@@ -287,7 +287,7 @@ typedef struct TwmWindow
+ #define TBPM_QUESTION ":question"	/* name of unknown titlebar pixmap */
+ #define TBPM_MENU ":menu"	/* name of titlebar pixmap for menus */
+ 
+-extern char *malloc(), *calloc(), *realloc(), *getenv();
++extern char  *getenv();
+ extern void free();
+ extern void Reborder(), Done();
+ void ComputeCommonTitleOffsets();
+diff --git a/clients/xauth/parsedpy.c b/clients/xauth/parsedpy.c
+index 9c94e365087ead1824988c256842bb37ddcc4b5a..c02e9d867d65adcce9f383e9d2017bfc4115c94b 100644
+--- a/clients/xauth/parsedpy.c
++++ b/clients/xauth/parsedpy.c
+@@ -40,7 +40,7 @@
+ #define UNIX_CONNECTION_LENGTH 4
+ #endif
+ 
+-extern char *malloc();
++
+ 
+ 
+ /*
+diff --git a/clients/xauth/xauth.h b/clients/xauth/xauth.h
+index 0b5421ed151c0c626afb866ec3aa691de93d61ae..98bf69b3fb230b03cde38a537bf2503ff226161d 100644
+--- a/clients/xauth/xauth.h
++++ b/clients/xauth/xauth.h
+@@ -35,7 +35,7 @@ typedef int Bool;
+ 
+ extern char *ProgramName;
+ 
+-extern char *copystring(), *malloc(), *realloc();
++extern char *copystring();
+ int process_command(), auth_initialize(), auth_finalize();
+ extern int print_help();
+ extern int verbose;
+diff --git a/clients/xclipboard/xclipboard.c b/clients/xclipboard/xclipboard.c
+index cae63e22eeb5ed8a548771118e8992f130301be5..5e051d86d2c3a2cca218b671d2fe5051a320e06e 100644
+--- a/clients/xclipboard/xclipboard.c
++++ b/clients/xclipboard/xclipboard.c
+@@ -51,7 +51,7 @@ typedef struct _Clip {
+     int		    avail;
+ } ClipRec, *ClipPtr;
+ 
+-extern char *malloc ();
++
+ 
+ static long TextLength (w)
+     Widget  w;
+diff --git a/clients/xditview/libXdvi/Dvi.c b/clients/xditview/libXdvi/Dvi.c
+index 61bbe5697569f6f2c2297a7e4e6ce64dfe986c5d..2016ddd4569f1716b228e995e377899cc7fccb83 100644
+--- a/clients/xditview/libXdvi/Dvi.c
++++ b/clients/xditview/libXdvi/Dvi.c
+@@ -220,7 +220,7 @@ SetValues (current, request, new)
+ 	DviWidget current, request, new;
+ {
+ 	Boolean		redisplay = FALSE;
+-	extern char	*malloc ();
++	
+ 	char		*new_map;
+ 	int		cur, req;
+ 
+diff --git a/clients/xditview/libXdvi/font.c b/clients/xditview/libXdvi/font.c
+index e99883552df4149c8309f82329bf955f466708d1..67cf1843e9d73d08bd3619d547b41a5a390a1218 100644
+--- a/clients/xditview/libXdvi/font.c
++++ b/clients/xditview/libXdvi/font.c
+@@ -12,7 +12,7 @@
+ #include "DviP.h"
+ #include "XFontName.h"
+ 
+-extern char	*malloc ();
++
+ 
+ static char *
+ savestr (s)
+diff --git a/clients/xlsfonts/dsimple.c b/clients/xlsfonts/dsimple.c
+index 43c5c290c4b2d9ed6887518f62bbd218da503a1a..8bea876277f4431639cf8e58039e85aa024e2ed4 100644
+--- a/clients/xlsfonts/dsimple.c
++++ b/clients/xlsfonts/dsimple.c
+@@ -45,7 +45,7 @@ extern int screen;
+ char *Malloc(size)
+      unsigned size;
+ {
+-	char *data, *malloc();
++	char *data;
+ 
+ 	if (!(data = malloc(size)))
+ 	  Fatal_Error("Out of memory!");
+@@ -61,7 +61,7 @@ char *Realloc(ptr, size)
+         char *ptr;
+         int size;
+ {
+-	char *new_ptr, *realloc();
++	char *new_ptr;
+ 
+ 	if (!ptr)
+ 	  return(Malloc(size));
+diff --git a/clients/xman/defs.h b/clients/xman/defs.h
+index 306bfcf1d0d648f1bc1bf4e43861fbcc95e4d5d8..5c6ef2d18b2615b5991caef915053348884f6489 100644
+--- a/clients/xman/defs.h
++++ b/clients/xman/defs.h
+@@ -21,7 +21,7 @@
+  */
+ 
+ #ifndef HELPFILE
+-#define HELPFILE "/usr/lib/X11/xman.help" /* name of the default helpfile. */ 
++#define HELPFILE "/helios/lib/X11/xman.help" /* name of the default helpfile. */ 
+ #endif
+ 
+ /* The default cursors */
+@@ -161,7 +161,7 @@
+ #ifdef macII
+ #  define MANDIR "/usr/catman/u_man:/usr/catman/a_man"	
+ #else
+-#  define MANDIR "/usr/man"
++#  define MANDIR "/helios/man"
+ #endif
+ 
+ #define INDENT 15
+diff --git a/clients/xman/man.h b/clients/xman/man.h
+index 5932f481ff66fb652a62318328c630a31301a00a..32e304d5e642d2356a36b0627852d9b3f4222b6e 100644
+--- a/clients/xman/man.h
++++ b/clients/xman/man.h
+@@ -175,7 +175,7 @@ typedef struct _Xman_Resources {
+ 
+ /* Standard library function definitions. */
+ 
+-char * mktemp(), * getenv(), * malloc(), * realloc();
++char * mktemp(), * getenv();
+ void exit();
+ 
+ /* Toolkit standard definitions. */
+diff --git a/clients/xpr/x2jet.c b/clients/xpr/x2jet.c
+index ab16833ff734790bad23565d11f6d3ff3866ddf3..36c01b0cfc2b1fe4b114f8ffd35df9008f916d56 100644
+--- a/clients/xpr/x2jet.c
++++ b/clients/xpr/x2jet.c
+@@ -84,7 +84,7 @@ extern	nl_catd	nlmsg_fd;
+ typedef struct { long width, height; } Area;
+ typedef struct { long x, y; } Location;
+ 
+-char *malloc();
++
+ 
+ 
+ static Area limit;	/* image clip limits (dots) */
+diff --git a/clients/xpr/x2pmp.c b/clients/xpr/x2pmp.c
+index 9bcc9fe1613bb5de19993f00264c68ad57da23e0..84ab6c12b2c2a22a41299cbae86b9963ef74d8fc 100644
+--- a/clients/xpr/x2pmp.c
++++ b/clients/xpr/x2pmp.c
+@@ -34,7 +34,7 @@ typedef XColor Color
+ #define min_(a, b) (a) < (b) ? (a) : (b)
+ #define abs_(a) (a) < 0 ? -(a) : (a)
+ 
+-extern char *calloc();
++
+ static void leave();
+ static bits_set();
+ static unsigned char *magnification_table();
+diff --git a/clients/xpr/xpr.c b/clients/xpr/xpr.c
+index b6b73be58022b800e83a1276023983738028c393..dfa4581cf7d4a66bc52278e68663400ad96638ef 100644
+--- a/clients/xpr/xpr.c
++++ b/clients/xpr/xpr.c
+@@ -104,7 +104,7 @@ int debug = 0;
+ char *infilename = NULL;
+ char *progname;
+ 
+-char *malloc();
++
+ char *convert_data();
+ 
+ typedef struct _grayRec {
+diff --git a/clients/xprop/dsimple.c b/clients/xprop/dsimple.c
+index dd199cf813c1286c40ff206559c1b6ba8cd77c82..7356852eb61b8b472ee44a2199306ebe487e5c90 100644
+--- a/clients/xprop/dsimple.c
++++ b/clients/xprop/dsimple.c
+@@ -45,7 +45,7 @@ extern int screen;
+ char *Malloc(size)
+      unsigned size;
+ {
+-	char *data, *malloc();
++	char *data;
+ 
+ 	if (!(data = malloc(size)))
+ 	  Fatal_Error("Out of memory!");
+@@ -61,7 +61,7 @@ char *Realloc(ptr, size)
+         char *ptr;
+         int size;
+ {
+-	char *new_ptr, *realloc();
++	char *new_ptr;
+ 
+ 	if (!ptr)
+ 	  return(Malloc(size));
+diff --git a/clients/xrefresh/xrefresh.c b/clients/xrefresh/xrefresh.c
+index a0dc60e832240f71c7035d1fbc251904a885a192..24761320bb702d87b55a1182300340e5134ffc17 100644
+--- a/clients/xrefresh/xrefresh.c
++++ b/clients/xrefresh/xrefresh.c
+@@ -36,7 +36,7 @@ SOFTWARE.
+ #include <X11/Xutil.h>
+ #include <ctype.h>
+ 
+-char *malloc();
++
+ 
+ Window XCreateWindow();
+ 
+@@ -64,7 +64,7 @@ static char *copystring (s)
+     register char *s;
+ {
+     int len = (s ? strlen (s) : 0) + 1;
+-    char *malloc();
++    
+     char *retval;
+ 
+     retval = malloc (len);
+diff --git a/clients/xwd/dsimple.c b/clients/xwd/dsimple.c
+index 05f088180e879646859878f4b17c359e212ee173..153cdc1a909ac584b07b7adb0525f4a46da6722a 100644
+--- a/clients/xwd/dsimple.c
++++ b/clients/xwd/dsimple.c
+@@ -45,7 +45,7 @@ extern int screen;
+ char *Malloc(size)
+      unsigned size;
+ {
+-	char *data, *malloc();
++	char *data;
+ 
+ 	if (!(data = malloc(size)))
+ 	  Fatal_Error("Out of memory!");
+@@ -61,7 +61,7 @@ char *Realloc(ptr, size)
+         char *ptr;
+         int size;
+ {
+-	char *new_ptr, *realloc();
++	char *new_ptr;
+ 
+ 	if (!ptr)
+ 	  return(Malloc(size));
+diff --git a/clients/xwd/xwd.c b/clients/xwd/xwd.c
+index b1992aa56d918de228ee900b9b4f277a27f9d9f2..383b969d6a662ad7c2ccba6cfe0dbd961e7c8fb4 100644
+--- a/clients/xwd/xwd.c
++++ b/clients/xwd/xwd.c
+@@ -168,7 +168,7 @@ main(argc, argv)
+  *              writting.
+  */
+ 
+-char *calloc();
++
+ 
+ #include "X11/XWDFile.h"
+ 
+diff --git a/clients/xwininfo/dsimple.c b/clients/xwininfo/dsimple.c
+index dafb0433f783511110fce0b5f6ee99b3e500220b..aac0c6675742d7885f1c93a803c6acd0c4ed92e6 100644
+--- a/clients/xwininfo/dsimple.c
++++ b/clients/xwininfo/dsimple.c
+@@ -45,7 +45,7 @@ extern int screen;
+ char *Malloc(size)
+      unsigned size;
+ {
+-	char *data, *malloc();
++	char *data;
+ 
+ 	if (!(data = malloc(size)))
+ 	  Fatal_Error("Out of memory!");
+@@ -61,7 +61,7 @@ char *Realloc(ptr, size)
+         char *ptr;
+         int size;
+ {
+-	char *new_ptr, *realloc();
++	char *new_ptr;
+ 
+ 	if (!ptr)
+ 	  return(Malloc(size));
+diff --git a/clients/xwud/xwud.c b/clients/xwud/xwud.c
+index 2afa580586f2c599c459964a71a014ec95b8b500..cb0db7375b5f51506efae8ba04ca6ffb11168149 100644
+--- a/clients/xwud/xwud.c
++++ b/clients/xwud/xwud.c
+@@ -16,7 +16,7 @@ static char *rcsid = "$XConsortium: xwud.c,v 1.34 89/12/10 17:54:58 rws Exp $";
+ #include <X11/keysymdef.h>
+ 
+ extern int errno;
+-extern char *malloc();
++
+ unsigned Image_Size();
+ 
+ char *progname;
+diff --git a/config/imake.c b/config/imake.c
+index 8ec212e97764f1440a8c6c4b9c9d0e92983a063b..93af3a6848111af630415128d0cc577d98c4ec60 100644
+--- a/config/imake.c
++++ b/config/imake.c
+@@ -157,7 +157,7 @@ boolean	verbose = FALSE;
+ boolean	show = TRUE;
+ extern int	errno;
+ extern char	*Emalloc();
+-extern char	*realloc();
++
+ extern char	*getenv();
+ extern char	*mktemp();
+ 
+@@ -734,7 +734,7 @@ writetmpfile(fd, buf, cnt)
+ char *Emalloc(size)
+ 	int	size;
+ {
+-	char	*p, *malloc();
++	char	*p;
+ 
+ 	if ((p = malloc(size)) == NULL)
+ 		LogFatalI("Cannot allocate %d bytes\n", size);
+diff --git a/demos/ico/ico.c b/demos/ico/ico.c
+index 3380a2b8fa1e7923172726dad10a490a3198c12b..daba39cd1c05486f79aa3ce4a57e6181b7a00302 100644
+--- a/demos/ico/ico.c
++++ b/demos/ico/ico.c
+@@ -738,7 +738,7 @@ int prevX, prevY;
+ char *xalloc(nbytes)
+ int nbytes;
+ {
+-char *p, *malloc();
++char *p;
+ 
+ 	p = malloc((unsigned int)nbytes);
+ 	if (p) return p;
+diff --git a/demos/plaid/plaid.c b/demos/plaid/plaid.c
+index a63f10169bcbb015d5f13e1fef708456b52aaa7d..e102e65c632c6e4450d54d8d00484fa6a08ca7bf 100644
+--- a/demos/plaid/plaid.c
++++ b/demos/plaid/plaid.c
+@@ -34,7 +34,7 @@ extern int errno;
+ char *ProgramName;
+ 
+ int rand();
+-char *malloc();
++
+ 
+ Window XCreateWindow();
+ 
+diff --git a/examples/text/ttextext/mapfile.c b/examples/text/ttextext/mapfile.c
+index 5821fe8394823de0c73419a0ec7ff25d781d9244..2b7c0e15bccb75cf786a7831da881b10fb9dd227 100644
+--- a/examples/text/ttextext/mapfile.c
++++ b/examples/text/ttextext/mapfile.c
+@@ -5,7 +5,7 @@
+ #include "mapfile.h"
+ 
+ extern int errno;
+-char *malloc(), *calloc();
++
+ 
+ int mapfilein (filename, maplistp)
+     char *filename;			/* name of file to read in */
+diff --git a/server/ddx/ibm/common/ibmMalloc.h b/server/ddx/ibm/common/ibmMalloc.h
+index ef7a15f2c6b5a1d7a024083fdcdc7cad8ebb4db4..980cf65a5e64e748f4fb38851b9151299d11b5be 100644
+--- a/server/ddx/ibm/common/ibmMalloc.h
++++ b/server/ddx/ibm/common/ibmMalloc.h
+@@ -105,5 +105,5 @@ struct arenastate {
+ };
+ 
+ struct arenastate *GetMallocArena();
+-char *malloc(), *realloc();
++
+ 
+diff --git a/server/os/4.2bsd/utils.c b/server/os/4.2bsd/utils.c
+index f10e2b2abd7cc4b566ff57251d5483a4fc570285..4a17b5b722ac81ae20adde70ba66337fa0f7a8b7 100644
+--- a/server/os/4.2bsd/utils.c
++++ b/server/os/4.2bsd/utils.c
+@@ -496,7 +496,7 @@ unsigned long *
+ Xalloc (amount)
+     unsigned long amount;
+ {
+-    char		*malloc();
++    
+     register pointer  ptr;
+ 	
+     if(!amount)
+@@ -545,8 +545,8 @@ Xrealloc (ptr, amount)
+     register pointer ptr;
+     unsigned long amount;
+ {
+-    char *malloc();
+-    char *realloc();
++    
++    
+ 
+ #ifdef MEMBUG
+     if (MemoryValidate)
+diff --git a/util/att-nameserver/itserver.c b/util/att-nameserver/itserver.c
+index 61076a894e3ef8fe74c5c73e179d0cc4418c56bd..d4a44af21431191e54cf2bbe0260180fcccb37a3 100644
+--- a/util/att-nameserver/itserver.c
++++ b/util/att-nameserver/itserver.c
+@@ -43,7 +43,7 @@
+ 
+ #include "osdep.h"
+ 
+-extern	char	*calloc(), *realloc(), *alialloc();
++extern	char	 *alialloc();
+ extern  char    *program;
+ int	network;
+ int	nextentry;
+diff --git a/util/att-nameserver/starserver.c b/util/att-nameserver/starserver.c
+index 55c0eec734197ec47df2faa7450b6c769fc74ae5..44d16528b968f7c59292e49d5c59c02b72ebcbc0 100644
+--- a/util/att-nameserver/starserver.c
++++ b/util/att-nameserver/starserver.c
+@@ -37,7 +37,7 @@
+ #include "osdep.h"
+ 
+ 
+-extern	char	*calloc(), *realloc(), *alialloc();
++extern	char	 *alialloc();
+ extern  char    *program;
+ int	network;
+ int	nextentry;
+diff --git a/util/att-nameserver/xdaemon.c b/util/att-nameserver/xdaemon.c
+index e484d0268a9cc3ccdd2736114ffb121131dc352d..a33f3236e6b5e50f011e8057096b3aacf753b030 100644
+--- a/util/att-nameserver/xdaemon.c
++++ b/util/att-nameserver/xdaemon.c
+@@ -39,7 +39,7 @@
+ 
+ #define	NSECONDS	2	
+ 
+-extern	char	*calloc(), *realloc();
++
+ extern	char	*program;
+ int	network;
+ int	nextentry;
+diff --git a/util/compress/compress.c b/util/compress/compress.c
+index 63836114230417f0c7b588d11082f35d26ea17b6..b994a549d8da8427fbc024929c8a83cee3ba2c19 100644
+--- a/util/compress/compress.c
++++ b/util/compress/compress.c
+@@ -453,7 +453,7 @@ register int argc; char **argv;
+     int overwrite = 0;	/* Do not overwrite unless given -f flag */
+     char tempname[100];
+     char **filelist, **fileptr;
+-    char *cp, *rindex(), *malloc();
++    char *cp, *rindex();
+     struct stat statbuf;
+     extern onintr(), oops();
+ 
+diff --git a/util/cpp/cpp6.c b/util/cpp/cpp6.c
+index 3fd80014acb61674b5da26cb6aada219d6227212..3f82a1a6bae385822677cbd02faee7fb841e6d2a 100644
+--- a/util/cpp/cpp6.c
++++ b/util/cpp/cpp6.c
+@@ -476,7 +476,7 @@ int		size;
+  */
+ {
+ 	register char	*result;
+-	extern char	*malloc();
++	
+ 
+ 	if ((result = malloc((unsigned) size)) == NULL)
+ 	    cfatal("Out of memory", NULLST);
+diff --git a/util/makedepend/def.h b/util/makedepend/def.h
+index 2f978deda5fe6d5b01cb2ad1cedf2a9d1335c256..9050edfe35f5f3bcc8a256bbdf8a8bb14dd355d6 100644
+--- a/util/makedepend/def.h
++++ b/util/makedepend/def.h
+@@ -82,8 +82,8 @@ struct filepointer {
+ };
+ 
+ char			*copy();
+-char			*malloc();
+-char			*realloc();
++
++
+ char			*basename();
+ char			*getline();
+ struct symtab		*slookup();
+diff --git a/util/patch/common.h b/util/patch/common.h
+index 80b9c93bb5864fc9725b6f983885be570bc45648..58b5285550ac1002b733879a1a3add3c81a32326 100644
+--- a/util/patch/common.h
++++ b/util/patch/common.h
+@@ -144,8 +144,8 @@ EXT char end_defined[128];		/* #endif xyzzy */
+ 
+ EXT char *revision INIT(Nullch);	/* prerequisite revision, if any */
+ 
+-char *malloc();
+-char *realloc();
++
++
+ char *strcpy();
+ char *strcat();
+ long atol();

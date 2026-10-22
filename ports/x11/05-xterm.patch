@@ -1,0 +1,1652 @@
+Subject: Connect xterm to the native terminal service and handle input and resize events
+
+diff --git a/clients/xterm/Tekproc.c b/clients/xterm/Tekproc.c
+index 9196400c1f52247c93c3bdc8434be372356118d0..41975f500f440edf05fe89a60087b21f9696c2ca 100644
+--- a/clients/xterm/Tekproc.c
++++ b/clients/xterm/Tekproc.c
+@@ -35,6 +35,7 @@
+ 
+ #include <X11/Xos.h>
+ #include "ptyx.h"
++#include "helios-pty.h"
+ #include <X11/Xatom.h>
+ #include <X11/Xutil.h>
+ #include <X11/cursorfont.h>
+@@ -634,7 +635,7 @@ Tinput()
+ 	register TScreen *screen = &term->screen;
+ 	register int i;
+ 	register TekLink *tek;
+-	extern char *malloc();
++	
+ 
+ 	if(Tpushback > Tpushb)
+ 		return(*--Tpushback);
+@@ -666,11 +667,11 @@ again:
+ 			if(Tselect_mask & pty_mask) {
+ 				if(screen->logging)
+ 					FlushLog(screen);
+-				if((Tbcnt = read(screen->respond,
++				if((Tbcnt = helios_pty_read(screen->respond,
+ 				 Tbptr = Tbuffer, BUF_SIZE)) < 0) {
+ 					if(errno == EIO)
+ 						Cleanup (0);
+-					else if(errno != EWOULDBLOCK)
++					else if(errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
+ 						Panic(
+ 				 "Tinput:read returned unexpected error (%d)\n",
+ 						 errno);
+@@ -1154,7 +1155,7 @@ static void TekRealize (gw, valuemaskp, values)
+     int winX, winY, width, height;
+     XSizeHints sizehints;
+     char Tdefault[32];
+-    extern char *malloc();
++    
+ 
+     tw->core.border_pixel = term->core.border_pixel;
+ 
+diff --git a/clients/xterm/button.c b/clients/xterm/button.c
+index 7b52dbca0637ad1f64e1fdc40f627bf0542d59f9..64f4f583da630232401b787ef794d0314f4b4471 100644
+--- a/clients/xterm/button.c
++++ b/clients/xterm/button.c
+@@ -51,7 +51,7 @@ static char rcs_id[] = "$XConsortium: button.c,v 1.50 90/03/05 11:46:57 keith Ex
+ #include "error.h"
+ #include "menu.h"
+ 
+-extern char *malloc();
++
+ 
+ #define KeyState(x) (((x) & (ShiftMask|ControlMask)) + (((x) & Mod1Mask) ? 2 : 0))
+     /* adds together the bits:
+diff --git a/clients/xterm/charproc.c b/clients/xterm/charproc.c
+index db9d59095465e15f319089ba56474e8eb1c51ca3..e6f8423b1c4a8d7ee50bc63afc3efbe488f07c70 100644
+--- a/clients/xterm/charproc.c
++++ b/clients/xterm/charproc.c
+@@ -54,6 +54,7 @@
+ #undef FIONCLEX					/* redefined from sgtty.h */
+ #endif
+ #include "ptyx.h"
++#include "helios-pty.h"
+ #include "VTparse.h"
+ #include "data.h"
+ #include <X11/Xutil.h>
+@@ -1097,7 +1098,7 @@ int l;
+ 		}
+ 	} else if (l) {
+ 		if ((r = write(f, d, l)) < 0) {
+-			if (errno == EWOULDBLOCK)
++			if ((errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
+ 				r = 0;
+ 			else if (errno == EINTR)
+ 				r = 0;
+@@ -1136,11 +1137,11 @@ in_put()
+ 		if((select_mask & pty_mask) && (eventMode == NORMAL)) {
+ 			if(screen->logging)
+ 				FlushLog(screen);
+-			if((bcnt = read(screen->respond, bptr = buffer,
++			if((bcnt = helios_pty_read(screen->respond, bptr = buffer,
+ 			 BUF_SIZE)) < 0) {
+ 				if(errno == EIO)
+ 					Cleanup (0);
+-				else if(errno != EWOULDBLOCK)
++				else if(errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)
+ 					Panic(
+ 				 "input: read returned unexpected error (%d)\n",
+ 					 errno);
+@@ -2090,7 +2091,7 @@ XSetWindowAttributes *values;
+ 	unsigned int width, height;
+ 	register TScreen *screen = &term->screen;
+ 	int xpos, ypos, pr;
+-	extern char *malloc();
++	
+ 	XSizeHints		sizehints;
+ 	extern int		VTgcFontMask;
+ 	int scrollbar_width;
+diff --git a/clients/xterm/main.c b/clients/xterm/main.c
+index f32aaefba7bd883c720b028d8ef8353c942c0c02..775829aded35fdc0e0122e4c77c2916cff9e1697 100644
+--- a/clients/xterm/main.c
++++ b/clients/xterm/main.c
+@@ -115,7 +115,7 @@ SOFTWARE.
+ #define ttyslot() 1
+ #endif /* apollo */
+ 
+-#include <utmp.h>
++/* Native login manages Helios sessions. */
+ #ifdef LASTLOG
+ #include <lastlog.h>
+ #endif
+@@ -163,14 +163,14 @@ int	Ptyfd;
+ #endif
+ 
+ SIGNAL_T Exit();
+-extern char *malloc();
+-extern char *calloc();
+-extern char *realloc();
++
++
++
+ extern char *ttyname();
+ extern char *getenv();
+ extern char *strindex ();
+ extern void exit();
+-extern void sleep();
++
+ extern void bcopy();
+ extern long lseek();
+ extern void HandlePopupMenu();
+@@ -183,34 +183,6 @@ static Bool added_utmp_entry = False;
+ 
+ static char **command_to_exec;
+ 
+-#ifdef USE_SYSV_TERMIO
+-/* The following structures are initialized in main() in order
+-** to eliminate any assumptions about the internal order of their
+-** contents.
+-*/
+-static struct termio d_tio;
+-#ifdef TIOCSLTC
+-static struct ltchars d_ltc;
+-#endif	/* TIOCSLTC */
+-#ifdef TIOCLSET
+-static unsigned int d_lmode;
+-#endif	/* TIOCLSET */
+-#else /* not USE_SYSV_TERMIO */
+-static struct  sgttyb d_sg = {
+-        0, 0, 0177, CKILL, EVENP|ODDP|ECHO|XTABS|CRMOD
+-};
+-static struct  tchars d_tc = {
+-        CINTR, CQUIT, CSTART,
+-        CSTOP, CEOF, CBRK,
+-};
+-static struct  ltchars d_ltc = {
+-        CSUSP, CDSUSP, CRPRNT,
+-        CFLUSH, CWERASE, CLNEXT
+-};
+-static int d_disipline = NTTYDISC;
+-static long int d_lmode = LCRTBS|LCRTERA|LCRTKIL|LCTLECH;
+-#endif /* USE_SYSV_TERMIO */
+-
+ static int parse_tty_modes ();
+ /*
+  * SYSV has the termio.c_cc[V] and ltchars; BSD has tchars and ltchars
+@@ -667,7 +639,7 @@ char **argv;
+ 	XtGetApplicationResources( toplevel, &resource, application_resources,
+ 				   XtNumber(application_resources), NULL, 0 );
+ 
+-	waiting_for_initial_map = resource.wait_for_map;
++	waiting_for_initial_map = False;
+ 
+ 	/*
+ 	 * fill in terminal modes
+@@ -817,10 +789,10 @@ char **argv;
+ 		unsigned char *old_bufend;
+ 
+ 		old_bufend = (unsigned char *) _bufend(stderr);
+-		fileno(stderr) = i;
++		dup2(i,2);
+ 		_bufend(stderr) = old_bufend;
+ #else	/* USE_SYSV_TERMIO */
+-		fileno(stderr) = i;
++		dup2(i,2);
+ #endif	/* USE_SYSV_TERMIO */
+ 
+ 		/* mark this file as close on exec */
+@@ -898,76 +870,6 @@ char *name;
+  * has problems, we can re-enter this function and get another one.
+  */
+ 
+-get_pty (pty)
+-int *pty;
+-{
+-	static int devindex, letter = 0;
+-
+-#ifdef att
+-	if ((*pty = open ("/dev/ptmx", O_RDWR)) < 0) {
+-	    return 1;
+-	}
+-	return 0;
+-#else /* !att, need lots of code */
+-
+-#if defined(umips) && defined (SYSTYPE_SYSV)
+-	struct stat fstat_buf;
+-
+-	*pty = open ("/dev/ptc", O_RDWR);
+-	if (*pty < 0 || (fstat (*pty, &fstat_buf)) < 0) {
+-	  return(1);
+-	}
+-	sprintf (ttydev, "/dev/ttyq%d", minor(fstat_buf.st_rdev));
+-	sprintf (ptydev, "/dev/ptyq%d", minor(fstat_buf.st_rdev));
+-	if ((*tty = open (ttydev, O_RDWR)) < 0) {
+-	  close (*pty);
+-	  return(1);
+-	}
+-	/* got one! */
+-	return(0);
+-#else /* not (umips && SYSTYPE_SYSV) */
+-#ifdef CRAY
+-	for (; devindex < 256; devindex++) {
+-	    sprintf (ttydev, "/dev/ttyp%03d", devindex);
+-	    sprintf (ptydev, "/dev/pty/%03d", devindex);
+-
+-	    if ((*pty = open (ptydev, O_RDWR)) >= 0) {
+-		/* We need to set things up for our next entry
+-		 * into this function!
+-		 */
+-		(void) devindex++;
+-		return(0);
+-	    }
+-	}
+-#else /* !CRAY */
+-	while (PTYCHAR1[letter]) {
+-	    ttydev [strlen(ttydev) - 2]  = ptydev [strlen(ptydev) - 2] =
+-		    PTYCHAR1 [letter];
+-
+-	    while (PTYCHAR2[devindex]) {
+-		ttydev [strlen(ttydev) - 1] = ptydev [strlen(ptydev) - 1] =
+-			PTYCHAR2 [devindex];
+-		if ((*pty = open (ptydev, O_RDWR)) >= 0) {
+-			/* We need to set things up for our next entry
+-			 * into this function!
+-			 */
+-			(void) devindex++;
+-			return(0);
+-		}
+-		devindex++;
+-	    }
+-	    devindex = 0;
+-	    (void) letter++;
+-	}
+-#endif /* CRAY else not CRAY */
+-	/* We were unable to allocate a pty master!  Return an error
+-	 * condition and let our caller terminate cleanly.
+-	 */
+-	return(1);
+-#endif /* umips && SYSTYPE_SYSV */
+-#endif /* att */
+-}
+-
+ get_terminal ()
+ /* 
+  * sets up X and initializes the terminal structure except for term.buf.fildes.
+@@ -1016,1265 +918,7 @@ SIGNAL_T hungtty(i)
+ 	SIGNAL_RETURN;
+ }
+ 
+-#ifdef USE_HANDSHAKE
+-typedef enum {		/* c == child, p == parent                        */
+-	PTY_BAD,	/* c->p: can't open pty slave for some reason     */
+-	PTY_FATALERROR,	/* c->p: we had a fatal error with the pty        */
+-	PTY_GOOD,	/* c->p: we have a good pty, let's go on          */
+-	PTY_NEW,	/* p->c: here is a new pty slave, try this        */
+-	PTY_NOMORE,	/* p->c; no more pty's, terminate                 */
+-	UTMP_ADDED,	/* c->p: utmp entry has been added                */
+-	UTMP_TTYSLOT,	/* c->p: here is my ttyslot                       */
+-	PTY_EXEC	/* p->c: window has been mapped the first time    */
+-} status_t;
+-
+-typedef struct {
+-	status_t status;
+-	int error;
+-	int fatal_error;
+-	int tty_slot;
+-	int rows;
+-	int cols;
+-	char buffer[1024];
+-} handshake_t;
+-
+-/* HsSysError()
+- *
+- * This routine does the equivalent of a SysError but it handshakes
+- * over the errno and error exit to the master process so that it can
+- * display our error message and exit with our exit code so that the
+- * user can see it.
+- */
+-
+-void
+-HsSysError(pf, error)
+-int pf;
+-int error;
+-{
+-	handshake_t handshake;
+-
+-	handshake.status = PTY_FATALERROR;
+-	handshake.error = errno;
+-	handshake.fatal_error = error;
+-	strcpy(handshake.buffer, ttydev);
+-	write(pf, &handshake, sizeof(handshake));
+-	exit(error);
+-}
+-
+-static int pc_pipe[2];	/* this pipe is used for parent to child transfer */
+-static int cp_pipe[2];	/* this pipe is used for child to parent transfer */
+-
+-first_map_occurred ()
+-{
+-    handshake_t handshake;
+-    register TScreen *screen = &term->screen;
+-
+-    if (screen->max_row > 0 && screen->max_col > 0) {
+-	handshake.status = PTY_EXEC;
+-	handshake.rows = screen->max_row;
+-	handshake.cols = screen->max_col;
+-	write (pc_pipe[1], (char *) &handshake, sizeof(handshake));
+-	close (cp_pipe[0]);
+-	close (pc_pipe[1]);
+-	waiting_for_initial_map = False;
+-    }
+-}
+-#else
+-/*
+- * temporary hack to get xterm working on att ptys
+- */
+-first_map_occurred ()
+-{
+-    return;
+-}
+-#define HsSysError(a,b)
+-#endif /* USE_HANDSHAKE else !USE_HANDSHAKE */
+-
+-
+-spawn ()
+-/* 
+- *  Inits pty and tty and forks a login process.
+- *  Does not close fd Xsocket.
+- *  If slave, the pty named in passedPty is already open for use
+- */
+-{
+-	extern char *SysErrorMsg();
+-	register TScreen *screen = &term->screen;
+-	int Xsocket = screen->display->fd;
+-#ifdef USE_HANDSHAKE
+-	handshake_t handshake;
+-#else
+-	int fds[2];
+-#endif
+-	int tty = -1;
+-	int discipline;
+-	int done;
+-#ifdef USE_SYSV_TERMIO
+-	struct termio tio;
+-	struct termio dummy_tio;
+-#ifdef TIOCLSET
+-	unsigned lmode;
+-#endif	/* TIOCLSET */
+-#ifdef TIOCSLTC
+-	struct ltchars ltc;
+-#endif	/* TIOCSLTC */
+-	int one = 1;
+-	int zero = 0;
+-	int status;
+-#else	/* else not USE_SYSV_TERMIO */
+-	unsigned lmode;
+-	struct tchars tc;
+-	struct ltchars ltc;
+-	struct sgttyb sg;
+-#endif	/* USE_SYSV_TERMIO */
+-
+-	char termcap [1024];
+-	char newtc [1024];
+-	char *ptr, *shname, *shname_minus;
+-	int i, no_dev_tty = FALSE;
+-#ifdef USE_SYSV_TERMIO
+-	char *dev_tty_name = (char *) 0;
+-	int fd;			/* for /etc/wtmp */
+-#endif	/* USE_SYSV_TERMIO */
+-	char **envnew;		/* new environment */
+-	char buf[32];
+-	char *TermName = NULL;
+-	int ldisc = 0;
+-#ifdef sun
+-#ifdef TIOCSSIZE
+-	struct ttysize ts;
+-#endif	/* TIOCSSIZE */
+-#else	/* not sun */
+-#ifdef TIOCSWINSZ
+-	struct winsize ws;
+-#endif	/* TIOCSWINSZ */
+-#endif	/* sun */
+-	struct passwd *pw = NULL;
+-#ifdef UTMP
+-	struct utmp utmp;
+-#ifdef LASTLOG
+-	struct lastlog lastlog;
+-#endif	/* LASTLOG */
+-#endif	/* UTMP */
+-
+-	screen->uid = getuid();
+-	screen->gid = getgid();
+-
+-#ifdef SIGTTOU
+-	/* so that TIOCSWINSZ || TIOCSIZE doesn't block */
+-	signal(SIGTTOU,SIG_IGN);
+-#endif
+-
+-	if (am_slave) {
+-		screen->respond = am_slave;
+-		ptydev[strlen(ptydev) - 2] = ttydev[strlen(ttydev) - 2] =
+-			passedPty[0];
+-		ptydev[strlen(ptydev) - 1] = ttydev[strlen(ttydev) - 1] =
+-			passedPty[1];
+-
+-		setgid (screen->gid);
+-		setuid (screen->uid);
+-	} else {
+-		Bool tty_got_hung = False;
+-
+- 		/*
+- 		 * Sometimes /dev/tty hangs on open (as in the case of a pty
+- 		 * that has gone away).  Simply make up some reasonable
+- 		 * defaults.
+- 		 */
+- 		signal(SIGALRM, hungtty);
+- 		alarm(2);		/* alarm(1) might return too soon */
+- 		if (! setjmp(env)) {
+- 			tty = open ("/dev/tty", O_RDWR, 0);
+- 			alarm(0);
+- 		} else {
+-			tty_got_hung = True;
+- 			tty = -1;
+- 			errno = ENXIO;
+- 		}
+- 		signal(SIGALRM, SIG_DFL);
+- 
+-		/*
+-		 * Check results and ignore current control terminal if
+-		 * necessary.  ENXIO is what is normally returned if there is
+-		 * no controlling terminal, but some systems (e.g. SunOS 4.0)
+-		 * seem to return EIO.
+-		 */
+- 		if (tty < 0) {
+-			if (tty_got_hung || errno == ENXIO || errno == EIO) {
+-				no_dev_tty = TRUE;
+-#ifdef USE_SYSV_TERMIO
+-				tio = d_tio;
+-#ifdef TIOCSLTC
+-				ltc = d_ltc;
+-#endif	/* TIOCSLTC */
+-#ifdef TIOCLSET
+-				lmode = d_lmode;
+-#endif	/* TIOCLSET */
+-#else	/* not USE_SYSV_TERMIO */
+-				sg = d_sg;
+-				tc = d_tc;
+-				discipline = d_disipline;
+-				ltc = d_ltc;
+-				lmode = d_lmode;
+-#endif	/* USE_SYSV_TERMIO */
+-			} else {
+-			    SysError(ERROR_OPDEVTTY);
+-			}
+-		} else {
+-			/* get a copy of the current terminal's state */
+-
+-#ifdef USE_SYSV_TERMIO
+-			if(ioctl(tty, TCGETA, &tio) == -1)
+-				SysError(ERROR_TIOCGETP);
+-#ifdef TIOCSLTC
+-			if(ioctl(tty, TIOCGLTC, &ltc) == -1)
+-				SysError(ERROR_TIOCGLTC);
+-#endif	/* TIOCSLTC */
+-#ifdef TIOCLSET
+-			if(ioctl(tty, TIOCLGET, &lmode) == -1)
+-				SysError(ERROR_TIOCLGET);
+-#endif	/* TIOCLSET */
+-#else	/* not USE_SYSV_TERMIO */
+-			if(ioctl(tty, TIOCGETP, (char *)&sg) == -1)
+-				SysError (ERROR_TIOCGETP);
+-			if(ioctl(tty, TIOCGETC, (char *)&tc) == -1)
+-				SysError (ERROR_TIOCGETC);
+-			if(ioctl(tty, TIOCGETD, (char *)&discipline) == -1)
+-				SysError (ERROR_TIOCGETD);
+-			if(ioctl(tty, TIOCGLTC, (char *)&ltc) == -1)
+-				SysError (ERROR_TIOCGLTC);
+-			if(ioctl(tty, TIOCLGET, (char *)&lmode) == -1)
+-				SysError (ERROR_TIOCLGET);
+-#endif	/* USE_SYSV_TERMIO */
+-			close (tty);
+-			/* tty is no longer an open fd! */
+-			tty = -1;
+-		}
+-
+-#ifdef 	PUCC_PTYD
+-		if(-1 == (screen->respond = openrpty(ttydev, ptydev,
+-				(resource.utmpInhibit ?  OPTY_NOP : OPTY_LOGIN),
+-				getuid(), XDisplayString(screen->display)))) {
+-#else /* not PUCC_PTYD */
+-		if (get_pty (&screen->respond)) {
+-#endif /* PUCC_PTYD */
+-			/*  no ptys! */
+-			(void) fprintf(stderr, "%s: no available ptys\n",
+-				       xterm_name);
+-			exit (ERROR_PTYS);
+-#ifdef PUCC_PTYD
+-		}
+-#else
+-		}			/* keep braces balanced for emacs */
+-#endif
+-#ifdef PUCC_PTYD
+-		  else {
+-			/*
+-			 *  set the fd of the master in a global var so
+-			 *  we can undo all this on exit
+-			 *
+-			 */
+-			Ptyfd = screen->respond;
+-		  }
+-#endif /* PUCC_PTYD */
+-	}
+-
+-	/* avoid double MapWindow requests */
+-	XtSetMappedWhenManaged( screen->TekEmu ? XtParent(tekWidget) :
+-			        XtParent(term), False );
+-        /* Realize the Tek or VT widget, depending on which mode we're in.
+-           If VT mode, this calls VTRealize (the widget's Realize proc) */
+-        XtRealizeWidget (screen->TekEmu ? XtParent(tekWidget) :
+-			 XtParent(term));
+-
+-	if(screen->TekEmu) {
+-		envnew = tekterm;
+-		ptr = newtc;
+-	} else {
+-		envnew = vtterm;
+-		ptr = termcap;
+-	}
+-	TermName = NULL;
+-	if (resource.term_name) {
+-	    if (tgetent (ptr, resource.term_name) == 1) {
+-		TermName = resource.term_name;
+-		if (!screen->TekEmu)
+-		    resize (screen, TermName, termcap, newtc);
+-	    } else {
+-		fprintf (stderr, "%s:  invalid termcap entry \"%s\".\n",
+-			 ProgramName, resource.term_name);
+-	    }
+-	}
+-	if (!TermName) {
+-	    while (*envnew != NULL) {
+-		if(tgetent(ptr, *envnew) == 1) {
+-			TermName = *envnew;
+-			if(!screen->TekEmu)
+-			    resize(screen, TermName, termcap, newtc);
+-			break;
+-		}
+-		envnew++;
+-	    }
+-	    if (TermName == NULL) {
+-		fprintf (stderr, "%s:  unable to find usable termcap entry.\n",
+-			 ProgramName);
+-		Exit (1);
+-	    }
+-	}
+-
+-#ifdef sun
+-#ifdef TIOCSSIZE
+-	/* tell tty how big window is */
+-	if(screen->TekEmu) {
+-		ts.ts_lines = 38;
+-		ts.ts_cols = 81;
+-	} else {
+-		ts.ts_lines = screen->max_row + 1;
+-		ts.ts_cols = screen->max_col + 1;
+-	}
+-#endif	/* TIOCSSIZE */
+-#else	/* not sun */
+-#ifdef TIOCSWINSZ
+-	/* tell tty how big window is */
+-	if(screen->TekEmu) {
+-		ws.ws_row = 38;
+-		ws.ws_col = 81;
+-		ws.ws_xpixel = TFullWidth(screen);
+-		ws.ws_ypixel = TFullHeight(screen);
+-	} else {
+-		ws.ws_row = screen->max_row + 1;
+-		ws.ws_col = screen->max_col + 1;
+-		ws.ws_xpixel = FullWidth(screen);
+-		ws.ws_ypixel = FullHeight(screen);
+-	}
+-#endif	/* TIOCSWINSZ */
+-#endif	/* sun */
+-
+-	if (!am_slave) {
+-#ifdef USE_HANDSHAKE
+-	    if (pipe(pc_pipe) || pipe(cp_pipe))
+-		SysError (ERROR_FORK);
+-#endif
+-	    if ((screen->pid = fork ()) == -1)
+-		SysError (ERROR_FORK);
+-		
+-	    if (screen->pid == 0) {
+-		/*
+-		 * now in child process
+-		 */
+-		extern char **environ;
+-		int pgrp = getpid();
+-#ifdef USE_SYSV_TERMIO
+-		char numbuf[12];
+-#endif	/* USE_SYSV_TERMIO */
+-
+-#ifndef USE_HANDSHAKE
+-		int ptyfd;
+-
+-		setpgrp();
+-		grantpt (screen->respond);
+-		unlockpt (screen->respond);
+-		if ((ptyfd = open (ptsname(screen->respond), O_RDWR)) < 0) {
+-		    SysError (1);
+-		}
+-		if (ioctl (ptyfd, I_PUSH, "ptem") < 0) {
+-		    SysError (2);
+-		}
+-		if (!getenv("CONSEM") && ioctl (ptyfd, I_PUSH, "consem") < 0) {
+-		    SysError (3);
+-		}
+-		if (ioctl (ptyfd, I_PUSH, "ldterm") < 0) {
+-		    SysError (4);
+-		}
+-		tty = ptyfd;
+-		close (screen->respond);
+-#ifdef TIOCSWINSZ
+-                /* tell tty how big window is */
+-                if(screen->TekEmu) {
+-                        ws.ws_row = 24;
+-                        ws.ws_col = 80;
+-                        ws.ws_xpixel = TFullWidth(screen);
+-                        ws.ws_ypixel = TFullHeight(screen);
+-                } else {
+-                        ws.ws_row = screen->max_row + 1;
+-                        ws.ws_col = screen->max_col + 1;
+-                        ws.ws_xpixel = FullWidth(screen);
+-                        ws.ws_ypixel = FullHeight(screen);
+-                }
+-#endif
+-
+-
+-#else /* USE_HANDSHAKE:  warning, goes for a long ways */
+-		/* close parent's sides of the pipes */
+-		close (cp_pipe[0]);
+-		close (pc_pipe[1]);
+-
+-		/* Make sure that our sides of the pipes are not in the
+-		 * 0, 1, 2 range so that we don't fight with stdin, out
+-		 * or err.
+-		 */
+-		if (cp_pipe[1] <= 2) {
+-			if ((i = fcntl(cp_pipe[1], F_DUPFD, 3)) >= 0) {
+-				(void) close(cp_pipe[1]);
+-				cp_pipe[1] = i;
+-			}
+-		}
+-		if (pc_pipe[0] <= 2) {
+-			if ((i = fcntl(pc_pipe[0], F_DUPFD, 3)) >= 0) {
+-				(void) close(pc_pipe[0]);
+-				pc_pipe[0] = i;
+-			}
+-		}
+-
+-		/* we don't need the socket, or the pty master anymore */
+-		close (Xsocket);
+-		close (screen->respond);
+-
+-		/* Now is the time to set up our process group and
+-		 * open up the pty slave.
+-		 */
+-#ifdef	USE_SYSV_PGRP
+-		(void) setpgrp();
+-#endif	/* USE_SYSV_PGRP */
+-		while (1) {
+-#ifdef TIOCNOTTY
+-			if ((tty = open ("/dev/tty", 2)) >= 0) {
+-				ioctl (tty, TIOCNOTTY, (char *) NULL);
+-				close (tty);
+-			}
+-#endif	/* TIOCNOTTY */
+-			if ((tty = open(ttydev, O_RDWR, 0)) >= 0) {
+-#ifdef	USE_SYSV_PGRP
+-				/* We need to make sure that we are acutally
+-				 * the process group leader for the pty.  If
+-				 * we are, then we should now be able to open
+-				 * /dev/tty.
+-				 */
+-				if ((i = open("/dev/tty", O_RDWR, 0)) >= 0) {
+-					/* success! */
+-					close(i);
+-					break;
+-				}
+-#else	/* USE_SYSV_PGRP */
+-				break;
+-#endif	/* USE_SYSV_PGRP */
+-			}
+-
+-#ifdef TIOCSCTTY
+-			ioctl(tty, TIOCSCTTY, 0);
+-#endif
+-			/* let our master know that the open failed */
+-			handshake.status = PTY_BAD;
+-			handshake.error = errno;
+-			strcpy(handshake.buffer, ttydev);
+-			write(cp_pipe[1], (char *) &handshake,
+-			    sizeof(handshake));
+-
+-			/* get reply from parent */
+-			i = read(pc_pipe[0], (char *) &handshake,
+-			    sizeof(handshake));
+-			if (i <= 0) {
+-				/* parent terminated */
+-				exit(1);
+-			}
+-
+-			if (handshake.status == PTY_NOMORE) {
+-				/* No more ptys, let's shutdown. */
+-				exit(1);
+-			}
+-
+-			/* We have a new pty to try */
+-			free(ttydev);
+-			ttydev = malloc((unsigned)
+-			    (strlen(handshake.buffer) + 1));
+-			strcpy(ttydev, handshake.buffer);
+-		}
+-
+-		/* use the same tty name that everyone else will use
+-		** (from ttyname)
+-		*/
+-		if (ptr = ttyname(tty))
+-		{
+-			/* it may be bigger */
+-			ttydev = realloc (ttydev, (unsigned) (strlen(ptr) + 1));
+-			(void) strcpy(ttydev, ptr);
+-		}
+-
+-#endif /* !USE_HANDSHAKE else USE_HANDSHAKE - from near fork */
+-
+-#ifdef USE_TTY_GROUP
+-	{ 
+-#include <grp.h>
+-		struct group *ttygrp;
+-		if (ttygrp = getgrnam("tty")) {
+-			/* change ownership of tty to real uid, "tty" gid */
+-			chown (ttydev, screen->uid, ttygrp->gr_gid);
+-			chmod (ttydev, 0620);
+-		}
+-		else {
+-			/* change ownership of tty to real group and user id */
+-			chown (ttydev, screen->uid, screen->gid);
+-			chmod (ttydev, 0622);
+-		}
+-		endgrent();
+-	}
+-#else /* else !USE_TTY_GROUP */
+-		/* change ownership of tty to real group and user id */
+-		chown (ttydev, screen->uid, screen->gid);
+-
+-		/* change protection of tty */
+-		chmod (ttydev, 0622);
+-#endif /* USE_TTY_GROUP */
+-
+-		/*
+-		 * set up the tty modes
+-		 */
+-		{
+-#ifdef USE_SYSV_TERMIO
+-#ifdef umips
+-		    /* If the control tty had its modes screwed around with,
+-		       eg. by lineedit in the shell, or emacs, etc. then tio
+-		       will have bad values.  Let's just get termio from the
+-		       new tty and tailor it.  */
+-		    if (ioctl (tty, TCGETA, &tio) == -1)
+-		      SysError (ERROR_TIOCGETP);
+-		    tio.c_lflag |= ECHOE;
+-#endif /* umips */
+-		    /* Now is also the time to change the modes of the
+-		     * child pty.
+-		     */
+-		    /* input: nl->nl, don't ignore cr, cr->nl */
+-		    tio.c_iflag &= ~(INLCR|IGNCR);
+-		    tio.c_iflag |= ICRNL;
+-		    /* ouput: cr->cr, nl is not return, no delays, ln->cr/nl */
+-		    tio.c_oflag &=
+-		     ~(OCRNL|ONLRET|NLDLY|CRDLY|TABDLY|BSDLY|VTDLY|FFDLY);
+-		    tio.c_oflag |= ONLCR;
+-#ifdef BAUD_0
+-		    /* baud rate is 0 (don't care) */
+-		    tio.c_cflag &= ~(CBAUD);
+-#else	/* !BAUD_0 */
+-		    /* baud rate is 9600 (nice default) */
+-		    tio.c_cflag &= ~(CBAUD);
+-		    tio.c_cflag |= B9600;
+-#endif	/* !BAUD_0 */
+-		    /* enable signals, canonical processing (erase, kill, etc),
+-		    ** echo
+-		    */
+-		    tio.c_lflag |= ISIG|ICANON|ECHO;
+-		    /* reset EOL to defalult value */
+-		    tio.c_cc[VEOL] = '@' & 0x3f;		/* '^@'	*/
+-		    /* certain shells (ksh & csh) change EOF as well */
+-		    tio.c_cc[VEOF] = 'D' & 0x3f;		/* '^D'	*/
+-
+-#define TMODE(ind,var) if (ttymodelist[ind].set) var = ttymodelist[ind].value;
+-		    if (override_tty_modes) {
+-			/* sysv-specific */
+-			TMODE (XTTYMODE_intr, tio.c_cc[VINTR]);
+-			TMODE (XTTYMODE_quit, tio.c_cc[VQUIT]);
+-			TMODE (XTTYMODE_erase, tio.c_cc[VERASE]);
+-			TMODE (XTTYMODE_kill, tio.c_cc[VKILL]);
+-			TMODE (XTTYMODE_eof, tio.c_cc[VEOF]);
+-			TMODE (XTTYMODE_eol, tio.c_cc[VEOL]);
+-#ifdef VSWTCH
+-			TMODE (XTTYMODE_swtch, d_tio.c_cc[VSWTCH]);
+-#endif
+-#ifdef TIOCSLTC
+-			/* both SYSV and BSD have ltchars */
+-			TMODE (XTTYMODE_susp, ltc.t_suspc);
+-			TMODE (XTTYMODE_dsusp, ltc.t_dsuspc);
+-			TMODE (XTTYMODE_rprnt, ltc.t_rprntc);
+-			TMODE (XTTYMODE_flush, ltc.t_flushc);
+-			TMODE (XTTYMODE_weras, ltc.t_werasc);
+-			TMODE (XTTYMODE_lnext, ltc.t_lnextc);
+-#endif
+-		    }
+-#undef TMODE
+-
+-		    if (ioctl (tty, TCSETA, &tio) == -1)
+-			    HsSysError(cp_pipe[1], ERROR_TIOCSETP);
+-#ifdef TIOCSLTC
+-		    if (ioctl (tty, TIOCSLTC, &ltc) == -1)
+-			    HsSysError(cp_pipe[1], ERROR_TIOCSETC);
+-#endif	/* TIOCSLTC */
+-#ifdef TIOCLSET
+-		    if (ioctl (tty, TIOCLSET, (char *)&lmode) == -1)
+-			    HsSysError(cp_pipe[1], ERROR_TIOCLSET);
+-#endif	/* TIOCLSET */
+-#ifdef TIOCCONS
+-		    if (Console) {
+-			    int on = 1;
+-			    if (ioctl (tty, TIOCCONS, (char *)&on) == -1)
+-				    HsSysError(cp_pipe[1], ERROR_TIOCCONS);
+-		    }
+-#endif	/* TIOCCONS */
+-#else	/* USE_SYSV_TERMIO */
+-		    sg.sg_flags &= ~(ALLDELAY | XTABS | CBREAK | RAW);
+-		    sg.sg_flags |= ECHO | CRMOD;
+-		    /* make sure speed is set on pty so that editors work right*/
+-		    sg.sg_ispeed = B9600;
+-		    sg.sg_ospeed = B9600;
+-		    /* reset t_brkc to default value */
+-		    tc.t_brkc = -1;
+-
+-#define TMODE(ind,var) if (ttymodelist[ind].set) var = ttymodelist[ind].value;
+-		    if (override_tty_modes) {
+-			TMODE (XTTYMODE_intr, tc.t_intrc);
+-			TMODE (XTTYMODE_quit, tc.t_quitc);
+-			TMODE (XTTYMODE_erase, sg.sg_erase);
+-			TMODE (XTTYMODE_kill, sg.sg_kill);
+-			TMODE (XTTYMODE_eof, tc.t_eofc);
+-			TMODE (XTTYMODE_start, tc.t_startc);
+-			TMODE (XTTYMODE_stop, tc.t_stopc);
+-			TMODE (XTTYMODE_brk, tc.t_brkc);
+-			/* both SYSV and BSD have ltchars */
+-			TMODE (XTTYMODE_susp, ltc.t_suspc);
+-			TMODE (XTTYMODE_dsusp, ltc.t_dsuspc);
+-			TMODE (XTTYMODE_rprnt, ltc.t_rprntc);
+-			TMODE (XTTYMODE_flush, ltc.t_flushc);
+-			TMODE (XTTYMODE_weras, ltc.t_werasc);
+-			TMODE (XTTYMODE_lnext, ltc.t_lnextc);
+-		    }
+-#undef TMODE
+-
+-		    if (ioctl (tty, TIOCSETP, (char *)&sg) == -1)
+-			    HsSysError (cp_pipe[1], ERROR_TIOCSETP);
+-		    if (ioctl (tty, TIOCSETC, (char *)&tc) == -1)
+-			    HsSysError (cp_pipe[1], ERROR_TIOCSETC);
+-		    if (ioctl (tty, TIOCSETD, (char *)&discipline) == -1)
+-			    HsSysError (cp_pipe[1], ERROR_TIOCSETD);
+-		    if (ioctl (tty, TIOCSLTC, (char *)&ltc) == -1)
+-			    HsSysError (cp_pipe[1], ERROR_TIOCSLTC);
+-		    if (ioctl (tty, TIOCLSET, (char *)&lmode) == -1)
+-			    HsSysError (cp_pipe[1], ERROR_TIOCLSET);
+-#ifdef TIOCCONS
+-		    if (Console) {
+-			    int on = 1;
+-			    if (ioctl (tty, TIOCCONS, (char *)&on) == -1)
+-				    HsSysError(cp_pipe[1], ERROR_TIOCCONS);
+-		    }
+-#endif	/* TIOCCONS */
+-#endif	/* !USE_SYSV_TERMIO */
+-		}
+-
+-		signal (SIGCHLD, SIG_DFL);
+-#ifdef att
+-		/* watch out for extra shells (I don't understand either) */
+-		signal (SIGHUP, SIG_DFL);
+-#else
+-		signal (SIGHUP, SIG_IGN);
+-#endif
+-		/* restore various signals to their defaults */
+-		signal (SIGINT, SIG_DFL);
+-		signal (SIGQUIT, SIG_DFL);
+-		signal (SIGTERM, SIG_DFL);
+-
+-		/* copy the environment before Setenving */
+-		for (i = 0 ; environ [i] != NULL ; i++) ;
+-		/*
+-		 * The `4' (`5' for SYSV) is the number of Setenv()
+-		 * calls which may add a new entry to the environment.
+-		 * The `1' is for the NULL terminating entry.
+-		 */
+-#ifdef USE_SYSV_ENVVARS
+-		envnew = (char **) calloc ((unsigned) i + (5 + 1), sizeof(char *));
+-#else
+-		envnew = (char **) calloc ((unsigned) i + (4 + 1), sizeof(char *));
+-#endif /* USE_SYSV_ENVVARS */
+-		bcopy((char *)environ, (char *)envnew, i * sizeof(char *));
+-		environ = envnew;
+-		Setenv ("TERM=", TermName);
+-		if(!TermName)
+-			*newtc = 0;
+-
+-		sprintf (buf, "%lu", screen->TekEmu ? 
+-			 ((unsigned long) XtWindow (XtParent(tekWidget))) :
+-			 ((unsigned long) XtWindow (XtParent(term))));
+-		Setenv ("WINDOWID=", buf);
+-		/* put the display into the environment of the shell*/
+-		Setenv ("DISPLAY=", XDisplayString (screen->display));
+-
+-		signal(SIGTERM, SIG_DFL);
+-
+-		/* this is the time to go and set up stdin, out, and err
+-		 */
+-		{
+-		    /* dup the tty */
+-		    for (i = 0; i <= 2; i++)
+-			if (i != tty) {
+-			    (void) close(i);
+-			    (void) dup(tty);
+-			}
+-
+-#ifndef att
+-		    /* and close the tty */
+-		    if (tty > 2)
+-			(void) close(tty);
+-#endif
+-		}
+-
+-#ifndef	USE_SYSV_PGRP
+-#ifdef TIOCSCTTY
+-		setsid();
+-		ioctl(0, TIOCSCTTY, 0);
+-#endif
+-		ioctl(0, TIOCSPGRP, (char *)&pgrp);
+-		setpgrp(0,0);
+-		close(open(ttydev, O_WRONLY, 0));
+-		setpgrp (0, pgrp);
+-#endif /* USE_SYSV_PGRP */
+-
+-#ifdef UTMP
+-#ifdef USE_SYSV_UTMP
+-		/* Set up our utmp entry now.  We need to do it here
+-		** for the following reasons:
+-		**   - It needs to have our correct process id (for
+-		**     login).
+-		**   - If our parent was to set it after the fork(),
+-		**     it might make it out before we need it.
+-		**   - We need to do it before we go and change our
+-		**     user and group id's.
+-		*/
+-
+-		(void) setutent ();
+-		/* set up entry to search for */
+-		(void) strncpy(utmp.ut_id,ttydev + strlen(ttydev) - 2,
+-		 sizeof (utmp.ut_id));
+-		utmp.ut_type = DEAD_PROCESS;
+-
+-		/* position to entry in utmp file */
+-		(void) getutid(&utmp);
+-
+-		/* set up the new entry */
+-		pw = getpwuid(screen->uid);
+-		utmp.ut_type = USER_PROCESS;
+-		utmp.ut_exit.e_exit = 2;
+-		(void) strncpy(utmp.ut_user,
+-			       (pw && pw->pw_name) ? pw->pw_name : "????",
+-			       sizeof(utmp.ut_user));
+-		    
+-		(void) strncpy(utmp.ut_id, ttydev + strlen(ttydev) - 2,
+-			sizeof(utmp.ut_id));
+-		(void) strncpy (utmp.ut_line,
+-			ttydev + strlen("/dev/"), sizeof (utmp.ut_line));
+-#ifdef HAS_UTMP_UT_HOST
+-		(void) strncpy(utmp.ut_host, DisplayString(screen->display),
+-			       sizeof(utmp.ut_host));
+-#endif
+-		(void) strncpy(utmp.ut_name, pw->pw_name, 
+-			       sizeof(utmp.ut_name));
+-
+-		utmp.ut_pid = getpid();
+-		utmp.ut_time = time ((long *) 0);
+-
+-		/* write out the entry */
+-		if (!resource.utmpInhibit) (void) pututline(&utmp);
+-
+-		/* close the file */
+-		(void) endutent();
+-
+-#else	/* USE_SYSV_UTMP */
+-		/* We can now get our ttyslot!  We can also set the initial
+-		 * UTMP entry.
+-		 */
+-		tslot = ttyslot();
+-		added_utmp_entry = False;
+-		{
+-			if ((pw = getpwuid(screen->uid)) &&
+-			    !resource.utmpInhibit &&
+-			    (i = open(etc_utmp, O_WRONLY)) >= 0) {
+-				bzero((char *)&utmp, sizeof(struct utmp));
+-				(void) strncpy(utmp.ut_line,
+-					       ttydev + strlen("/dev/"),
+-					       sizeof(utmp.ut_line));
+-				(void) strncpy(utmp.ut_name, pw->pw_name,
+-					       sizeof(utmp.ut_name));
+-#ifdef HAS_UTMP_UT_HOST
+-				(void) strncpy(utmp.ut_host, 
+-					       XDisplayString (screen->display),
+-					       sizeof(utmp.ut_host));
+-#endif
+-				time(&utmp.ut_time);
+-				lseek(i, (long)(tslot * sizeof(struct utmp)), 0);
+-				write(i, (char *)&utmp, sizeof(struct utmp));
+-				close(i);
+-				added_utmp_entry = True;
+-#ifdef WTMP
+-				if (term->misc.login_shell &&
+-				(i = open(etc_wtmp, O_WRONLY|O_APPEND)) >= 0) {
+-				    write(i, (char *)&utmp,
+-					sizeof(struct utmp));
+-				close(i);
+-				}
+-#endif /* WTMP */
+-#ifdef LASTLOG
+-				if (term->misc.login_shell &&
+-				(i = open(etc_lastlog, O_WRONLY)) >= 0) {
+-				    bzero((char *)&lastlog,
+-					sizeof (struct lastlog));
+-				    (void) strncpy(lastlog.ll_line, ttydev +
+-					sizeof("/dev"),
+-					sizeof (lastlog.ll_line));
+-				    (void) strncpy(lastlog.ll_host, 
+-					  XDisplayString (screen->display),
+-					  sizeof (lastlog.ll_host));
+-				    time(&lastlog.ll_time);
+-				    lseek(i, (long)(screen->uid *
+-					sizeof (struct lastlog)), 0);
+-				    write(i, (char *)&lastlog,
+-					sizeof (struct lastlog));
+-				    close(i);
+-				}
+-#endif /* LASTLOG */
+-			} else
+-				tslot = -tslot;
+-		}
+-
+-		/* Let's pass our ttyslot to our parent so that it can
+-		 * clean up after us.
+-		 */
+-#ifdef USE_HANDSHAKE
+-		handshake.tty_slot = tslot;
+-#endif /* USE_HANDSHAKE */
+-#endif /* USE_SYSV_UTMP */
+-
+-#ifdef USE_HANDSHAKE
+-		/* Let our parent know that we set up our utmp entry
+-		 * so that it can clean up after us.
+-		 */
+-		handshake.status = UTMP_ADDED;
+-		handshake.error = 0;
+-		strcpy(handshake.buffer, ttydev);
+-		(void) write(cp_pipe[1], &handshake, sizeof(handshake));
+-#endif /* USE_HANDSHAKE */
+-#endif/* UTMP */
+-
+-		(void) setgid (screen->gid);
+-#ifdef HAS_BSD_GROUPS
+-		if (geteuid() == 0 && pw)
+-		  initgroups (pw->pw_name, pw->pw_gid);
+-#endif
+-		(void) setuid (screen->uid);
+-
+-#ifdef USE_HANDSHAKE
+-		/* mark the pipes as close on exec */
+-		fcntl(cp_pipe[1], F_SETFD, 1);
+-		fcntl(pc_pipe[0], F_SETFD, 1);
+-
+-		/* We are at the point where we are going to
+-		 * exec our shell (or whatever).  Let our parent
+-		 * know we arrived safely.
+-		 */
+-		handshake.status = PTY_GOOD;
+-		handshake.error = 0;
+-		(void) strcpy(handshake.buffer, ttydev);
+-		(void) write(cp_pipe[1], &handshake, sizeof(handshake));
+-
+-		if (waiting_for_initial_map) {
+-		    i = read (pc_pipe[0], (char *) &handshake,
+-			      sizeof(handshake));
+-		    if (i != sizeof(handshake) ||
+-			handshake.status != PTY_EXEC) {
+-			/* some very bad problem occurred */
+-			exit (ERROR_PTY_EXEC);
+-		    }
+-		    screen->max_row = handshake.rows;
+-		    screen->max_col = handshake.cols;
+-#ifdef sun
+-#ifdef TIOCSSIZE
+-		    ts.ts_lines = screen->max_row + 1;
+-		    ts.ts_cols = screen->max_col + 1;
+-#endif /* TIOCSSIZE */
+-#else /* !sun */
+-#ifdef TIOCSWINSZ
+-		    ws.ws_row = screen->max_row + 1;
+-		    ws.ws_col = screen->max_col + 1;
+-		    ws.ws_xpixel = FullWidth(screen);
+-		    ws.ws_ypixel = FullHeight(screen);
+-#endif /* TIOCSWINSZ */
+-#endif /* sun else !sun */
+-		}
+-#endif /* USE_HANDSHAKE */
+-
+-#ifdef USE_SYSV_ENVVARS
+-		sprintf (numbuf, "%d", screen->max_col + 1);
+-		Setenv("COLUMNS=", numbuf);
+-		sprintf (numbuf, "%d", screen->max_row + 1);
+-		Setenv("LINES=", numbuf);
+-#else
+-		if(!screen->TekEmu) {
+-		    strcpy (termcap, newtc);
+-		    resize (screen, TermName, termcap, newtc);
+-		}
+-		if (term->misc.titeInhibit) {
+-		    remove_termcap_entry (newtc, ":ti=");
+-		    remove_termcap_entry (newtc, ":te=");
+-		}
+-		Setenv ("TERMCAP=", newtc);
+-#endif /* USE_SYSV_ENVVAR */
+-
+-
+-		/* need to reset after all the ioctl bashing we did above */
+-#ifdef sun
+-#ifdef TIOCSSIZE
+-		ioctl  (0, TIOCSSIZE, &ts);
+-#endif	/* TIOCSSIZE */
+-#else	/* not sun */
+-#ifdef TIOCSWINSZ
+-		ioctl (0, TIOCSWINSZ, (char *)&ws);
+-#endif	/* TIOCSWINSZ */
+-#endif	/* sun */
+-
+-		signal(SIGHUP, SIG_DFL);
+-		if (command_to_exec) {
+-			execvp(*command_to_exec, command_to_exec);
+-			/* print error message on screen */
+-			fprintf(stderr, "%s: Can't execvp %s\n", xterm_name,
+-			 *command_to_exec);
+-		} 
+-
+-#ifdef att
+-		/* fix pts sh hanging around */
+-		signal (SIGHUP, SIG_DFL);
+-#endif
+-
+-#ifdef UTMP
+-		if(((ptr = getenv("SHELL")) == NULL || *ptr == 0) &&
+-		 ((pw == NULL && (pw = getpwuid(screen->uid)) == NULL) ||
+-		 *(ptr = pw->pw_shell) == 0))
+-#else	/* UTMP */
+-		if(((ptr = getenv("SHELL")) == NULL || *ptr == 0) &&
+-		 ((pw = getpwuid(screen->uid)) == NULL ||
+-		 *(ptr = pw->pw_shell) == 0))
+-#endif	/* UTMP */
+-			ptr = "/bin/sh";
+-		if(shname = rindex(ptr, '/'))
+-			shname++;
+-		else
+-			shname = ptr;
+-		shname_minus = malloc(strlen(shname) + 2);
+-		(void) strcpy(shname_minus, "-");
+-		(void) strcat(shname_minus, shname);
+-#ifndef USE_SYSV_TERMIO
+-		ldisc = XStrCmp("csh", shname + strlen(shname) - 3) == 0 ?
+-		 NTTYDISC : 0;
+-		ioctl(0, TIOCSETD, (char *)&ldisc);
+-#endif	/* !USE_SYSV_TERMIO */
+-
+-#ifdef USE_LOGIN_DASH_P
+-		if (term->misc.login_shell && pw && added_utmp_entry)
+-		  execl (bin_login, "login", "-p", "-f", pw->pw_name, 0);
+-#endif
+-		execlp (ptr, (term->misc.login_shell ? shname_minus : shname),
+-			0);
+-
+-		/* Exec failed. */
+-		fprintf (stderr, "%s: Could not exec %s!\n", xterm_name, ptr);
+-		sleep(5);
+-		exit(ERROR_EXEC);
+-	    }				/* end if in child after fork */
+-
+-#ifdef USE_HANDSHAKE
+-	    /* Parent process.  Let's handle handshaked requests to our
+-	     * child process.
+-	     */
+-
+-	    /* close childs's sides of the pipes */
+-	    close (cp_pipe[1]);
+-	    close (pc_pipe[0]);
+-
+-	    for (done = 0; !done; ) {
+-		if (read(cp_pipe[0], &handshake, sizeof(handshake)) <= 0) {
+-			/* Our child is done talking to us.  If it terminated
+-			 * due to an error, we will catch the death of child
+-			 * and clean up.
+-			 */
+-			break;
+-		}
+-
+-		switch(handshake.status) {
+-		case PTY_GOOD:
+-			/* Success!  Let's free up resources and
+-			 * continue.
+-			 */
+-			done = 1;
+-			break;
+-
+-		case PTY_BAD:
+-			/* The open of the pty failed!  Let's get
+-			 * another one.
+-			 */
+-			(void) close(screen->respond);
+-			if (get_pty(&screen->respond)) {
+-			    /* no more ptys! */
+-			    (void) fprintf(stderr,
+-				   "%s: no available ptys\n", xterm_name);
+-			    handshake.status = PTY_NOMORE;
+-			    write(pc_pipe[1], &handshake, sizeof(handshake));
+-			    exit (ERROR_PTYS);
+-			}
+-			handshake.status = PTY_NEW;
+-			(void) strcpy(handshake.buffer, ttydev);
+-			write(pc_pipe[1], &handshake, sizeof(handshake));
+-			break;
+-
+-		case PTY_FATALERROR:
+-			errno = handshake.error;
+-			close(cp_pipe[0]);
+-			close(pc_pipe[1]);
+-			SysError(handshake.fatal_error);
+-
+-		case UTMP_ADDED:
+-			/* The utmp entry was set by our slave.  Remember
+-			 * this so that we can reset it later.
+-			 */
+-			added_utmp_entry = True;
+-#ifndef	USE_SYSV_UTMP
+-			tslot = handshake.tty_slot;
+-#endif	/* USE_SYSV_UTMP */
+-			free(ttydev);
+-			ttydev = malloc((unsigned) strlen(handshake.buffer) + 1);
+-			strcpy(ttydev, handshake.buffer);
+-			break;
+-		}
+-	    }
+-	    /* close our sides of the pipes */
+-	    if (!waiting_for_initial_map) {
+-		close (cp_pipe[0]);
+-		close (pc_pipe[1]);
+-	    }
+-#endif /* USE_HANDSHAKE */
+-	}				/* end if no slave */
+-
+-	/*
+-	 * still in parent (xterm process)
+-	 */
+-
+-#ifdef att
+-	/* hung sh problem? */
+-	signal (SIGHUP, SIG_DFL);
+-#else
+-	signal (SIGHUP,SIG_IGN);
+-#endif
+-
+-/*
+- * Unfortunately, System V seems to have trouble divorcing the child process
+- * from the process group of xterm.  This is a problem because hitting the 
+- * INTR or QUIT characters on the keyboard will cause xterm to go away if we
+- * don't ignore the signals.  This is annoying.
+- */
+-
+-#if defined(USE_SYSV_SIGNALS) && !defined(SIGTSTP)
+-	signal (SIGINT, SIG_IGN);
+-
+-#ifndef att
+-	/* hung shell problem */
+-	signal (SIGQUIT, SIG_IGN);
+-#endif
+-	signal (SIGTERM, SIG_IGN);
+-#else /* else is bsd or has job control */
+-#ifdef SYSV
+-	/* if we were spawned by a jobcontrol smart shell (like ksh or csh),
+-	 * then our pgrp and pid will be the same.  If we were spawned by
+-	 * a jobcontrol dump shell (like /bin/sh), then we will be in out
+-	 * parents pgrp, and we must ignore keyboard signals, or will will
+-	 * tank on everything.
+-	 */
+-	if (getpid() == getpgrp()) {
+-	    (void) signal(SIGINT, Exit);
+-	    (void) signal(SIGQUIT, Exit);
+-	    (void) signal(SIGTERM, Exit);
+-	} else {
+-	    (void) signal(SIGINT, SIG_IGN);
+-	    (void) signal(SIGQUIT, SIG_IGN);
+-	    (void) signal(SIGTERM, SIG_IGN);
+-	}
+-#else	/* SYSV */
+-	signal (SIGINT, Exit);
+-	signal (SIGQUIT, Exit);
+-	signal (SIGTERM, Exit);
+-#endif	/* SYSV */
+-#endif /* USE_SYSV_SIGNALS and not SIGTSTP */
+-
+-	return;
+-}							/* end spawn */
+-
+-SIGNAL_T Exit(n)
+-	int n;
+-{
+-	register TScreen *screen = &term->screen;
+-        int pty = term->screen.respond;  /* file descriptor of pty */
+-#ifdef UTMP
+-#ifdef USE_SYSV_UTMP
+-	struct utmp utmp;
+-	struct utmp *utptr;
+-#ifdef WTMP
+-	int fd;			/* for /etc/wtmp */
+-#endif
+-	/* cleanup the utmp entry we forged earlier */
+-	if (!resource.utmpInhibit && added_utmp_entry) {
+-#ifdef CRAY
+-#define PTYCHARLEN 4
+-#else
+-#define PTYCHARLEN 2
+-#endif
+-	    utmp.ut_type = USER_PROCESS;
+-	    (void) strncpy(utmp.ut_id, ttydev + strlen(ttydev) - PTYCHARLEN,
+-		    sizeof(utmp.ut_id));
+-	    (void) setutent();
+-	    utptr = getutid(&utmp);
+-	    /* write it out only if it exists, and the pid's match */
+-	    if (utptr && (utptr->ut_pid = screen->pid)) {
+-		    utptr->ut_type = DEAD_PROCESS;
+-		    utptr->ut_time = time((long *) 0);
+-		    (void) pututline(utptr);
+-#ifdef WTMP
+-		    /* set wtmp entry if wtmp file exists */
+-		    if ((fd = open(etc_wtmp, O_WRONLY | O_APPEND)) >= 0) {
+-		      (void) write(fd, utptr, sizeof(utmp));
+-		      (void) close(fd);
+-		    }
+-#endif
+-
+-	    }
+-	    (void) endutent();
+-	}
+-#else	/* not USE_SYSV_UTMP */
+-	register int i;
+-	struct utmp utmp;
+-
+-	if (!resource.utmpInhibit && added_utmp_entry &&
+-	    (!am_slave && tslot > 0 && (i = open(etc_utmp, O_WRONLY)) >= 0)) {
+-		bzero((char *)&utmp, sizeof(struct utmp));
+-		lseek(i, (long)(tslot * sizeof(struct utmp)), 0);
+-		write(i, (char *)&utmp, sizeof(struct utmp));
+-		close(i);
+-#ifdef WTMP
+-		if (term->misc.login_shell &&
+-		    (i = open(etc_wtmp, O_WRONLY | O_APPEND)) >= 0) {
+-			(void) strncpy(utmp.ut_line, ttydev +
+-			    sizeof("/dev"), sizeof (utmp.ut_line));
+-			time(&utmp.ut_time);
+-			write(i, (char *)&utmp, sizeof(struct utmp));
+-			close(i);
+-		}
+-#endif /* WTMP */
+-	}
+-#endif	/* USE_SYSV_UTMP */
+-#endif	/* UTMP */
+-        close(pty); /* close explicitly to avoid race with slave side */
+-	if(screen->logging)
+-		CloseLog(screen);
+-
+-	if (!am_slave) {
+-		/* restore ownership of tty and pty */
+-		chown (ttydev, 0, 0);
+-		chown (ptydev, 0, 0);
+-
+-		/* restore modes of tty and pty */
+-		chmod (ttydev, 0666);
+-		chmod (ptydev, 0666);
+-	}
+-	exit(n);
+-	SIGNAL_RETURN;
+-}
+-
+-/* ARGSUSED */
+-resize(screen, TermName, oldtc, newtc)
+-TScreen *screen;
+-char *TermName;
+-register char *oldtc, *newtc;
+-{
+-#ifndef USE_SYSV_ENVVARS
+-	register char *ptr1, *ptr2;
+-	register int i;
+-	register int li_first = 0;
+-	register char *temp;
+-	char *index();
+-
+-	if ((ptr1 = strindex (oldtc, "co#")) == NULL){
+-		strcat (oldtc, "co#80:");
+-		ptr1 = strindex (oldtc, "co#");
+-	}
+-	if ((ptr2 = strindex (oldtc, "li#")) == NULL){
+-		strcat (oldtc, "li#24:");
+-		ptr2 = strindex (oldtc, "li#");
+-	}
+-	if(ptr1 > ptr2) {
+-		li_first++;
+-		temp = ptr1;
+-		ptr1 = ptr2;
+-		ptr2 = temp;
+-	}
+-	ptr1 += 3;
+-	ptr2 += 3;
+-	strncpy (newtc, oldtc, i = ptr1 - oldtc);
+-	newtc += i;
+-	sprintf (newtc, "%d", li_first ? screen->max_row + 1 :
+-	 screen->max_col + 1);
+-	newtc += strlen(newtc);
+-	ptr1 = index (ptr1, ':');
+-	strncpy (newtc, ptr1, i = ptr2 - ptr1);
+-	newtc += i;
+-	sprintf (newtc, "%d", li_first ? screen->max_col + 1 :
+-	 screen->max_row + 1);
+-	ptr2 = index (ptr2, ':');
+-	strcat (newtc, ptr2);
+-#endif /* USE_SYSV_ENVVARS */
+-}
+-
+-static SIGNAL_T reapchild ()
+-{
+-#if defined(USE_SYSV_SIGNALS) && !defined(SIGTSTP)
+-	int status, pid;
+-
+-	pid = wait(&status);
+-	if (pid == -1) {
+-		(void) signal(SIGCHLD, reapchild);
+-		SIGNAL_RETURN;
+-	}
+-#else	/* defined(USE_SYSV_SIGNALS) && !defined(SIGTSTP) */
+-	union wait status;
+-	register int pid;
+-	
+-#ifdef DEBUG
+-	if (debug) fputs ("Exiting\n", stderr);
+-#endif	/* DEBUG */
+-	pid  = wait3 (&status, WNOHANG, (struct rusage *)NULL);
+-	if (!pid) {
+-#ifdef USE_SYSV_SIGNALS
+-		(void) signal(SIGCHLD, reapchild);
+-#endif /* USE_SYSV_SIGNALS */
+-		SIGNAL_RETURN;
+-	}
+-#endif	/* defined(USE_SYSV_SIGNALS) && !defined(SIGTSTP) */
+-
+-#ifdef PUCC_PTYD
+-		closepty(ttydev, ptydev, (resource.utmpInhibit ?  OPTY_NOP : OPTY_LOGIN), Ptyfd);
+-#endif /* PUCC_PTYD */
+-
+-	if (pid != term->screen.pid) {
+-#ifdef USE_SYSV_SIGNALS
+-		(void) signal(SIGCHLD, reapchild);
+-#endif	/* USE_SYSV_SIGNALS */
+-		SIGNAL_RETURN;
+-	}
+-	
+-	/*
+-	 * Use pid instead of process group (which would have to get before
+-	 * the wait call above) so that we don't accidentally hose other
+-	 * applications.  Otherwise, somebody could write a program which put
+-	 * itself in somebody else's process group.  Also, we call Exit instead
+-	 * of Cleanup so that we don't do a killpg on -1 by accident.  Some
+-	 * operating systems seem to do very nasty things with that.
+-	 */
+-	if (pid > 1) {
+-	    killpg (pid, SIGHUP);
+-	}
+-	Exit (0);
+-	SIGNAL_RETURN;
+-}
++#include "helios-main.inc"
+ 
+ /* VARARGS1 */
+ consolepr(fmt,x0,x1,x2,x3,x4,x5,x6,x7,x8,x9)
+diff --git a/clients/xterm/menu.c b/clients/xterm/menu.c
+index ede5510fdfb98e5a686b21ec8134c4c31d5ca450..29034b5e255884adea0ae42ebf2c3c513a9a58e3 100644
+--- a/clients/xterm/menu.c
++++ b/clients/xterm/menu.c
+@@ -275,7 +275,7 @@ static void handle_send_signal (gw, sig)
+ {
+     register TScreen *screen = &term->screen;
+ 
+-    if (screen->pid > 1) killpg (screen->pid, sig);
++    if (screen->pid > 1) kill (screen->pid, sig);
+ }
+ 
+ 
+diff --git a/clients/xterm/misc.c b/clients/xterm/misc.c
+index ef34c32626264e3b5ef50b51efb8fcdac592b62b..043fc0820d40400214297be6a88d27426efa8aed 100644
+--- a/clients/xterm/misc.c
++++ b/clients/xterm/misc.c
+@@ -48,7 +48,7 @@
+ #include "error.h"
+ #include "menu.h"
+ 
+-extern char *malloc();
++
+ extern char *mktemp();
+ extern void exit();
+ extern void perror();
+@@ -387,7 +387,7 @@ register TScreen *screen;
+ 	register char *cp;
+ 	register int i;
+ 	static char *log_default;
+-	char *malloc(), *rindex();
++	char  *rindex();
+ #ifdef ALLOWLOGFILEEXEC
+ 	void logpipe();
+ #ifdef SYSV
+@@ -419,7 +419,7 @@ register TScreen *screen;
+ 		int p[2];
+ 		static char *shell;
+ 
+-		if(pipe(p) < 0 || (i = fork()) < 0)
++		if(pipe(p) < 0 || (i = vfork()) < 0)
+ 			return;
+ 		if(i == 0) {	/* child */
+ 			close(p[1]);
+@@ -439,14 +439,14 @@ register TScreen *screen;
+ 			close(screen->respond);
+ 			if(!shell) {
+ 				register struct passwd *pw;
+-				char *getenv(), *malloc();
++				char *getenv();
+ 				struct passwd *getpwuid();
+ 
+ 				if(((cp = getenv("SHELL")) == NULL || *cp == 0)
+ 				 && ((pw = getpwuid(screen->uid)) == NULL ||
+ 				 *(cp = pw->pw_shell) == 0) ||
+ 				 (shell = malloc((unsigned) strlen(cp) + 1)) == NULL)
+-					shell = "/bin/sh";
++					shell = "/helios/bin/shell";
+ 				else
+ 					strcpy(shell, cp);
+ 			}
+@@ -535,7 +535,7 @@ int (*func)();
+ 	register char *cp;
+ 	char buf[512];
+ 	char *bufend = &buf[(sizeof buf) - 1];	/* leave room for null */
+-	extern char *malloc();
++	
+ 	Bool okay = True;
+ 
+ 	/* 
+@@ -676,7 +676,7 @@ int code;
+ 
+ 	screen = &term->screen;
+ 	if (screen->pid > 1) {
+-	    (void) killpg (screen->pid, SIGHUP);
++	    (void) kill (screen->pid, SIGHUP);
+ 	}
+ 	Exit (code);
+ }
+diff --git a/clients/xterm/screen.c b/clients/xterm/screen.c
+index 1c59dd2173e98ba28dc8331ac96055f087010f49..6cf70ae5eb72b9e87cb6c239743e330c6a2aaa92 100644
+--- a/clients/xterm/screen.c
++++ b/clients/xterm/screen.c
+@@ -37,9 +37,10 @@ static char rcs_id[] = "$XConsortium: screen.c,v 1.16 89/12/10 20:44:52 jim Exp
+ #include <stdio.h>
+ #include <sys/ioctl.h>
+ #include "ptyx.h"
++#include "helios-pty.h"
+ #include "error.h"
+ 
+-extern Char *calloc(), *malloc(), *realloc();
++
+ extern void bcopy();
+ extern void free();
+ 
+@@ -519,6 +520,7 @@ unsigned *flags;
+ 	screen->fullVwin.fullheight = height;
+ 	screen->fullVwin.fullwidth = width;
+ 	ResizeSelection (screen, rows, cols);
++    helios_pty_resize(screen->respond,cols,rows);
+ #ifdef sun
+ #ifdef TIOCSSIZE
+ 	/* Set tty's idea of window size */
+diff --git a/clients/xterm/scrollbar.c b/clients/xterm/scrollbar.c
+index a5ce3f6b1c798a71572ace5d1149bd815dc419ce..a19b6f22662e804944677a17df286e4dc3b291c0 100644
+--- a/clients/xterm/scrollbar.c
++++ b/clients/xterm/scrollbar.c
+@@ -329,7 +329,7 @@ ScrollBarOn (xw, init, doalloc)
+ 	register TScreen *screen = &xw->screen;
+ 	register int border = 2 * screen->border;
+ 	register int i;
+-	Char *realloc(), *calloc();
++	
+ 
+ 	if(screen->scrollbar)
+ 		return;

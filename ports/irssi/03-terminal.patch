@@ -1,0 +1,71 @@
+Subject: Handle native terminal input and window dimensions
+
+diff --git a/src/fe-text/term-terminfo.c b/src/fe-text/term-terminfo.c
+index 5552d9cb2c6fbdb565ea94a20ad30a4c0ec27ab1..d04b54ed633d50758a134d999d87004a12ca87e3 100644
+--- a/src/fe-text/term-terminfo.c
++++ b/src/fe-text/term-terminfo.c
+@@ -1,3 +1,4 @@
++int ktm_terminal_read(int,char *,int);
+ /*
+  term-terminfo.c : irssi
+ 
+@@ -617,7 +618,7 @@ int term_gets(unichar *buffer, int size)
+ 	if (size > sizeof(term_inbuf)-term_inbuf_pos)
+ 		size = sizeof(term_inbuf)-term_inbuf_pos;
+ 
+-	ret = read(fileno(current_term->in),
++	ret = ktm_terminal_read(fileno(current_term->in),
+ 		   term_inbuf + term_inbuf_pos, size);
+ 	if (ret == 0) {
+ 		/* EOF - terminal got lost */
+diff --git a/src/fe-text/term.c b/src/fe-text/term.c
+index 59c3fe4d49406f0025f91f8ee5192946d12ad436..6270bf398db67b07b98e448359fdeb44be26756a 100644
+--- a/src/fe-text/term.c
++++ b/src/fe-text/term.c
+@@ -35,6 +35,7 @@
+ #endif
+ #include <signal.h>
+ #include <termios.h>
++#include <helios/unix/api.h>
+ 
+ #define MIN_SCREEN_WIDTH 20
+ 
+@@ -48,7 +49,12 @@ static int resize_dirty;
+ 
+ int term_get_size(int *width, int *height)
+ {
+-#ifdef TIOCGWINSZ
++#ifdef __HELIOS
++    unsigned rows,columns;
++    if(hu_terminal_size(0,&rows,&columns)<0)return FALSE;
++    *width=columns<MIN_SCREEN_WIDTH?MIN_SCREEN_WIDTH:columns;*height=rows;
++    return TRUE;
++#elif defined(TIOCGWINSZ)
+ 	struct winsize ws;
+ 
+ 	/* Get new window size */
+@@ -171,7 +177,8 @@ void term_common_init(void)
+ 
+ #ifdef SIGWINCH
+ 	sigemptyset (&act.sa_mask);
+-	act.sa_flags = 0;
++	act.sa_flags = SA_ASYNC;
++    tcsetpgrp(0,getpgrp());
+ 	act.sa_handler = sig_winch;
+ 	sigaction(SIGWINCH, &act, NULL);
+ #endif
+diff --git a/src/fe-text/terminfo-core.c b/src/fe-text/terminfo-core.c
+index ebaf4171c6dcf1ec39b4fc6112acc8c506dce90b..781041fd614370347b3afda327953e07ebdd46dd 100644
+--- a/src/fe-text/terminfo-core.c
++++ b/src/fe-text/terminfo-core.c
+@@ -461,7 +461,9 @@ static void terminfo_input_init(TERM_REC *term)
+ 	tcgetattr(fileno(term->in), &term->old_tio);
+ 	memcpy(&term->tio, &term->old_tio, sizeof(term->tio));
+ 
+-	term->tio.c_lflag &= ~(ICANON | ECHO); /* CBREAK, no ECHO */
++	term->tio.c_oflag &= ~OPOST;
++    term->tio.c_iflag &= ~BRKINT;
++    term->tio.c_lflag &= ~(ICANON | ECHO | ISIG); /* CBREAK, no ECHO */
+ 	term->tio.c_cc[VMIN] = 1; /* read() is satisfied after 1 char */
+ 	term->tio.c_cc[VTIME] = 0; /* No timer */
+ 

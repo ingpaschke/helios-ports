@@ -1,0 +1,31 @@
+Irssi 0.8.10 for Helios
+
+Run: irssi
+Connect: /connect hostname 6667
+TLS: /connect -ssl hostname 6697
+Join: /join #channel
+Exit: /quit
+Settings and logs use ~/.irssi. /save preserves settings; /help is installed.
+
+This is a native transputer program, linked with GLib 1.2.10. It uses Helios
+/internet for IPv4 TCP and the POSIX hosts/DNS resolver. IRC, DCC and notifylist
+are statically linked. TLS uses the portable hu_tls provider API, including
+data and event-loop readiness. With the default host backend, the Linux I/O server performs
+encryption and validates the certificate and original server hostname against
+its trust store. The handshake is asynchronous; IRC registration waits for it.
+Use /server add -ssl hostname 6697 and /save to preserve a TLS server entry.
+TLS requires a direct TCP connection. Client certificates, per-server CA files,
+IRC proxies with TLS and disabling verification are not supported. An older
+io-server reports an error; the client never falls back to plaintext.
+This build has no Perl, dynamic modules, or /EXEC. DCC remains plaintext.
+DNS runs in a separate Helios task through helios-unix.lib and hu-resolve.
+The UI receives a bounded message over a native Helios /fifo stream channel.
+
+Terminal support covers xterm, screen, ansi and vt100. Xterm is recommended.
+The port reads Helios terminal dimensions directly, handles SIGWINCH and maps
+Helios CSI/SS3 cursor keys to their seven-bit terminal sequences. The console
+does not support every xterm display feature; use a Helios xterm for full UI.
+
+Source revisions and file hashes are recorded in the distribution's
+PROVENANCE.json. source.tar.gz contains the maintained Irssi/GLib source and
+port recipes. COPYING.irssi and COPYING.glib contain their licenses.
