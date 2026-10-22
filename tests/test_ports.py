@@ -67,6 +67,20 @@ class PortsTest(unittest.TestCase):
         (tree/'hello.txt').write_text('accidental cache edit')
         self.assertEqual((self.prepare()/'hello.txt').read_text(), 'upstream\n')
 
+    def test_build_diagnostics_ignore_quoted_source(self):
+        log = self.work / 'diagnostic.log'
+        Builder.run([sys.executable, '-c',
+                     'print(\'test.c:1: warning: old declaration\');'
+                     'print(\'  77 | error("Fatal Error: example");\');'
+                     'print(\'     |       ^\')'], log)
+        # Some legacy assemblers report failures without a nonzero status.
+        for diagnostic in ('Fatal Error: bad input', 'undefined symbol: missing',
+                           'undefined reference to missing'):
+            with self.subTest(diagnostic=diagnostic):
+                with self.assertRaises(RuntimeError):
+                    Builder.run([sys.executable, '-c',
+                                 'print(' + repr(diagnostic) + ')'], log)
+
     def test_new_files_modes_symlinks_and_removal_round_trip(self):
         edited = self.root/'edited'
         shutil.copytree(self.upstream, edited)

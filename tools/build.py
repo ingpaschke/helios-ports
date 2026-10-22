@@ -61,7 +61,11 @@ class Builder:
                 with destination.open('wb') as generated:
                     result = subprocess.run(command, cwd=cwd, stdout=generated, stderr=out)
         text = log.read_text(errors='replace')
-        if result.returncode or re.search(r'undefined reference|undefined symbol|Fatal Error', text, re.I):
+        # Clang prints numbered source excerpts beneath warnings. A string
+        # literal such as "Notifier fatal error" is not a build diagnostic.
+        diagnostics = '\n'.join(line for line in text.splitlines()[1:]
+                                if not re.match(r'\s*(?:\d+\s*\||\|)', line))
+        if result.returncode or re.search(r'undefined reference|undefined symbol|Fatal Error', diagnostics, re.I):
             raise RuntimeError(str(log)+'\n'+'\n'.join(text.splitlines()[-15:]))
 
     def fingerprint(self, name):
