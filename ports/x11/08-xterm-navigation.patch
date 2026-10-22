@@ -1,0 +1,22 @@
+Subject: Keep Home and End outside the four-entry cursor-key table
+
+diff --git a/clients/xterm/input.c b/clients/xterm/input.c
+index b999a9f49d73fe33fd64f285cc989fb412cf1a7e..7687349535329e1690012b480e60f8490a04bd5c 100644
+--- a/clients/xterm/input.c
++++ b/clients/xterm/input.c
+@@ -115,8 +115,13 @@ Bool eightbit;
+ 		} else
+ 			unparseputc(kypd_num[keysym-XK_KP_Space], pty);
+ 		key = TRUE;
+-        } else if (IsCursorKey(keysym) &&
+-        	keysym != XK_Prior && keysym != XK_Next) {
++         } else if (keysym == XK_Home || keysym == XK_End) {
++                /* Home/End are outside the four-entry cursor table. */
++                unparseputc(ESC, pty);
++                unparseputc('[', pty);
++                unparseputc(keysym == XK_Home ? 'H' : 'F', pty);
++                key = TRUE;
++        } else if (keysym >= XK_Left && keysym <= XK_Down) {
+        		if (keyboard->flags & CURSOR_APL) {
+ 			reply.a_type = SS3;
+ 			unparseseq(&reply, pty);

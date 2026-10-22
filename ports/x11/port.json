@@ -44,10 +44,15 @@
       "file": "07-build-tools.patch",
       "description": "Build font utilities on the host and generate the twm fallback configuration",
       "sha256": "a44eae45325d3d35dc4148d11cd371b92b5a56ed2a1fa082da6423ac9beeec85"
+    },
+    {
+      "file": "08-xterm-navigation.patch",
+      "sha256": "58fe795adb8a6ff7072e2cecb852e3d7a3e4bb6839a345911f209d8d3e25d832",
+      "description": "Keep Home and End outside the four-entry cursor-key table"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "bbb719c391fe7e1b1d16efa3f10884e17480b6fe7d532630321a7357afc4b4d6",
+  "patched_tree_sha256": "67097739473c0d38905754ebbd6aa152965108e726eb0768115f93496514335b",
   "dependencies": [
     "xterm-tty"
   ],
