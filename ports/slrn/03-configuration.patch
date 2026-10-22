@@ -1,4 +1,4 @@
-Subject: Select supported features and install terminal and newsreader defaults
+Subject: Select supported features and install newsreader defaults
 
 diff --git a/src/version.c b/src/version.c
 index 10b81af83dcb6e473d6abac0b523c2370841bf6a..f6edc53a9befc34e6d0f6a9330d4a6905bb25e05 100644

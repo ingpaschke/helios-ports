@@ -23,19 +23,18 @@
     },
     {
       "file": "03-configuration.patch",
-      "description": "Select supported features and install terminal and newsreader defaults",
-      "sha256": "18dc51cb89c6ebe9b653859071de9c1ceed40ac7429cd8e092b7eb408dca79d4"
+      "sha256": "a4e02161597b353ff7630cdcd7dbdea585fbb4b5736c5e65fe5f5babaeb57bda",
+      "description": "Select supported features and install newsreader defaults"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "a829f87875fe672b5bc8c7639756d6347c5f5a1814a15b370af14c4a09002d47",
+  "patched_tree_sha256": "9313a27eaa783c4787ca361f63e3f327f139ce03d959fea75cf58c9996d97a8a",
   "dependencies": [
-    "slang"
+    "slang",
+    "ncurses"
   ],
   "requires_compat": true,
-  "host_tools": [
-    "tic"
-  ],
+  "host_tools": [],
   "build": {
     "compile": {
       "flags": [
@@ -255,16 +254,6 @@
         "type": "copy",
         "source": "${src}/COPYRIGHT",
         "destination": "${stage}/local/share/slrn/COPYRIGHT.slrn"
-      },
-      {
-        "type": "run",
-        "command": [
-          "tic",
-          "-o",
-          "${stage}/local/share/terminfo",
-          "${src}/helios/helios.ti"
-        ],
-        "cwd": "${src}"
       }
     ]
   }
