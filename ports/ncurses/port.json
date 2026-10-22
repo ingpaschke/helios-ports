@@ -172,7 +172,7 @@
           "tic",
           "-x",
           "-e",
-          "xterm-256color,linux,screen,screen-256color",
+          "xterm-256color,linux,screen,screen-256color,sun",
           "-o",
           "${stage}/local/share/terminfo",
           "${src}/misc/terminfo.src"

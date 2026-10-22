@@ -52,7 +52,7 @@
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "67097739473c0d38905754ebbd6aa152965108e726eb0768115f93496514335b",
+  "patched_tree_sha256": "3e08dbda15783a18a4af6ac529678494752bea8851f4d2c9321de544431c0084",
   "dependencies": [
     "xterm-tty"
   ],

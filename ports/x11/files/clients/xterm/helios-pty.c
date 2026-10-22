@@ -15,6 +15,11 @@
 #include <helios/unix/spawn.h>
 #include "helios-pty.h"
 
+/* The display client selects the terminal emulation used by ttyserv. */
+#ifndef HELIOS_PTY_TERM
+#define HELIOS_PTY_TERM "xterm"
+#endif
+
 static int server_pid=-1, child_pid=-1, master_fd=-1, slave_fd=-1;
 static char tty_path[256];
 
@@ -42,7 +47,7 @@ int helios_pty_open(int columns,int rows)
     struct hu_spawn_actions actions;
     struct hu_spawn_attr attr={HU_SPAWN_LOCAL,0,0,3};
     char machine[128], name[32], master[256], discard[256];
-    char *args[]={"xterm-ttyserv","-p","-n",name,"-t","xterm",NULL};
+    char *args[]={"xterm-ttyserv","-p","-n",name,"-t",HELIOS_PTY_TERM,NULL};
     atexit(helios_pty_close);
     MachineName(machine);
     sprintf(name,"tty.x%x",MyTask->Port);

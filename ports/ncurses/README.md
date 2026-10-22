@@ -49,7 +49,7 @@ The library searches `/helios/local/share/terminfo`. `TERMINFO` can select anoth
 directory. The supplied `files/helios.ti` contains the Helios ANSI, VT100 and
 X11R4 xterm descriptions, shared with S-Lang applications such as slrn. These
 three entries are installed and also built into the library. Linux console,
-screen, screen-256color and xterm-256color entries are compiled from the pinned
+screen, screen-256color, xterm-256color and Sun console entries are compiled from the pinned
 upstream database and require the installed files. Additional descriptions can be compiled
 on the host with `tic -o destination descriptions.src` and copied to Helios.
 
