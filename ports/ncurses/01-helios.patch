@@ -1,0 +1,102 @@
+Subject: Build for Helios with native terminal dimensions and raw output
+
+diff --git a/config.sub b/config.sub
+index 3d35cde174de9cd9788e4bff9b5391c1b06a2fbe..89f38448419dc932d74f77012017167c686211b8 100755
+--- a/config.sub
++++ b/config.sub
+@@ -1345,6 +1345,7 @@ case $cpu-$vendor in
+ 			| m68hc11 \
+ 			| m68hc12 \
+ 			| m68hcs12x \
++			| t800 \
+ 			| m68k \
+ 			| m88110 \
+ 			| m88k \
+@@ -2022,6 +2023,7 @@ case $os in
+ 	| hcos* \
+ 	| hiux* \
+ 	| hms* \
++	| helios* \
+ 	| hpux* \
+ 	| ieee* \
+ 	| interix* \
+diff --git a/include/curses.h.in b/include/curses.h.in
+index 0541e35a78e138ed39c7fe6262d1de957bf43842..6a3db5c9ffc1da0d0344597e57b4b12413e809fe 100644
+--- a/include/curses.h.in
++++ b/include/curses.h.in
+@@ -38,6 +38,10 @@
+ #ifndef __NCURSES_H
+ #define __NCURSES_H
+ 
++#ifdef __HELIOS
++#include <helios.h>
++#endif
++
+ /*
+  The symbols beginning NCURSES_ or USE_ are configuration choices.
+  A few of the former can be overridden by applications at compile-time.
+diff --git a/ncurses/base/lib_getch.c b/ncurses/base/lib_getch.c
+index e5f6c0041cc21d17231011ea09cbfb1b4723e922..c1ed4caa1eb860af0671ff0ab379501303ccf8aa 100644
+--- a/ncurses/base/lib_getch.c
++++ b/ncurses/base/lib_getch.c
+@@ -692,11 +692,11 @@ wgetch(WINDOW *win)
+ */
+ 
+ static int
+-kgetch(SCREEN *sp, bool forever EVENTLIST_2nd(_nc_eventlist * evl))
++kgetch(SCREEN *sp, bool wait_forever EVENTLIST_2nd(_nc_eventlist * evl))
+ {
+     TRIES *ptr;
+     int ch = 0;
+-    int timeleft = forever ? 9999999 : GetEscdelay(sp);
++    int timeleft = wait_forever ? 9999999 : GetEscdelay(sp);
+ 
+     TR(TRACE_IEVENT, ("kgetch() called"));
+ 
+diff --git a/ncurses/base/lib_newterm.c b/ncurses/base/lib_newterm.c
+index 91f67c2ff98e77efa4300068a669bae1543fc5c2..7d3af1f301303979f95e4e7dd0d0a028c0198b6b 100644
+--- a/ncurses/base/lib_newterm.c
++++ b/ncurses/base/lib_newterm.c
+@@ -86,6 +86,11 @@ _nc_initscr(NCURSES_SP_DCL0)
+ 	buf.c_lflag &= (unsigned) ~(ECHO | ECHONL);
+ 	buf.c_iflag &= (unsigned) ~(ICRNL | INLCR | IGNCR);
+ 	buf.c_oflag &= (unsigned) ~(ONLCR);
++#ifdef __HELIOS
++        /* Cooked Helios output interprets escapes itself. Let ncurses send
++         * its terminal-specific control sequences through unchanged. */
++        buf.c_oflag &= ~OPOST;
++#endif
+ #elif HAVE_SGTTY_H
+ 	buf.sg_flags &= ~(ECHO | CRMOD);
+ #elif USE_NAMED_PIPES
+diff --git a/ncurses/tinfo/lib_setup.c b/ncurses/tinfo/lib_setup.c
+index 14a6dda0d279349ef44de3f9135a9221ef04d4ae..1a6ea304dfa07c8725979b4fa8525b9784710682 100644
+--- a/ncurses/tinfo/lib_setup.c
++++ b/ncurses/tinfo/lib_setup.c
+@@ -42,6 +42,9 @@
+  *		setupterm(char *, int, int *)
+  */
+ 
++#ifdef __HELIOS
++#include <helios/unix/api.h>
++#endif
+ #include <curses.priv.h>
+ #include <tic.h>		/* for MAX_NAME_SIZE */
+ 
+@@ -525,7 +528,15 @@ _nc_get_screensize(SCREEN *sp,
+ 	       *linep, *colp));
+ 	}
+ #endif
+-#if HAVE_SIZECHANGE
++#ifdef __HELIOS
++        {
++            unsigned rows, cols;
++            if (hu_terminal_size(cur_term->Filedes, &rows, &cols) == 0) {
++                *linep = (sp && sp->_filtered) ? 1 : (int) rows;
++                *colp = (int) cols;
++            }
++        }
++#elif HAVE_SIZECHANGE
+ 	/* try asking the OS */
+ 	if (NC_ISATTY(cur_term->Filedes)) {
+ 	    STRUCT_WINSIZE size;

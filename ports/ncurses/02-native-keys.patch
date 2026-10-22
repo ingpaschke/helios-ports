@@ -1,0 +1,26 @@
+Subject: Recognize native Helios terminal-server key sequences
+
+diff --git a/ncurses/tinfo/init_keytry.c b/ncurses/tinfo/init_keytry.c
+index 78f8b3e4eb592f2528c4e3bdb69288a24d73fd65..84da48347c0aa6ef85f60d916efcb40378178160 100644
+--- a/ncurses/tinfo/init_keytry.c
++++ b/ncurses/tinfo/init_keytry.c
+@@ -28,6 +28,9 @@
+  ****************************************************************************/
+ 
+ #include <curses.priv.h>
++#ifdef __HELIOS
++#include "heliosky.h"
++#endif
+ #include <tic.h>		/* struct tinfo_fkeys */
+ 
+ MODULE_ID("$Id: init_keytry.c,v 1.22 2024/12/07 18:14:49 tom Exp $")
+@@ -107,6 +110,9 @@ _nc_init_keytry(SCREEN *sp)
+ 	    }
+ 	}
+ #endif
++#ifdef __HELIOS
++        helios_keys(sp);
++#endif
+ #ifdef TRACE
+ 	_nc_trace_tries(sp->_keytry);
+ #endif

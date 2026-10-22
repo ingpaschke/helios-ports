@@ -21,6 +21,7 @@ writing your own recipe.
 | [links](ports/links/port.json) | 2.30 | Text browser with HTTP and HTTPS |
 | [slrn](ports/slrn/port.json), [slang](ports/slang/port.json) | 1.0.3a / 2.3.3 | Newsreader and terminal library |
 | [xmahjongg](ports/xmahjongg/port.json) | 3.7 | Mahjong solitaire, also named xshanghai |
+| [ncurses](ports/ncurses/README.md) | 6.6 | Curses, terminfo, menu, panel and form libraries |
 | [frotz](ports/frotz/port.json) | 2.55 | Z-machine interpreter |
 | [nethack](ports/nethack/port.json) | 3.1.3 | NetHack with the X11 interface |
 | [telnet](ports/telnet/port.json) | Helios port | Telnet client with terminal and window-size translation |
@@ -32,8 +33,8 @@ The host needs Python 3.12 or newer, Git, llvm-t800, a built Helios-NG SP2 SDK
 and its assembler. Network clients and the desktop also need a built helios-unix
 installation stage. The current recipes target T800 processors. X11 needs Bison
 and Flex to generate twm's parser. NetHack additionally uses GCC, qemu-i386 and
-an i386 musl host SDK for its ILP32 data generators; slrn needs `tic`, and Frotz
-needs `make`.
+an i386 musl host SDK for its ILP32 data generators. Frotz needs `make`; ncurses also needs GCC, Awk,
+`tic` and `infocmp`.
 
 ```sh
 python3 ports.py list

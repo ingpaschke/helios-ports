@@ -168,6 +168,11 @@ launching, descriptor actions, polling, terminal handling, name resolution and
 TLS. Its installed manual pages include `helios-unix(7)`, `hu_spawn(3)`,
 `hu_poll(3)`, `hu_terminal(3)`, `hu_resolve(3)` and `hu_tls(3)`.
 
+For curses or terminfo applications, use the [ncurses port](../ports/ncurses/README.md).
+Declare `ncurses` as a dependency, use its headers, and link its library before
+helios-unix. Frotz uses its original Unix screen and input code this way; a
+separate curses emulator or terminal-size polling loop is unnecessary.
+
 Understand the caller's expectations before replacing an API. A Unix `fork`
 assumption needs a design change: launch a task with explicit arguments and
 communication channels. Do not substitute a pretend shared-address-space fork.

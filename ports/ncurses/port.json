@@ -1,0 +1,209 @@
+{
+  "format": 1,
+  "name": "ncurses",
+  "version": "6.6",
+  "upstream": {
+    "kind": "archive",
+    "url": "https://invisible-island.net/archives/ncurses/ncurses-6.6.tar.gz",
+    "filename": "ncurses-6.6.tar.gz",
+    "sha256": "355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11",
+    "subdirectory": "ncurses-6.6",
+    "tree_sha256": "ebe28f08c6e4bef78e0df1218be67feafd04992910af5302eb8635a8d17f5655"
+  },
+  "patches": [
+    {
+      "file": "01-helios.patch",
+      "sha256": "a8a2493d3a683efd716c06e1da6300046313d2a25fdd635ce363d52fd584976b",
+      "description": "Build for Helios with native terminal dimensions and raw output"
+    },
+    {
+      "file": "02-native-keys.patch",
+      "sha256": "6a6493f6a33769b0f7654c08dc8f1dfcd1b97aa569c6a740a984bdeedf5bf70b",
+      "description": "Recognize native Helios terminal-server key sequences"
+    }
+  ],
+  "patched_tree_sha256": "114cc00d881c67d9b15c3b6296ecf4f19d8bd6c6e5cdf49f3ea44026012a6a65",
+  "dependencies": [],
+  "requires_compat": true,
+  "host_tools": [
+    "gcc",
+    "make",
+    "awk",
+    "tic",
+    "infocmp",
+    "sh"
+  ],
+  "build": {
+    "prepare": [
+      {
+        "type": "run",
+        "command": [
+          "mkdir",
+          "-p",
+          "${work}/target"
+        ]
+      },
+      {
+        "type": "run",
+        "command": [
+          "env",
+          "PATH=${asm_dir}:/usr/bin:/bin",
+          "CC=${clang} --target=t800-helios --sysroot=${sdk}",
+          "CFLAGS=-Os -DICANON=ICANNON -Dssize_t=int -I${compat}/include/helios-unix",
+          "LIBS=-lbsd",
+          "BUILD_CC=gcc",
+          "AR=${asm}",
+          "RANLIB=:",
+          "ac_cv_func_poll=no",
+          "ac_cv_header_stdint_h=no",
+          "ac_cv_header_malloc_h=no",
+          "cf_cv_header_stdbool_h=no",
+          "cf_cv_sizechange=yes",
+          "sh",
+          "${src}/configure",
+          "--host=t800-unknown-helios",
+          "--prefix=/helios/local",
+          "--disable-widec",
+          "--with-bool=int",
+          "--without-cxx",
+          "--without-cxx-binding",
+          "--without-ada",
+          "--without-debug",
+          "--without-shared",
+          "--without-gpm",
+          "--without-progs",
+          "--without-tests",
+          "--without-manpages",
+          "--disable-stripping",
+          "--with-default-terminfo-dir=/helios/local/share/terminfo",
+          "--with-terminfo-dirs=/helios/local/share/terminfo",
+          "--with-fallbacks=ansi,vt100,xterm",
+          "--with-chtype=unsigned int",
+          "--with-mmask-t=unsigned int",
+          "--with-database=${src}/helios.ti"
+        ],
+        "cwd": "${work}/target"
+      },
+      {
+        "type": "run",
+        "command": [
+          "env",
+          "PATH=${asm_dir}:/usr/bin:/bin",
+          "make",
+          "-j${jobs}",
+          "ARFLAGS=-p -o",
+          "libs"
+        ],
+        "cwd": "${work}/target"
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${work}/target/lib/libncurses.a",
+        "destination": "${stage}/local/lib/ncurses.lib"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/lib/libmenu.a",
+        "destination": "${stage}/local/lib/menu.lib"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/lib/libpanel.a",
+        "destination": "${stage}/local/lib/panel.lib"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/lib/libform.a",
+        "destination": "${stage}/local/lib/form.lib"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/include/curses.h",
+        "destination": "${stage}/local/include/ncurses/curses.h"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/include/ncurses_dll.h",
+        "destination": "${stage}/local/include/ncurses/ncurses_dll.h"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/include/term.h",
+        "destination": "${stage}/local/include/ncurses/term.h"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/include/unctrl.h",
+        "destination": "${stage}/local/include/ncurses/unctrl.h"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/include/panel.h",
+        "destination": "${stage}/local/include/ncurses/panel.h"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/include/menu.h",
+        "destination": "${stage}/local/include/ncurses/menu.h"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/include/form.h",
+        "destination": "${stage}/local/include/ncurses/form.h"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/include/curses.h",
+        "destination": "${stage}/local/include/ncurses/ncurses.h"
+      },
+      {
+        "type": "run",
+        "command": [
+          "mkdir",
+          "-p",
+          "${stage}/local/share/terminfo"
+        ]
+      },
+      {
+        "type": "run",
+        "command": [
+          "tic",
+          "-x",
+          "-e",
+          "xterm-256color,linux,screen,screen-256color",
+          "-o",
+          "${stage}/local/share/terminfo",
+          "${src}/misc/terminfo.src"
+        ]
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYING",
+        "destination": "${stage}/local/share/ncurses/COPYING"
+      },
+      {
+        "type": "run",
+        "command": [
+          "tic",
+          "-o",
+          "${stage}/local/share/terminfo",
+          "${src}/helios.ti"
+        ]
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/include/eti.h",
+        "destination": "${stage}/local/include/ncurses/eti.h"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/target/include/termcap.h",
+        "destination": "${stage}/local/include/ncurses/termcap.h"
+      }
+    ],
+    "outputs": []
+  },
+  "files": "files"
+}
