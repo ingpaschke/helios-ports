@@ -1,0 +1,150 @@
+Subject: Honor ignored modifiers in passive grabs and release unbound input events
+
+diff --git a/clients/olwm/evbind.c b/clients/olwm/evbind.c
+index d9b9ddf230fee8b031ee4f11b57c9489cd87bf8d..7eb08b857d234803d741b4b4816b31a80fcaddbf 100644
+--- a/clients/olwm/evbind.c
++++ b/clients/olwm/evbind.c
+@@ -926,97 +926,49 @@ static void
+ grabRootKeys(dpy, root, grab)
+     Display *dpy;
+     Window root;
+-    Bool grab;		/* True = grab, False = release */
++    Bool grab;
+ {
+     KeyBinding *k;
+-    unsigned int NumLockMask =
+-	FindModifierMask(XKeysymToKeycode(dpy, XK_Num_Lock));
+-
++    unsigned int ignored, subset;
+     for (k=KeyBindingTable; k < KeyBindingTable+bindingTableCount; ++k) {
+-	if (k->desc->function != NULLFUNC) {
+-	    if (grab) {
+-		XGrabKey(dpy, k->keycode, k->modstate,
+-			 root, False, GrabModeAsync, GrabModeSync);
+-		XGrabKey(dpy, k->keycode, k->modstate | LockMask,
+-			 root, False, GrabModeAsync, GrabModeSync);
+-	    } else {
+-		XUngrabKey(dpy, k->keycode, k->modstate, root);
+-		XUngrabKey(dpy, k->keycode, k->modstate|LockMask, root);
+-	    }
+-	    if (NumLockMask != 0) {
+-		if (grab) {
+-		    XGrabKey(dpy, k->keycode, k->modstate | NumLockMask,
+-			     root, False, GrabModeAsync, GrabModeSync);
+-		    XGrabKey(dpy, k->keycode,
+-			     k->modstate | NumLockMask | LockMask,
+-			     root, False, GrabModeAsync, GrabModeSync);
+-		} else {
+-		    XUngrabKey(dpy, k->keycode, k->modstate | NumLockMask,
+-			       root);
+-		    XUngrabKey(dpy, k->keycode,
+-			       k->modstate | NumLockMask | LockMask, root);
+-		}
+-	    }
+-	}
++        if (k->desc->function == NULLFUNC) continue;
++        ignored = ModMaskMap[MOD_IGNORE] & 0xff & ~k->modstate;
++        subset = ignored;
++        for (;;) {
++            if (grab)
++                XGrabKey(dpy, k->keycode, k->modstate | subset,
++                         root, False, GrabModeAsync, GrabModeSync);
++            else
++                XUngrabKey(dpy, k->keycode, k->modstate | subset, root);
++            if (subset == 0) break;
++            subset = (subset - 1) & ignored;
++        }
+     }
+ }
+ 
+-
+-/*
+- * Issue or release passive button grabs on this root window.  Like
+- * grabRootKeys, has to deal with Lock and NumLock by issuing up to four
+- * separate grabs.  Note: these are synchronous grabs.  This relies on the
+- * root event handler to issue an AllowEvents or GrabPointer request.
+- */
++/* Passive grabs must accept each combination of ignored modifiers, including
++ * lock state retained by an X server after the key's modifier map is cleared. */
+ static void
+ grabRootButtons(dpy, root, grab)
+     Display *dpy;
+     Window root;
+-    Bool grab;		/* True = grab, False = release */
++    Bool grab;
+ {
+-    unsigned int NumLockMask =
+-	FindModifierMask(XKeysymToKeycode(dpy, XK_Num_Lock));
++    unsigned int ignored, subset;
+     unsigned int eventmask =
+-	ButtonPressMask | ButtonMotionMask | ButtonReleaseMask;
+-
+-    if (ModMaskMap[MOD_WMGRAB] != 0) {
+-	if (grab) {
+-	    XGrabButton(dpy, AnyButton,
+-			ModMaskMap[MOD_WMGRAB],
+-			root, False, eventmask,
+-			GrabModeSync, GrabModeSync, None, None);
+-	    XGrabButton(dpy, AnyButton,
+-			ModMaskMap[MOD_WMGRAB] | LockMask,
+-			root, False, eventmask,
+-			GrabModeSync, GrabModeSync, None, None);
+-	} else {
+-	    XUngrabButton(dpy, AnyButton,
+-			  ModMaskMap[MOD_WMGRAB],
+-			  root);
+-	    XUngrabButton(dpy, AnyButton,
+-			  ModMaskMap[MOD_WMGRAB] | LockMask,
+-			  root);
+-	}
+-
+-	if (NumLockMask != 0) {
+-	    if (grab) {
+-		XGrabButton(dpy, AnyButton,
+-			    ModMaskMap[MOD_WMGRAB] | NumLockMask,
+-			    root, False, eventmask,
+-			    GrabModeSync, GrabModeSync, None, None);
+-		XGrabButton(dpy, AnyButton,
+-			    ModMaskMap[MOD_WMGRAB] | LockMask | NumLockMask,
+-			    root, False, eventmask,
+-			    GrabModeSync, GrabModeSync, None, None);
+-	    } else {
+-		XUngrabButton(dpy, AnyButton,
+-			      ModMaskMap[MOD_WMGRAB] | NumLockMask,
+-			      root);
+-		XUngrabButton(dpy, AnyButton,
+-			      ModMaskMap[MOD_WMGRAB] | LockMask | NumLockMask,
+-			      root);
+-	    }
+-	}
++        ButtonPressMask | ButtonMotionMask | ButtonReleaseMask;
++    if (ModMaskMap[MOD_WMGRAB] == 0) return;
++    ignored = ModMaskMap[MOD_IGNORE] & 0xff & ~ModMaskMap[MOD_WMGRAB];
++    subset = ignored;
++    for (;;) {
++        if (grab)
++            XGrabButton(dpy, AnyButton, ModMaskMap[MOD_WMGRAB] | subset,
++                        root, False, eventmask, GrabModeSync, GrabModeSync,
++                        None, None);
++        else
++            XUngrabButton(dpy, AnyButton, ModMaskMap[MOD_WMGRAB] | subset, root);
++        if (subset == 0) break;
++        subset = (subset - 1) & ignored;
+     }
+ }
+ 
+diff --git a/clients/olwm/wingframe.c b/clients/olwm/wingframe.c
+index 2d7eca067444bd2907f5ec73e47a4953a9e63775..0e901d84bcf782d42fb55022c2d71a2b0f4c0e92 100644
+--- a/clients/olwm/wingframe.c
++++ b/clients/olwm/wingframe.c
+@@ -441,6 +441,10 @@ WinGenericFrame *frameInfo;
+ 		(WinFunc(frameInfo,fcore.menuPress))(dpy, event, frameInfo);
+             break;
+ 
++        default:
++            /* An unbound modifier/button must not freeze both input devices. */
++            FrameAllowEvents(frameInfo->core.client, event->xbutton.time);
++            break;
+         }  /*  End switch on button pressed */
+ }
+ 

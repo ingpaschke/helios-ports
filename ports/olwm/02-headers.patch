@@ -1,0 +1,97 @@
+Subject: Use standard C headers and build without wide-character locales
+
+diff --git a/clients/olwm/info.c b/clients/olwm/info.c
+index 9e74d5b7d788d029a5517fce2aad968d6a3f061b..ce88f45a0123f455d8f6b2fa931ed0e2b37c29f7 100644
+--- a/clients/olwm/info.c
++++ b/clients/olwm/info.c
+@@ -12,7 +12,7 @@
+ 
+ #include <errno.h>
+ #include <stdio.h>
+-#include <memory.h>
++#include <string.h>
+ #include <X11/Xos.h>
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h>
+diff --git a/clients/olwm/mem.c b/clients/olwm/mem.c
+index 38eb66d69294ae0ba26ca57fff1aa58c33740519..58d508c8d8d2ec4e8edce74e4fa06a54185a1ed8 100644
+--- a/clients/olwm/mem.c
++++ b/clients/olwm/mem.c
+@@ -16,7 +16,7 @@
+ 
+ 
+ #include <stdlib.h>
+-#include <memory.h>
++#include <string.h>
+ #include <stdio.h>
+ #include <sys/types.h>
+ 
+diff --git a/clients/olwm/menu.c b/clients/olwm/menu.c
+index 0f2b86ed5b1dea3684807e88d20cef430bb3f972..b79efa309d9dc5d622c223998ee604399fc1f6d1 100644
+--- a/clients/olwm/menu.c
++++ b/clients/olwm/menu.c
+@@ -22,7 +22,7 @@
+ #include <ctype.h>
+ #include <errno.h>
+ #include <stdio.h>
+-#include <memory.h>
++#include <string.h>
+ #include <X11/Xos.h>
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h>
+diff --git a/clients/olwm/olwm.c b/clients/olwm/olwm.c
+index f8606293044f4a4e7a315d753ee26e25374cb462..e805465dfbc127bfa5be3a32226d28a8cfb87cd6 100644
+--- a/clients/olwm/olwm.c
++++ b/clients/olwm/olwm.c
+@@ -10,7 +10,7 @@
+  */
+ 
+ #include <errno.h>
+-#include <memory.h>
++#include <string.h>
+ #include <signal.h>
+ #include <stdio.h>
+ #include <string.h>
+diff --git a/clients/olwm/resources.c b/clients/olwm/resources.c
+index 3fcefe968dc2d53d16dab3a1a7018a8a7e6f7308..13fd458e7e35cae2d6b37b91afb1fc4b3df41cfb 100644
+--- a/clients/olwm/resources.c
++++ b/clients/olwm/resources.c
+@@ -15,7 +15,7 @@
+ #endif
+ #include <ctype.h>
+ #include <errno.h>
+-#include <memory.h>
++#include <string.h>
+ #include <stdio.h>
+ #include <string.h>
+ #include <sys/file.h>
+diff --git a/clients/olwm/usermenu.c b/clients/olwm/usermenu.c
+index 3cb5866f1a120a95bf33faad9312b9ff0517f247..3d8a7426eb379dfa385c27e0144a3125a2b24136 100644
+--- a/clients/olwm/usermenu.c
++++ b/clients/olwm/usermenu.c
+@@ -801,7 +801,11 @@ menuFromFileSearch(file, menu, messages)
+ {
+ 	char		**pFmt;
+ 	char		fullPath[MAXPATHLEN];
+-	char		*locale = GRV.lc_dlang.locale;
++	#ifdef OW_I18N_L3
++        char *locale = GRV.lc_dlang.locale;
++#else
++        char *locale = "C";
++#endif
+ 	int		rval;
+ 
+ 	if (file[0] == '/')
+diff --git a/clients/olwm/win.c b/clients/olwm/win.c
+index 5ada949b8cdb4f19b45b9335a846c9693c494c8d..89be30e9caabadcdc807dc25b0617224df4aa37b 100644
+--- a/clients/olwm/win.c
++++ b/clients/olwm/win.c
+@@ -10,7 +10,7 @@
+  */
+ 
+ #include <stdio.h>
+-#include <memory.h>
++#include <string.h>
+ #include <X11/Xos.h>
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h>

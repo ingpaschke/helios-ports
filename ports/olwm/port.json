@@ -1,0 +1,201 @@
+{
+  "format": 1,
+  "name": "olwm",
+  "version": "3.2p1.4",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/olvwm/xview.git",
+    "revision": "a5160375bf2a65c914824673b857f372863f78f2",
+    "subdirectory": "xview-3.2p1.4",
+    "include": [
+      "clients/olwm/**",
+      "LEGAL_NOTICE",
+      "README",
+      "clients/olvwm-4.1/gettext.c"
+    ],
+    "tree_sha256": "e84c455b1c6d5b77069407f66b8e3ff1bf7a74be2a30b54a4cf21cc5478bff8b"
+  },
+  "patches": [
+    {
+      "file": "01-runtime.patch",
+      "sha256": "76ac0c603623a4b6cd6db0dae1e1b9b2519bec69280a27111b51e68df5143bb1",
+      "description": "Use native task spawning, readiness waits and signal handling"
+    },
+    {
+      "file": "02-headers.patch",
+      "sha256": "af0d1bc9ee1f7ec3c6ef1b9a78136d74e9cf4aa4b8ff9ba6fb773a613c811675",
+      "description": "Use standard C headers and build without wide-character locales"
+    },
+    {
+      "file": "03-timing.patch",
+      "sha256": "a8c5153204a9f82e9ed8b55d3f5a86103feb7c8073395f34bbe4ad54f497235b",
+      "description": "Preserve subsecond event deadlines and use native timed waits"
+    },
+    {
+      "file": "04-session.patch",
+      "sha256": "26fd3453de8c95217ce615fc33607d48c40ed6022a09f05ef1e185d06acee087",
+      "description": "Preserve child display addresses and release the old manager before restarting"
+    },
+    {
+      "file": "05-input-grabs.patch",
+      "sha256": "966c48f48ff0aa5524de8a5b151a41fe5f5e18230a72ea66c138fdcba25cc64c",
+      "description": "Honor ignored modifiers in passive grabs and release unbound input events"
+    },
+    {
+      "file": "06-drag.patch",
+      "sha256": "450dc43f0b06f9fb2d847d5b4ae5e9c093a47a2884c11d46c40700106cd2e809",
+      "description": "Thaw decoration grabs before chord detection and preserve drag positions"
+    }
+  ],
+  "patched_tree_sha256": "ac82d2bc471553ca0274ebf8e2daef39442cf1785ecd811f8d5c7baaa1186cf6",
+  "dependencies": [
+    "x11",
+    "olgx"
+  ],
+  "build": {
+    "compile": {
+      "flags": [
+        "-std=gnu89",
+        "-Dhelios",
+        "-D_BSD",
+        "-DNeedFunctionPrototypes=0",
+        "-DNeedWidePrototypes=0",
+        "-DNO_ALLOCA",
+        "-Wno-error=implicit-function-declaration",
+        "-Wno-error=int-conversion",
+        "-Wno-error=incompatible-pointer-types",
+        "-Wno-error=return-mismatch",
+        "-I${dep:x11}/include",
+        "-I${dep:x11}/include/X11",
+        "-I${dep:x11}/include/X11/extensions",
+        "-DSHAPE",
+        "-I${dep:olgx}/stage/local/include",
+        "-I${src}/clients/olwm",
+        "-I${src}/helios",
+        "-I${compat}/include/helios-unix",
+        "-include",
+        "${src}/helios/platform.h",
+        "-DOPENWINHOME_DEFAULT=\"/helios/local/openwin\""
+      ]
+    },
+    "groups": [
+      {
+        "name": "olwm",
+        "sources": [
+          "${src}/clients/olwm/atom.c",
+          "${src}/clients/olwm/client.c",
+          "${src}/clients/olwm/cmdstream.c",
+          "${src}/clients/olwm/debug.c",
+          "${src}/clients/olwm/defaults.c",
+          "${src}/clients/olwm/dsdm.c",
+          "${src}/clients/olwm/environ.c",
+          "${src}/clients/olwm/error.c",
+          "${src}/clients/olwm/evbind.c",
+          "${src}/clients/olwm/events.c",
+          "${src}/clients/olwm/fontset.c",
+          "${src}/clients/olwm/group.c",
+          "${src}/clients/olwm/helpsend.c",
+          "${src}/clients/olwm/i18n.c",
+          "${src}/clients/olwm/info.c",
+          "${src}/clients/olwm/kbdfuncs.c",
+          "${src}/clients/olwm/list.c",
+          "${src}/clients/olwm/mem.c",
+          "${src}/clients/olwm/menu.c",
+          "${src}/clients/olwm/moveresize.c",
+          "${src}/clients/olwm/notice.c",
+          "${src}/clients/olwm/olwm.c",
+          "${src}/clients/olwm/properties.c",
+          "${src}/clients/olwm/resources.c",
+          "${src}/clients/olwm/screen.c",
+          "${src}/clients/olwm/selection.c",
+          "${src}/clients/olwm/services.c",
+          "${src}/clients/olwm/slave.c",
+          "${src}/clients/olwm/slots.c",
+          "${src}/clients/olwm/st.c",
+          "${src}/clients/olwm/states.c",
+          "${src}/clients/olwm/usermenu.c",
+          "${src}/clients/olwm/usleep.c",
+          "${src}/clients/olwm/win.c",
+          "${src}/clients/olwm/winbusy.c",
+          "${src}/clients/olwm/winbutton.c",
+          "${src}/clients/olwm/wincolor.c",
+          "${src}/clients/olwm/winframe.c",
+          "${src}/clients/olwm/wingframe.c",
+          "${src}/clients/olwm/winicon.c",
+          "${src}/clients/olwm/winipane.c",
+          "${src}/clients/olwm/winmenu.c",
+          "${src}/clients/olwm/winnofoc.c",
+          "${src}/clients/olwm/winpane.c",
+          "${src}/clients/olwm/winpinmenu.c",
+          "${src}/clients/olwm/winpush.c",
+          "${src}/clients/olwm/winresize.c",
+          "${src}/clients/olwm/winroot.c",
+          "${src}/helios/platform.c"
+        ]
+      },
+      {
+        "name": "session",
+        "sources": [
+          "${src}/helios/session.c"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "olwm",
+        "type": "executable",
+        "groups": [
+          "olwm"
+        ],
+        "output": "${stage}/bin/x11/olwm"
+      },
+      {
+        "name": "olwm-session",
+        "type": "executable",
+        "groups": [
+          "session"
+        ],
+        "output": "${stage}/bin/x11/olwm-session"
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/LEGAL_NOTICE",
+        "destination": "${stage}/local/share/olwm/LEGAL_NOTICE"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/clients/olwm/olwm.man",
+        "destination": "${stage}/local/share/olwm/olwm.1"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/clients/olwm/openwin-menu",
+        "destination": "${stage}/local/openwin/lib/openwin-menu"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYING.GPL3",
+        "destination": "${stage}/local/share/olwm/COPYING.GPL3"
+      }
+    ],
+    "link": {
+      "libraries": [
+        "${dep:olgx}/stage/local/lib/olgx.lib",
+        "${dep:x11}/lib/libXext.a",
+        "${dep:x11}/lib/libX11.a",
+        "${compat}/lib/helios-unix.lib",
+        "${sdk}/lib/netutils.lib",
+        "${sdk}/lib/bsd.lib",
+        "${sdk}/lib/c.lib",
+        "${sdk}/lib/helios.lib",
+        "${runtime}"
+      ],
+      "stack": 65536,
+      "heap": 131072
+    }
+  },
+  "requires_compat": true,
+  "files": "files"
+}

@@ -1,0 +1,199 @@
+Subject: Use native task spawning, readiness waits and signal handling
+
+diff --git a/clients/olwm/events.c b/clients/olwm/events.c
+index 974c1b6c1db34a3a01f885beaaa86daf46649bcc..b27c454593c4fc962be920ab6fa5b627082cdf92 100644
+--- a/clients/olwm/events.c
++++ b/clients/olwm/events.c
+@@ -304,7 +304,11 @@ XEvent *event;
+ 	    FD_ZERO(&xset);
+ 	    FD_SET(fd,&xset);
+ 
+-	    ready = select(fd+1,&rdset,&wrset,&xset,&polltime);
++	    #ifdef __HELIOS
++            ready = olwm_select(fd+1,&rdset,&wrset,&xset,&polltime);
++#else
++            ready = select(fd+1,&rdset,&wrset,&xset,&polltime);
++#endif
+ 
+ 	    gettimeofday(&polltime,NULL);
+ 	    if ((timeoutFunc != NULL) &&
+@@ -586,7 +590,11 @@ AwaitEvents(dpy, timeout)
+     while (1) {
+ 	FD_ZERO(&rfds);
+ 	FD_SET(ConnectionNumber(dpy), &rfds);
+-	s = select(ConnectionNumber(dpy)+1, &rfds, NULL, NULL, timeout);
++	#ifdef __HELIOS
++        s = olwm_select(ConnectionNumber(dpy)+1, &rfds, NULL, NULL, timeout);
++#else
++        s = select(ConnectionNumber(dpy)+1, &rfds, NULL, NULL, timeout);
++#endif
+ 	if (s == 0) {
+ 	    /* we timed out without getting anything */
+ 	    return False;
+diff --git a/clients/olwm/mem.c b/clients/olwm/mem.c
+index 4ade326f360beab1e69e119390801b02e226101c..38eb66d69294ae0ba26ca57fff1aa58c33740519 100644
+--- a/clients/olwm/mem.c
++++ b/clients/olwm/mem.c
+@@ -15,7 +15,7 @@
+  */
+ 
+ 
+-#include <malloc.h>
++#include <stdlib.h>
+ #include <memory.h>
+ #include <stdio.h>
+ #include <sys/types.h>
+diff --git a/clients/olwm/olwm.c b/clients/olwm/olwm.c
+index 055a86809d1a66a3c6f927cbc76ba847d88c769a..f8606293044f4a4e7a315d753ee26e25374cb462 100644
+--- a/clients/olwm/olwm.c
++++ b/clients/olwm/olwm.c
+@@ -598,7 +598,11 @@ int
+ RestartOLWM()
+ {
+     cleanup();
++#ifdef __HELIOS
++    olwm_restart(argVec);
++#else
+     execvp(argVec[0], argVec);
++#endif
+     ErrorGeneral("cannot restart");
+     /*NOTREACHED*/
+ }
+@@ -634,7 +638,7 @@ handleChildSignal()
+ void
+ ReapChildren()
+ {
+-#if defined(SYSV) || defined(__linux__)
++#if defined(SYSV) || defined(__linux__) || defined(__HELIOS)
+         pid_t pid;
+         int status;
+ #else
+@@ -645,7 +649,12 @@ ReapChildren()
+ 
+ 	if (!deadChildren)
+ 		return;
+-#if defined(SYSV) || defined(__linux__)
++#ifdef __HELIOS
++        sigset_t blocked, previous;
++        sigemptyset(&blocked);
++        sigaddset(&blocked, SIGCHLD);
++        sigprocmask(SIG_BLOCK, &blocked, &previous);
++#elif defined(SYSV) || defined(__linux__)
+ 	sighold(SIGCHLD);
+ #else
+ 	oldmask = sigblock(sigmask(SIGCHLD));
+@@ -655,7 +664,7 @@ ReapChildren()
+ 
+ 	while (1) {
+ 
+-#if defined(SYSV) || defined(__linux__)
++#if defined(SYSV) || defined(__linux__) || defined(__HELIOS)
+                 pid = waitpid(-1, &status, WNOHANG);
+ #else
+                 pid = wait3(&status, WNOHANG, (struct rusage *)0);
+@@ -682,7 +691,9 @@ ReapChildren()
+ 
+ 	deadChildren = False;
+ 
+-#if defined(SYSV) || defined(__linux__)
++#ifdef __HELIOS
++        sigprocmask(SIG_SETMASK, &previous, NULL);
++#elif defined(SYSV) || defined(__linux__)
+ 	sigrelse(SIGCHLD);
+ #else
+         (void) sigsetmask(oldmask);
+diff --git a/clients/olwm/resources.c b/clients/olwm/resources.c
+index 1d5ecd11576f33db32ff2d7005d87066701346aa..3fcefe968dc2d53d16dab3a1a7018a8a7e6f7308 100644
+--- a/clients/olwm/resources.c
++++ b/clients/olwm/resources.c
+@@ -408,7 +408,12 @@ ResourceItem MainItemTable[] = {
+ {   "invertFocusHighlighting",	"InvertFocusHighlighting", "False",
+     &(GRV.InvertFocusHighlighting), cvtBoolean,		NULL,
+     0L },
+-{   "runSlaveProcess",		"RunSlaveProcess",	"True",
++{   "runSlaveProcess",          "RunSlaveProcess",
++#ifdef __HELIOS
++    "False",
++#else
++    "True",
++#endif
+     &(GRV.RunSlaveProcess),	cvtBoolean,		NULL,
+     0L },
+ {   "selectToggleStacking",	"SelectToggleStacking","False",
+diff --git a/clients/olwm/services.c b/clients/olwm/services.c
+index f7786bcaa71730851c604fdd2cf06c46543de7d3..3f2e792288d8df444a090d5460353a2d95cae618 100644
+--- a/clients/olwm/services.c
++++ b/clients/olwm/services.c
+@@ -65,6 +65,9 @@ execCommand(winInfo,cmd)
+     WinGeneric *winInfo;
+     char *cmd;
+ {
++#ifdef __HELIOS
++    return olwm_launch(cmd, winInfo->core.client->scrInfo->environment);
++#else
+     char *args[4];
+     int pid;
+     char **env = winInfo->core.client->scrInfo->environment;
+@@ -90,6 +93,7 @@ execCommand(winInfo,cmd)
+ 	exit(1);
+     }
+     return 0;
++#endif
+ }
+ 
+ 
+@@ -190,6 +194,10 @@ PshFunc(dpy, winInfo, menuInfo, idx)
+ 	MenuInfo    	*menuInfo;
+ 	int     	idx;
+ {
++#ifdef __HELIOS
++        ErrorWarning("POSTSCRIPT menu actions require a NeWS server");
++        return -1;
++#else
+ 	char    *commArgv[2];
+ 	int	pshPipe[2];
+ 	int     pid;
+@@ -256,6 +264,7 @@ PshFunc(dpy, winInfo, menuInfo, idx)
+ 		close( pshPipe[1] );
+ 	}
+ 	return 1;
++#endif
+ }
+ 
+ /***************************************************************************
+@@ -506,7 +515,11 @@ SaveWorkspaceFunc(dpy, winInfo, menuInfo, idx)
+ 	    ErrorWarning(GetString("failed to grab keyboard"));
+ 	}
+ 
+-	status = system(GRV.SaveWorkspaceCmd);
++	#ifdef __HELIOS
++        status = olwm_run_wait(GRV.SaveWorkspaceCmd);
++#else
++        status = system(GRV.SaveWorkspaceCmd);
++#endif
+ 
+ 	XUngrabKeyboard(dpy,CurrentTime);
+ 	XUngrabPointer(dpy,CurrentTime);
+diff --git a/clients/olwm/slave.c b/clients/olwm/slave.c
+index f5294e0675f6b34d3b176b048433a776702690f7..da0365ef5bf0e2cebc8926ab9b8c6fa3aa4f949b 100644
+--- a/clients/olwm/slave.c
++++ b/clients/olwm/slave.c
+@@ -55,6 +55,10 @@ pid_t
+ SlaveStart(argv)
+ 	char		**argv;
+ {
++#ifdef __HELIOS
++        ErrorWarning("The optional XView help helper is not installed");
++        return -1;
++#else
+ 	int		input[2],output[2];
+ 	struct rlimit	rlimit;
+ 	int		fd,maxfd;
+@@ -114,6 +118,7 @@ SlaveStart(argv)
+ 		break;
+ 	}
+ 	return slaveInfo.pid;
++#endif
+ }
+ 
+ /* ----------------------------------------------------------------------

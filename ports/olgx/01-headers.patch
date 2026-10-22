@@ -1,0 +1,28 @@
+Subject: Use the standard allocator declarations with Helios headers
+
+diff --git a/lib/libolgx/ol_init.c b/lib/libolgx/ol_init.c
+index 689cdabedd56515ec0a6fb573b42d600dccc205e..7d4133fe528f9ee06f9b436a318a04603a62061c 100644
+--- a/lib/libolgx/ol_init.c
++++ b/lib/libolgx/ol_init.c
+@@ -9,7 +9,7 @@
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+-#include <malloc.h>
++#include <stdlib.h>
+ #include <X11/Xlib.h>
+ #include "olgx_impl.h"
+ #include "busy.h"
+diff --git a/lib/libolgx/ol_sb.c b/lib/libolgx/ol_sb.c
+index f9610b82a34247671efa5cbdb9df3138ec630777..a0773b3669e691308f3c116b5b4fbb7ee6dc508e 100644
+--- a/lib/libolgx/ol_sb.c
++++ b/lib/libolgx/ol_sb.c
+@@ -11,7 +11,7 @@
+  */
+ 
+ #include <stdio.h>
+-#include <malloc.h>
++#include <stdlib.h>
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h>
+ #include "olgx_impl.h"

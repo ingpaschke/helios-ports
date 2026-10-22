@@ -1,0 +1,98 @@
+{
+  "format": 1,
+  "name": "olgx",
+  "version": "3.2p1.4",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/olvwm/xview.git",
+    "revision": "a5160375bf2a65c914824673b857f372863f78f2",
+    "subdirectory": "xview-3.2p1.4",
+    "include": [
+      "lib/libolgx/**",
+      "LEGAL_NOTICE",
+      "README"
+    ],
+    "tree_sha256": "22f8f19557bda974fbe887b1286fb0e200c7c40b936fcfd2c09bff675e90e9e7"
+  },
+  "patches": [
+    {
+      "file": "01-headers.patch",
+      "sha256": "83a26ff72e47ad60b917e9f71cda32921897db3740cf90193a27ae8fad455277",
+      "description": "Use the standard allocator declarations with Helios headers"
+    }
+  ],
+  "patched_tree_sha256": "c5d968bfeced87d35bdf3f6b9f6a05346b6a07f8c989ca93b0321b649bdf668d",
+  "dependencies": [
+    "x11"
+  ],
+  "build": {
+    "compile": {
+      "flags": [
+        "-std=gnu89",
+        "-Dhelios",
+        "-D_BSD",
+        "-DNeedFunctionPrototypes=0",
+        "-DNeedWidePrototypes=0",
+        "-DNO_ALLOCA",
+        "-Wno-error=implicit-function-declaration",
+        "-Wno-error=int-conversion",
+        "-Wno-error=incompatible-pointer-types",
+        "-Wno-error=return-mismatch",
+        "-I${dep:x11}/include",
+        "-I${dep:x11}/include/X11",
+        "-I${dep:x11}/include/X11/extensions",
+        "-I${work}/include",
+        "-I${src}/lib/libolgx"
+      ]
+    },
+    "groups": [
+      {
+        "name": "olgx",
+        "sources": [
+          "${src}/lib/libolgx/ol_button.c",
+          "${src}/lib/libolgx/ol_color.c",
+          "${src}/lib/libolgx/ol_draw.c",
+          "${src}/lib/libolgx/ol_init.c",
+          "${src}/lib/libolgx/ol_misc.c",
+          "${src}/lib/libolgx/ol_sb.c",
+          "${src}/lib/libolgx/ol_slider.c"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "olgx",
+        "type": "archive",
+        "groups": [
+          "olgx"
+        ],
+        "output": "${stage}/local/lib/olgx.lib"
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/LEGAL_NOTICE",
+        "destination": "${stage}/local/share/olgx/LEGAL_NOTICE"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/lib/libolgx/olgx.h",
+        "destination": "${stage}/local/include/olgx/olgx.h"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYING.GPL3",
+        "destination": "${stage}/local/share/olgx/COPYING.GPL3"
+      }
+    ],
+    "prepare": [
+      {
+        "type": "copy",
+        "source": "${src}/lib/libolgx/olgx.h",
+        "destination": "${work}/include/olgx/olgx.h"
+      }
+    ]
+  },
+  "files": "files"
+}

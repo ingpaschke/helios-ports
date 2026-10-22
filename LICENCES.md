@@ -20,6 +20,7 @@ consult individual source and asset notices.
 | S-Lang | `COPYING` |
 | Xmahjongg | `COPYING`, `README`; X11 headers come from the shared X11 port |
 | ncurses | `COPYING`; new native key adapter and regression probes carry MIT notices |
+| OLWM, OLGX | Sun `LEGAL_NOTICE`, GPLv3 for later upstream patches (`COPYING.GPL3`); new native adapters carry MIT notices |
 | Frotz | `COPYING` |
 | NetHack | `dat/license`, `sys/share/random.c` |
 | Telnet | Berkeley notices in `telnet.c` and other sources |

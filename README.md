@@ -22,6 +22,7 @@ writing your own recipe.
 | [slrn](ports/slrn/port.json), [slang](ports/slang/port.json) | 1.0.3a / 2.3.3 | Newsreader and terminal library |
 | [xmahjongg](ports/xmahjongg/port.json) | 3.7 | Mahjong solitaire, also named xshanghai |
 | [ncurses](ports/ncurses/README.md) | 6.6 | Curses, terminfo, menu, panel and form libraries |
+| [olwm](ports/olwm/README.md), [olgx](ports/olgx/README.md) | 3.2p1.4 | Open Look window manager and graphics library |
 | [frotz](ports/frotz/port.json) | 2.55 | Z-machine interpreter |
 | [nethack](ports/nethack/port.json) | 3.1.3 | NetHack with the X11 interface |
 | [telnet](ports/telnet/port.json) | Helios port | Telnet client with terminal and window-size translation |

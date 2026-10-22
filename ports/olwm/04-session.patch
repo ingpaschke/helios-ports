@@ -1,0 +1,44 @@
+Subject: Preserve child display addresses and release the old manager before restarting
+
+diff --git a/clients/olwm/environ.c b/clients/olwm/environ.c
+index 71588151451b5632e7c7f23171b2fe428288c373..d8e302324222daca4542343b3af7adb4091ea639 100644
+--- a/clients/olwm/environ.c
++++ b/clients/olwm/environ.c
+@@ -91,7 +91,8 @@ putEnv(env,name,value)
+ 
+ 	/* search through, checking for variable in question */
+ 	for (count=0 ; count<env->used; count++) {
+-		if (!strncmp(env->environ[count],name,nameLen))
++		if (!strncmp(env->environ[count],name,nameLen) &&
++            env->environ[count][nameLen] == '=')
+ 			break;
+ 	}
+ 	
+@@ -128,10 +129,11 @@ putDisplayEnv(env,dpy,screen)
+ 	if ((dot = strchr(colon,'.')) != (char *)NULL) {
+ 		len = dot - display;
+ 	} else {
+-		len = colon - display;
++		len = strlen(display);
+ 	}
+ 
+-	(void)sprintf(value,"%*s.%d",len,display,screen);
++	if (len > sizeof(value) - 16) return;
++        (void)sprintf(value,"%.*s.%d",len,display,screen);
+ 
+ 	putEnv(env,"DISPLAY",value);
+ }
+diff --git a/clients/olwm/olwm.c b/clients/olwm/olwm.c
+index e805465dfbc127bfa5be3a32226d28a8cfb87cd6..19be747c7675a3871d8d0334f20a2100911fb9c8 100644
+--- a/clients/olwm/olwm.c
++++ b/clients/olwm/olwm.c
+@@ -599,6 +599,9 @@ RestartOLWM()
+ {
+     cleanup();
+ #ifdef __HELIOS
++    /* Release SubstructureRedirect before starting the replacement. */
++    XCloseDisplay(DefDpy);
++    DefDpy = NULL;
+     olwm_restart(argVec);
+ #else
+     execvp(argVec[0], argVec);

@@ -1,0 +1,167 @@
+Subject: Thaw decoration grabs before chord detection and preserve drag positions
+
+diff --git a/clients/olwm/client.c b/clients/olwm/client.c
+index 29370212e1dc762417f2ea4df85e78a23376ce10..3770feb887b438fc7fcc5bd0b3294df4d3f0de4e 100644
+--- a/clients/olwm/client.c
++++ b/clients/olwm/client.c
+@@ -931,11 +931,12 @@ Time	timestamp;
+  *	Moves the client to a new x,y position.
+  */
+ void
+-ClientMove(cli,trigger)
++ClientMove(cli,trigger,motion)
+     	Client 	*cli;
+ 	XEvent	*trigger;
++        XMotionEvent *motion;
+ {
+-	UserMoveWindows(cli, trigger);
++	UserMoveWindows(cli, trigger, motion);
+ }
+ 
+ /*
+diff --git a/clients/olwm/kbdfuncs.c b/clients/olwm/kbdfuncs.c
+index 5853d923df395ebd910885917dfd79b2955a6205..45de1d4e1314ee87e4a7baea460d290aff570d09 100644
+--- a/clients/olwm/kbdfuncs.c
++++ b/clients/olwm/kbdfuncs.c
+@@ -794,7 +794,7 @@ KeyMove(dpy, ke)
+ 	return;
+ 
+     if (CurrentClient->framewin != NULL)
+-	ClientMove(CurrentClient,ke);
++	ClientMove(CurrentClient,ke,(XMotionEvent *)NULL);
+ }
+ 
+ 
+diff --git a/clients/olwm/moveresize.c b/clients/olwm/moveresize.c
+index 868655bee57f3c7904bc7325e3554b1099b66a33..acba6c24c452ba802a021479e8b5608b1a18dbb5 100644
+--- a/clients/olwm/moveresize.c
++++ b/clients/olwm/moveresize.c
+@@ -230,8 +230,8 @@ mouseMovePaintStatus(mstuff, x, y)
+  *
+  * Allow the user to move a window or the set of selected windows.  The
+  * "first" parameter must be the button event that initiated the interaction.  
+- * The "winInfo" parameter must be the frame or icon on which the action was 
+- * initiated.  The external boolean DragWindow controls whether the whole 
++ * "motion" is the event that crossed the frame's drag threshold, or NULL
++ * for a keyboard/menu move.  The external boolean DragWindow controls whether the whole 
+  * window is moved or whether the outline is moved.
+  *
+  * TODO:
+@@ -239,9 +239,10 @@ mouseMovePaintStatus(mstuff, x, y)
+  * (2) implement hysteresis against other windows' edges.
+  */
+ void
+-UserMoveWindows(cli, first)
++UserMoveWindows(cli, first, motion)
+     Client *cli;
+     XEvent *first;
++    XMotionEvent *motion;
+ {
+     Display *dpy = cli->dpy;
+     List *winlist = NULL_LIST;
+@@ -354,6 +355,14 @@ UserMoveWindows(cli, first)
+ 	XGrabServer(dpy);
+ 	(void) ListApply(mstuff.winlist, drawOneBox, &mstuff);
+     }
++
++    /* The motion that crossed the drag threshold has already been consumed
++     * by the frame handler.  Apply it now, including for a one-motion drag. */
++    if (mstuff.mouse && motion != NULL && motion->same_screen) {
++        mstuff.curX = motion->x_root;
++        mstuff.curY = motion->y_root;
++        moveUpdate(&mstuff);
++    }
+ }
+ 
+ 
+@@ -458,8 +467,15 @@ movewinInterposer(dpy, event, w, mstuff)
+ 	break;
+ 
+     case ButtonRelease:
+-	if (AllButtonsUp(event))
+-	    moveDone(mstuff);
++        if (AllButtonsUp(event)) {
++            /* Do not depend on receiving a separate final MotionNotify. */
++            if (mstuff->mouse && event->xbutton.same_screen) {
++                mstuff->curX = event->xbutton.x_root;
++                mstuff->curY = event->xbutton.y_root;
++                moveUpdate(mstuff);
++            }
++            moveDone(mstuff);
++        }
+ 	break;
+ 
+     case MotionNotify:
+diff --git a/clients/olwm/services.c b/clients/olwm/services.c
+index 3f2e792288d8df444a090d5460353a2d95cae618..91b4302e744ff74f8888ba957e99c89924d67867 100644
+--- a/clients/olwm/services.c
++++ b/clients/olwm/services.c
+@@ -641,7 +641,7 @@ WindowMoveAction(dpy, winInfo, menuInfo, idx)
+ 	MenuInfo    	*menuInfo;
+ 	int     	idx;
+ {
+-	ClientMove(winInfo->core.client,(XEvent *)NULL);
++	ClientMove(winInfo->core.client,(XEvent *)NULL,(XMotionEvent *)NULL);
+ }
+ 
+ /*
+diff --git a/clients/olwm/winframe.c b/clients/olwm/winframe.c
+index 9d2ff98667fb5adc13a7416a339c608cd38e50da..88d092982aa9091674a4ed07afa1aba53478c187 100644
+--- a/clients/olwm/winframe.c
++++ b/clients/olwm/winframe.c
+@@ -376,7 +376,7 @@ XEvent *event;
+ WinPaneFrame *frameInfo;
+ XButtonEvent *lastpress;
+ {
+-	ClientMove(frameInfo->core.client,lastpress);
++	ClientMove(frameInfo->core.client,lastpress,&event->xmotion);
+ }
+ 
+ /*
+diff --git a/clients/olwm/wingframe.c b/clients/olwm/wingframe.c
+index 0e901d84bcf782d42fb55022c2d71a2b0f4c0e92..4fd9ffe5812dc493a1922a547498c1a585b7e941 100644
+--- a/clients/olwm/wingframe.c
++++ b/clients/olwm/wingframe.c
+@@ -375,6 +375,14 @@ WinGenericFrame *frameInfo;
+ 		     ModMaskMap[MOD_INVERT] |
+ 		     ModMaskMap[MOD_REDUCE];
+ 
++        /* A passive focus grab freezes both devices.  Chord detection needs
++         * subsequent motion/button events, so thaw decoration input before
++         * waiting for a chord.  Pane clicks remain frozen for ReplayPointer. */
++        if (event->xbutton.subwindow != panewindow) {
++            FrameAllowEvents(frameInfo->core.client, event->xbutton.time);
++            XFlush(dpy);
++        }
++
+ 	a = ResolveMouseBinding(dpy, event, ignoremask);
+ 
+ 	switch (a) {
+@@ -411,10 +419,10 @@ WinGenericFrame *frameInfo;
+ 			    (WinFunc(frameInfo,fcore.selectPress))(dpy,event,frameInfo);
+                         }
+ 
+-                        /* Let the button press through
+-                         * if we had grabbed it.
+-                         */
+-                        XAllowEvents(dpy, ReplayPointer, CurrentTime);
++                        /* Decoration input was already thawed above.  Replay
++                         * only pane clicks to their owning application. */
++                        if (event->xbutton.subwindow == panewindow)
++                            XAllowEvents(dpy, ReplayPointer, CurrentTime);
+                 }  /* End if not GRV.FocusFollowsMouse */
+ 
+                 lastSelectPress = event->xbutton;
+diff --git a/clients/olwm/winicon.c b/clients/olwm/winicon.c
+index e31a07fd479ad74768b5a52f077e398d656a2897..ce12984dac4199ad0da0b3ad5080ced6924fbc2e 100644
+--- a/clients/olwm/winicon.c
++++ b/clients/olwm/winicon.c
+@@ -142,7 +142,7 @@ XButtonEvent *lastpress;
+ {
+ 	SlotFree(iframe);
+ 	iframe->fManuallyPositioned = True;
+-	ClientMove(iframe->core.client,lastpress);
++	ClientMove(iframe->core.client,lastpress,&ev->xmotion);
+ }
+ 
+ 
