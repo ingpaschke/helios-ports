@@ -22,7 +22,7 @@
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "f570c1be480e6a31bdf2b8df9b5a1e3323edb6392be22560af8d9728eb2c79a2",
+  "patched_tree_sha256": "fd91ba2a4d04546f686d3f8dd3e957be683d55611b4df592a2cd96381ad365fb",
   "dependencies": [
     "x11"
   ],
@@ -125,6 +125,12 @@
         ]
       },
       {
+        "name": "helios-place",
+        "sources": [
+          "${src}/helios/place.c"
+        ]
+      },
+      {
         "name": "fvwm-session",
         "sources": [
           "${src}/helios/session.c"
@@ -191,6 +197,14 @@
           "helios-backdrop"
         ],
         "output": "${stage}/bin/x11/helios-backdrop"
+      },
+      {
+        "name": "helios-place",
+        "type": "executable",
+        "groups": [
+          "helios-place"
+        ],
+        "output": "${stage}/bin/x11/helios-place"
       },
       {
         "name": "fvwm-session",
