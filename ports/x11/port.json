@@ -49,10 +49,15 @@
       "file": "08-xterm-navigation.patch",
       "sha256": "58fe795adb8a6ff7072e2cecb852e3d7a3e4bb6839a345911f209d8d3e25d832",
       "description": "Keep Home and End outside the four-entry cursor-key table"
+    },
+    {
+      "file": "09-xterm-fonts.patch",
+      "description": "Pair normal and bold terminal fonts and reject incompatible bold font metrics",
+      "sha256": "ac1910fd8545981796928fdb370d2a7d5b4574123b66a930a5c9f912f0ddc3f7"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "3e08dbda15783a18a4af6ac529678494752bea8851f4d2c9321de544431c0084",
+  "patched_tree_sha256": "becc97db0a259f5acdaf2cdc8de3b3e603a14f5c839c6f0e4683f2edb6742eb8",
   "dependencies": [
     "xterm-tty"
   ],

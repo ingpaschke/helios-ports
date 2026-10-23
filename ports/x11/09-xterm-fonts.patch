@@ -1,0 +1,54 @@
+Subject: Pair terminal fonts and simulate bold when font metrics differ
+
+diff --git a/clients/xterm/main.h b/clients/xterm/main.h
+--- a/clients/xterm/main.h
++++ b/clients/xterm/main.h
+@@ -30,7 +30,7 @@
+ 
+ /* @(#)main.h\tX10/6.6\t11/10/86 */
+ 
+-#define	DEFBOLDFONT		"fixed"
++#define	DEFBOLDFONT		NULL
+ #define	DEFBORDER		2
+ #define	DEFBORDERWIDTH		2
+ #define	DEFFONT			"fixed"
+diff --git a/clients/xterm/XTerm.ad b/clients/xterm/XTerm.ad
+--- a/clients/xterm/XTerm.ad
++++ b/clients/xterm/XTerm.ad
+@@ -40,6 +40,9 @@
+ XTerm*vtMenu*tekmode*Label:  Switch to Tek Mode
+ XTerm*vtMenu*vthide*Label:  Hide VT Window
+ 
++XTerm*VT100*font: 9x15
++XTerm*VT100*boldFont: 9x15bold
++
+ XTerm*fontMenu.Label:  VT Fonts
+ XTerm*fontMenu*fontdefault*Label:	Default
+ XTerm*fontMenu*font1*Label:	Tiny
+diff --git a/clients/xterm/charproc.c b/clients/xterm/charproc.c
+--- a/clients/xterm/charproc.c
++++ b/clients/xterm/charproc.c
+@@ -2763,6 +2763,15 @@
+ 	  (bfs = XLoadQueryFont (screen->display, bfontname))))
+       bfs = nfs;
+ 
++    /* Bold glyphs must occupy the normal font's character cells. */
++    if (bfs != nfs &&
++        (bfs->ascent != nfs->ascent || bfs->descent != nfs->descent ||
++         bfs->max_bounds.width != nfs->max_bounds.width ||
++         bfs->min_bounds.width != nfs->min_bounds.width)) {
++        XFreeFont(screen->display, bfs);
++        bfs = nfs;
++    }
++
+     mask = (GCFont | GCForeground | GCBackground | GCGraphicsExposures |
+ 	    GCFunction);
+ 
+@@ -2809,7 +2818,6 @@
+     screen->reverseboldGC = new_reverseboldGC;
+     screen->fnt_norm = nfs;
+     screen->fnt_bold = bfs;
+-    screen->fnt_bold = screen->fnt_norm;
+     screen->enbolden = (nfs == bfs);
+     set_menu_font (False);
+     screen->menu_font_number = fontnum;
