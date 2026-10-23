@@ -1,0 +1,53 @@
+Subject: Translate caller-owned events without returning stack-local storage
+
+diff --git a/lib/libxview/canvas/cnvs_input.c b/lib/libxview/canvas/cnvs_input.c
+--- a/lib/libxview/canvas/cnvs_input.c
++++ b/lib/libxview/canvas/cnvs_input.c
+@@ -415,7 +415,6 @@
+     register Event *event;
+ {
+     Xv_Window       paint_window;
+-    Event           tmp_event;
+     int             x, y;
+ 
+     paint_window = xv_get(canvas_public, CANVAS_NTH_PAINT_WINDOW, 0);
+@@ -423,12 +422,11 @@
+ 	/* call xv_error */
+ 	return (event);
+     }
+-    tmp_event = *event;
+     win_translate_xy(paint_window, canvas_public,
+ 		     event_x(event), event_y(event), &x, &y);
+-    event_set_x(&tmp_event, x);
+-    event_set_y(&tmp_event, y);
+-    return (&tmp_event);
++    event_set_x(event, x);
++    event_set_y(event, y);
++    return (event);
+ }
+ 
+ /*
+@@ -440,7 +438,6 @@
+     register Event *event;
+ {
+     Xv_Window       paint_window;
+-    Event           tmp_event;
+     int             x, y;
+ 
+     paint_window = xv_get(canvas_public, CANVAS_NTH_PAINT_WINDOW, 0);
+@@ -448,12 +445,11 @@
+ 	/* call xv_error */
+ 	return (event);
+     }
+-    tmp_event = *event;
+     win_translate_xy(paint_window, canvas_public,
+ 		     event_x(event), event_y(event), &x, &y);
+-    event_set_x(&tmp_event, x);
+-    event_set_y(&tmp_event, y);
+-    return (&tmp_event);
++    event_set_x(event, x);
++    event_set_y(event, y);
++    return (event);
+ }
+ 
+ 

@@ -1,0 +1,64 @@
+Subject: Allocate login command names and bound terminal frame and icon labels
+
+diff --git a/clients/cmdtool/cmdtool.c b/clients/cmdtool/cmdtool.c
+--- a/clients/cmdtool/cmdtool.c
++++ b/clients/cmdtool/cmdtool.c
+@@ -121,7 +121,7 @@
+ 	char	err_msg[50];
+ 	char    *cmdline[100];
+ 	int     cmdline_count = 0;
+-	char	cmdline2[50];
++	char	*cmdline2;
+ 	Server_image  cmd_pixmap, cmd_mask_pixmap;
+ 
+ 	
+@@ -282,36 +282,29 @@
+ 
+ 	/* if the user wants to run .login format shell, prefix '-' to name */
+ 	if( run_login && argv != NULL ) {	/* jcb 5/10/90 */
+-		strcpy( cmdline2, "-"  );
+-		strcat( cmdline2, argv[0] );
++        cmdline2 = (char *) malloc(strlen(argv[0]) + 2);
++        if (cmdline2 == NULL) {
++            fputs("cmdtool: out of memory\n", stderr);
++            exit(EXIT_FAILURE);
++        }
++        cmdline2[0] = '-';
++        strcpy(cmdline2 + 1, argv[0]);
+ 		argv[0]	= cmdline2;
+ 	}
+ 
+ 	/* If FRAME_LABEL wasn't set by cmdline argument, set it */
+ 	if ((tmp_label1 = (char *)xv_get(base_frame, FRAME_LABEL)) == NULL) {
+-		(void)strncpy(frame_label,
+-		  am_cmdtool ? cmd_label : shell_label, sizeof(frame_label));
+-		if (become_console) {
+-			(void)strncat(frame_label, console_label,
+-				sizeof(frame_label));
+-		} else {
+-			(void)strncat(frame_label, " - ", sizeof(frame_label));
+-		}
+-		(void)strncat(frame_label, *argv, sizeof(frame_label));
++        xvh_format_strings(frame_label, sizeof(frame_label), "%s%s%s",
++            am_cmdtool ? cmd_label : shell_label,
++            become_console ? console_label : " - ", *argv);
+ 		(void)xv_set(base_frame, FRAME_LABEL, frame_label, 0);
+ 	}
+ 	tool_icon = (Icon)xv_get(base_frame, FRAME_ICON);
+ 	if (((tmp_label2 = (char *) xv_get(tool_icon, ICON_LABEL)) == NULL) ||
+ 	    *tmp_label2 == 0177) {
+-	    if (tmp_label1) {
+-		(void)strncpy(icon_label, tmp_label1, sizeof(icon_label));
+-            } else if (become_console) {
+-		(void)strncpy(icon_label, MSG("Console"), sizeof(icon_label));
+-	    } else {
+-		(void)strncpy(icon_label, *argv, sizeof(icon_label));
+-	    }
+-	    (void)xv_set(tool_icon, ICON_LABEL, icon_label, 0);
+-	    xv_set(tool_icon, ICON_LABEL, icon_label, NULL);
++        xvh_format_strings(icon_label, sizeof(icon_label), "%s",
++            tmp_label1 ? tmp_label1 : become_console ? MSG("Console") : *argv);
++        (void)xv_set(tool_icon, ICON_LABEL, icon_label, 0);
+ 	}
+ 	
+ 

@@ -1,0 +1,35 @@
+Subject: Keep descriptors outside notifier masks from corrupting memory
+
+diff --git a/lib/libxview/notify/ndet_fcntl.c b/lib/libxview/notify/ndet_fcntl.c
+--- a/lib/libxview/notify/ndet_fcntl.c
++++ b/lib/libxview/notify/ndet_fcntl.c
+@@ -35,12 +35,10 @@
+ #endif /* SVR4 */
+     int             fd, cmd, arg;
+ {
+-    fd_set          bit;
+     int             res;
+ #else /* __linux__ */
+ /* fcntl() is declared using variable args in linux */
+ fcntl(int fd, int cmd, ...) {
+-    fd_set          bit;
+     int             res;
+     va_list         args;
+     int             arg;
+@@ -51,12 +49,13 @@
+     va_end(args);
+ #endif /* __linux__ */
+ 
+-    /* Set fd bit */
+-    FD_ZERO(&bit);
+-    FD_SET(fd, &bit);
+     /* If call fails then ignore transition */
+     if ((res = notify_fcntl(fd, cmd, arg)) == -1)
+ 	return (res);
++    /* Native descriptors can exceed the notifier's fixed-size masks.
++     * Preserve fcntl semantics, but never index those masks out of range. */
++    if (fd < 0 || fd >= FD_SETSIZE)
++        return (res);
+     /*
+      * Update non-blocking read and async data ready flags if setting or
+      * querying.  Doing it on querying double checks information.

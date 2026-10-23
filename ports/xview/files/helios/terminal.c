@@ -1,9 +1,15 @@
 /* SPDX-License-Identifier: MIT */
 /* Reuse the separately compiled native backend supplied by the X11 port. */
+#include <unistd.h>
+
+/* Login argv[0] keeps its leading '-', while exec looks up the real file. */
 #define XVH_NATIVE_TERMINAL
+#define execvp(program, arguments) \
+    execvp(*(program) == '-' ? (program) + 1 : (program), arguments)
 #include <termios.h>
 #define HELIOS_PTY_TERM "sun"
 #include <clients/xterm/helios-pty.c>
+#undef execvp
 #include "terminal.h"
 #undef ioctl
 

@@ -1,0 +1,25 @@
+Subject: Handle clock startup allocation failures before accessing its state
+
+diff --git a/clients/clock/clock.c b/clients/clock/clock.c
+--- a/clients/clock/clock.c
++++ b/clients/clock/clock.c
+@@ -1733,9 +1733,16 @@
+ 	Menu_item       tmp_item;
+ 	char    **argscanner = argv;
+ 	int clock_usersetsize;
+-	Clock clck	= (Clock) malloc (sizeof (ClockObject)); 	
+-	clck-> display	= (ClockDisplay) malloc (sizeof (DisplayInfo));
+-	clck-> options	= (Options) malloc (sizeof (ClockOptions));
++    Clock clck = (Clock) calloc(1, sizeof(ClockObject));
++    if (clck != NULL) {
++        clck->display = (ClockDisplay) calloc(1, sizeof(DisplayInfo));
++        clck->options = (Options) calloc(1, sizeof(ClockOptions));
++    }
++    if (clck == NULL || clck->display == NULL || clck->options == NULL) {
++        cleanup(clck);
++        fputs("clock: out of memory\n", stderr);
++        exit(EXIT_FAILURE);
++    }
+ 	key		= xv_unique_key();
+ 
+ 

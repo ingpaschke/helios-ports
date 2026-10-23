@@ -97,9 +97,29 @@
       "file": "15-public-platform.patch",
       "sha256": "0667a1ff60d13b9eb975b296c839f7bcad2624f3320a1b5ec365b33bcb45fefc",
       "description": "Select the native ABI from public headers without requiring a SunOS build flag"
+    },
+    {
+      "file": "16-descriptor-bounds.patch",
+      "sha256": "b04d61009496e7af023a464c3959515105c8738832cea56f046b4c1cbd3ecde4",
+      "description": "Keep descriptors outside notifier masks from corrupting memory"
+    },
+    {
+      "file": "17-clock-allocation.patch",
+      "sha256": "0cbca38dccc2c41c247c0994a7b06a9bf2f35135ccac3eacfec2e3520d7767bd",
+      "description": "Handle clock startup allocation failures before accessing its state"
+    },
+    {
+      "file": "18-terminal-buffers.patch",
+      "sha256": "676b34de3e59a68112827b42e4c783b8352b4a695264b04a3600e6b727d04652",
+      "description": "Allocate login command names and bound terminal frame and icon labels"
+    },
+    {
+      "file": "19-event-lifetime.patch",
+      "sha256": "7fcc5b5720c99bb257f822aa05aa31c17c18eb6f62d46fe5028da9cb86c14955",
+      "description": "Translate caller-owned events without returning stack-local storage"
     }
   ],
-  "patched_tree_sha256": "e6f08d5c348dfaacd61ecf354b884b6f680f14e79096dd2b20205f2af95fad8d",
+  "patched_tree_sha256": "50578f7ad01300e9271164193e2806b13b600a7f8db07d1cea254d014d6c148b",
   "dependencies": [
     "x11",
     "olgx",

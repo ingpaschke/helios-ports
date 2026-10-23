@@ -109,9 +109,10 @@ python3 ports/xview/tests/build.py --work work --sdk /path/to/sdk/prod/TRAN \
 ```
 
 Copy `work/xview/tests/adapters` to Helios and run it with an existing writable
-test directory as its only argument. It checks allocating current-directory lookup, public headers, timers,
-distinct-file identity, aliases, filter input/output/EOF and failed-launch
-cleanup. It creates and removes files named `identity.a`, `identity.b` and
+test directory as its only argument. It checks allocating current-directory
+lookup, public headers, timers, distinct-file identity, aliases, descriptors
+beyond the notifier mask, filter input/output/EOF and failed-launch cleanup.
+It creates and removes files named `identity.a`, `identity.b` and
 `identity.missing` in that directory.
 
 The second probe, `work/xview/tests/chooser`, takes an existing directory
@@ -122,3 +123,31 @@ In an isolated display, also test typing, changing focus, editor load/save,
 reopening a file with an existing backup, terminal commands and resizing a
 SIGWINCH-aware program. Test Cmdtool and Shelltool separately, then close the
 clients and confirm that their child tasks and terminal services exit.
+
+`events` runs with `DISPLAY` set and checks that canvas event translation
+returns caller-owned events that remain valid across subsequent calls.
+
+`clock-oom` links the actual clock with a test-only allocation hook. Run it
+three times with `XV_FAIL_ALLOC` set to `1`, `2`, and `3`. Each run must report
+`FAILURE_INJECTED`, print `clock: out of memory`, and exit with status 1.
+The hook is not included in the installed applications.
+
+To check terminal labels and login commands, run Cmdtool and Shelltool with
+`-L` and a command path longer than 49 characters, then with a frame label
+longer than 150 characters (`-Wl`). The command must start, and icon labels
+must remain terminated and no longer than 29 bytes.
+
+The `terminal` test launcher supplies the long arguments without depending on
+console input-line limits. With `DISPLAY` set, run it as follows and repeat
+with `cmdtool`:
+
+```sh
+terminal shelltool
+terminal shelltool label
+```
+
+Before running it, copy the launcher itself to
+`/helios/tmp/xview-fixes/very-long-login-command-directory-to-exercise-buffer-bounds/xvchild`.
+It then also acts as the child command and records successful login-style
+execution in `/helios/tmp/terminal-child.log`. The second invocation supplies
+a 300-byte frame label. The child exits after 40 seconds.

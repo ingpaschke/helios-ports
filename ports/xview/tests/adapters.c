@@ -16,6 +16,7 @@ extern int xvh_same_file(int, const char *);
 extern int xvh_start_filter(char **, int *, int *);
 extern int xvh_setitimer(int, const struct itimerval *, struct itimerval *);
 extern int notify_select(int, fd_set *, fd_set *, fd_set *, const struct timeval *);
+extern int xvh_fcntl(int, int, ...);
 static volatile int alarms;
 static void alarmed(int sig) { (void)sig; ++alarms; }
 #define CHECK(c) do { if (!(c)) { fprintf(stderr,"FAIL line %d errno %d\n",__LINE__,errno); return 1; } } while (0)
@@ -51,6 +52,13 @@ int main(int argc, char **argv)
     close(destination);
     CHECK(xvh_same_file(source,a)==1 && xvh_same_file(source,alias)==1);
     CHECK(xvh_same_file(source,b)==0 && xvh_same_file(source,missing)==0);
+    CHECK(xvh_fcntl(-1,F_GETFL)==-1 && errno==EBADF);
+    destination = fcntl(source,F_DUPFD,FD_SETSIZE); CHECK(destination >= FD_SETSIZE);
+    CHECK(xvh_fcntl(destination,F_SETFL,O_NONBLOCK)==0);
+    CHECK((xvh_fcntl(destination,F_GETFL)&O_NONBLOCK)!=0);
+    CHECK(xvh_fcntl(destination,F_GETFD)>=0);
+    close(destination);
+    puts("PASS notifier descriptor boundaries and native high descriptors");
     close(source); unlink(a); unlink(b);
     puts("PASS native file identity");
 
