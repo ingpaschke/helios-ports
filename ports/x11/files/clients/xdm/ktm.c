@@ -9,7 +9,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <X11/Xlib.h>
+#include <X11/Xresource.h>
 #include "dm.h"
+#include "helios-logo-mask.h"
 
 int KtmKillGroup(int group, int sig) { return kill(-group, sig); }
 
@@ -56,6 +58,85 @@ void KtmLoginKeymap(Display *display)
     XRefreshKeyboardMapping(&changed);
     changed.request=MappingModifier;
     XRefreshKeyboardMapping(&changed);
+}
+
+static unsigned long KtmColor(Display *d, char *name)
+{
+    XColor c;
+    Colormap map=DefaultColormap(d,DefaultScreen(d));
+    if (!XParseColor(d,map,name,&c) || !XAllocColor(d,map,&c))
+        return BlackPixel(d,DefaultScreen(d));
+    return c.pixel;
+}
+
+/* The Helios logo as in helios-backdrop: spans grouped by coverage level,
+ * shaded from the header colour to the logo cream. */
+static void KtmLogo(Display *d, Drawable p, GC gc, int ox, int oy)
+{
+    static XRectangle spans[logo_width*logo_height];
+    XColor c;
+    int level,x,y,start,n;
+    for (level=1;level<=15;level++) {
+        c.red=(41+(237-41)*level/15)*257;
+        c.green=(67+(232-67)*level/15)*257;
+        c.blue=(76+(216-76)*level/15)*257;
+        if (!XAllocColor(d,DefaultColormap(d,DefaultScreen(d)),&c)) continue;
+        XSetForeground(d,gc,c.pixel);n=0;
+        for (y=0;y<logo_height;y++) for (x=0;x<logo_width;) {
+            if (logo_alpha[y*logo_width+x]!=level) {x++;continue;}
+            start=x++;
+            while (x<logo_width && logo_alpha[y*logo_width+x]==level) x++;
+            spans[n].x=ox+start;spans[n].y=oy+y;
+            spans[n].width=x-start;spans[n].height=1;n++;
+        }
+        if (n) XFillRectangles(d,p,gc,spans,n);
+    }
+}
+
+/* Give the greeter the look of the Helios desktop: paint the root window
+ * like helios-backdrop, and add /helios/etc/xdm/Xresources to the display's
+ * resource database before the login widget is created. The root
+ * background outlives this connection; the session replaces it. */
+void KtmLoginStyle(Display *d)
+{
+    static char banner[]="Helios 1.31-SP2  -  KTM transputer workstation";
+    XrmDatabase resources;
+    XFontStruct *font;
+    Window root;
+    Pixmap p;
+    GC gc;
+    int s,w,h,i;
+
+    resources=XrmGetFileDatabase("/helios/etc/xdm/Xresources");
+    if (resources) XrmMergeDatabases(resources,&d->db);
+
+    s=DefaultScreen(d); root=RootWindow(d,s);
+    w=DisplayWidth(d,s); h=DisplayHeight(d,s);
+    p=XCreatePixmap(d,root,w,h,DefaultDepth(d,s));
+    if (!p) return;
+    gc=XCreateGC(d,p,0,0);
+    XSetForeground(d,gc,KtmColor(d,"#304e57"));
+    XFillRectangle(d,p,gc,0,0,w,h);
+    XSetForeground(d,gc,KtmColor(d,"#29434c"));
+    XFillRectangle(d,p,gc,0,0,w,64);
+    KtmLogo(d,p,gc,22,11);
+    XSetForeground(d,gc,KtmColor(d,"#3b5c63"));
+    for (i=0;i<5;i++) XDrawArc(d,p,gc,w-390-i*32,h-420-i*32,
+                               300+i*64,300+i*64,0,360*64);
+    font=XLoadQueryFont(d,"-adobe-helvetica-medium-r-normal--14-*-*-*-p-*-iso8859-1");
+    if (!font) font=XLoadQueryFont(d,"fixed");
+    if (font && w>480) {
+        XSetFont(d,gc,font->fid);
+        XSetForeground(d,gc,KtmColor(d,"#a9c0bf"));
+        XDrawString(d,p,gc,w-28-XTextWidth(font,banner,strlen(banner)),
+                    32+font->ascent/2,banner,strlen(banner));
+    }
+    XSetWindowBackgroundPixmap(d,root,p);
+    XClearWindow(d,root);
+    XFreePixmap(d,p);
+    if (font) XFreeFont(d,font);
+    XFreeGC(d,gc);
+    XFlush(d);
 }
 
 static char userAuthPath[128];

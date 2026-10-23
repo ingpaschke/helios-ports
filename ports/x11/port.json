@@ -37,8 +37,8 @@
     },
     {
       "file": "06-xdm.patch",
-      "description": "Run XDM logins and display sessions as native Helios tasks",
-      "sha256": "ca449d1d0307e4db1f1d329fe1fd7045f29c175924dca8933a653a25f58dac2b"
+      "description": "Run XDM logins and display sessions as native Helios tasks, in the Helios desktop style",
+      "sha256": "3cda48a90a276672ca9e814e90a24ad7721c2a3da9a5fed34c876963bae532a5"
     },
     {
       "file": "07-build-tools.patch",
@@ -57,7 +57,7 @@
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "becc97db0a259f5acdaf2cdc8de3b3e603a14f5c839c6f0e4683f2edb6742eb8",
+  "patched_tree_sha256": "ea92d3c6a30dc133192e184fb931eecf6c2f283a722001575d6299a7c0f29dfd",
   "dependencies": [
     "xterm-tty"
   ],
