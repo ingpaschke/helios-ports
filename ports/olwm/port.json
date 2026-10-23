@@ -45,9 +45,14 @@
       "file": "06-drag.patch",
       "sha256": "450dc43f0b06f9fb2d847d5b4ae5e9c093a47a2884c11d46c40700106cd2e809",
       "description": "Thaw decoration grabs before chord detection and preserve drag positions"
+    },
+    {
+      "file": "07-decoration-input.patch",
+      "sha256": "67c7c443d538ff28e816e64054bc4267124b1509741fbaf64ed94976ef0f263c",
+      "description": "Deliver intercepted button presses to resize corners and window controls before thawing title-bar input"
     }
   ],
-  "patched_tree_sha256": "ac82d2bc471553ca0274ebf8e2daef39442cf1785ecd811f8d5c7baaa1186cf6",
+  "patched_tree_sha256": "1e126a978718b585b441002147009f9e03043910f1917a96e94f28de92573940",
   "dependencies": [
     "x11",
     "olgx"

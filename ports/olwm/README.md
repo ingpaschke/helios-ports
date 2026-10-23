@@ -67,8 +67,10 @@ The patches are divided by purpose:
 5. Passive grabs for every configured ignored-modifier combination, and
    release of unbound clicks so a synchronous grab cannot freeze input.
 6. Thaw decoration input before chord detection so passive focus grabs cannot
-   delay dragging. Replay only pane clicks to applications; retain the motion
+   delay dragging. Replay pane clicks to applications; retain the motion
    that starts a drag and the final button-release position.
+7. Replay intercepted presses to resize corners and window controls before
+   thawing title-bar input, preserving their own button handlers.
 
 New native adapters are readable source files in `files/helios`. The Sun
 licence and OLWM manual are installed in `/helios/local/share/olwm`.
@@ -113,3 +115,14 @@ To check passive-grab latency, set `OpenWindows.MouseChordTimeout: 2000`
 in the isolated manager's resources and use `--solid --max-start-delay 1`.
 Movement must begin without waiting for that two-second chord deadline,
 including when the test switches focus away from Calculator before dragging.
+
+For an automated resize check, start an xterm with
+`-geometry 40x12+200+200 -title Resize-test` on the isolated OLWM display:
+
+```sh
+python3 ports/olwm/tests/resize.py --display :21
+```
+
+This checks all four corners with and without keyboard focus. Each drag
+contains one motion event; the window must grow while its opposite corner
+stays fixed.

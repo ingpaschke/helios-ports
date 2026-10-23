@@ -1,0 +1,26 @@
+Subject: Deliver intercepted button presses to resize corners and window controls before thawing title-bar input
+
+diff --git a/clients/olwm/wingframe.c b/clients/olwm/wingframe.c
+index 4fd9ffe5812dc493a1922a547498c1a585b7e941..8ddf336b4e76c9253125d37b032c9ba9bcaa9c09 100644
+--- a/clients/olwm/wingframe.c
++++ b/clients/olwm/wingframe.c
+@@ -375,6 +375,19 @@ WinGenericFrame *frameInfo;
+ 		     ModMaskMap[MOD_INVERT] |
+ 		     ModMaskMap[MOD_REDUCE];
+ 
++        /* A frame's passive focus grab can intercept a press intended for
++         * a resize corner or window button.  Replay it before thawing, so
++         * that the child receives the initiating press under its own grab. */
++        if (event->xbutton.subwindow != None &&
++            event->xbutton.subwindow != panewindow) {
++            WinGeneric *child = WIGetInfo(event->xbutton.subwindow);
++            if (child != NULL &&
++                WinFunc(child,core.xevents[ButtonPress]) != NULL) {
++                XAllowEvents(dpy, ReplayPointer, event->xbutton.time);
++                return;
++            }
++        }
++
+         /* A passive focus grab freezes both devices.  Chord detection needs
+          * subsequent motion/button events, so thaw decoration input before
+          * waiting for a chord.  Pane clicks remain frozen for ReplayPointer. */
