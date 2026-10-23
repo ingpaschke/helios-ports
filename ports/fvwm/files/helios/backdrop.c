@@ -79,9 +79,7 @@ int main(void)
     for (;;) {
         time_t now=time(NULL);
         struct tm *tm=localtime(&now);
-        /* This native Helios libc does no timezone conversion; the KTM
-         * system clock is UTC. Do not silently label it as local time. */
-        if (tm && strftime(stamp,sizeof(stamp),"%a %d %b %Y  %H:%M UTC",tm)
+        if (tm && strftime(stamp,sizeof(stamp),"%a %d %b %Y  %H:%M %Z",tm)
             && strcmp(stamp,previous)) {
             if (w>440) {
                 int width=font?XTextWidth(font,stamp,strlen(stamp)):strlen(stamp)*6;

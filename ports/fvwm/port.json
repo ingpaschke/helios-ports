@@ -22,7 +22,7 @@
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "9512afcefda125743777c65390de580c01abe40882e3bf842bde2364cf5f73ca",
+  "patched_tree_sha256": "f570c1be480e6a31bdf2b8df9b5a1e3323edb6392be22560af8d9728eb2c79a2",
   "dependencies": [
     "x11"
   ],
