@@ -12,6 +12,7 @@
 #include <X11/Xresource.h>
 #include "dm.h"
 #include "helios-logo-mask.h"
+#include "perilogo-text.h"
 
 int KtmKillGroup(int group, int sig) { return kill(-group, sig); }
 
@@ -93,6 +94,42 @@ static void KtmLogo(Display *d, Drawable p, GC gc, int ox, int oy)
     }
 }
 
+/* Draw a bitmap in the GC's current foreground colour. */
+static void KtmStamp(Display *d, Drawable p, GC gc, char *bits,
+                     int width, int height, int x, int y)
+{
+    Pixmap mask=XCreateBitmapFromData(d,p,bits,width,height);
+    if (!mask) return;
+    XSetStipple(d,gc,mask);
+    XSetTSOrigin(d,gc,x,y);
+    XSetFillStyle(d,gc,FillStippled);
+    XFillRectangle(d,p,gc,x,y,width,height);
+    XSetFillStyle(d,gc,FillSolid);
+    XFreePixmap(d,mask);
+}
+
+/* The lower part of the vintage perilogo client's picture, "X Window
+ * System" over "PERIHELION" with a disc for its O, prerendered from its
+ * X11R2 fonts so that the display needs none of them. */
+static void KtmPerilogo(Display *d, Drawable p, GC gc, int w, int h)
+{
+    int axis=w-240;	/* the centre of the arcs */
+    int wx=axis-perilogo_word_width/2, wy=h-64-perilogo_word_height;
+    int xx=axis-perilogo_x_width/2, xy=wy-perilogo_x_height-20;
+    int x;
+    if (w<2*perilogo_x_width+240 || h<4*perilogo_x_height+300) return;
+    XSetForeground(d,gc,KtmColor(d,"#ede8d8"));
+    KtmStamp(d,p,gc,perilogo_x_bits,perilogo_x_width,perilogo_x_height,xx,xy);
+    KtmStamp(d,p,gc,perilogo_word_bits,perilogo_word_width,
+             perilogo_word_height,wx,wy);
+    XSetForeground(d,gc,KtmColor(d,"#e8b878"));
+    XFillArc(d,p,gc,wx+perilogo_disc_x,wy+perilogo_disc_y,
+             perilogo_disc_width,perilogo_disc_height,0,360*64);
+    XSetForeground(d,gc,KtmColor(d,"#a9c0bf"));
+    for (x=0;x<perilogo_word_width;x+=6)
+        XFillRectangle(d,p,gc,wx+x,wy+perilogo_word_ascent+6,3,1);
+}
+
 /* Give the greeter the look of the Helios desktop: paint the root window
  * like helios-backdrop, and add /helios/etc/xdm/Xresources to the display's
  * resource database before the login widget is created. The root
@@ -123,6 +160,7 @@ void KtmLoginStyle(Display *d)
     XSetForeground(d,gc,KtmColor(d,"#3b5c63"));
     for (i=0;i<5;i++) XDrawArc(d,p,gc,w-390-i*32,h-420-i*32,
                                300+i*64,300+i*64,0,360*64);
+    KtmPerilogo(d,p,gc,w,h);
     font=XLoadQueryFont(d,"-adobe-helvetica-medium-r-normal--14-*-*-*-p-*-iso8859-1");
     if (!font) font=XLoadQueryFont(d,"fixed");
     if (font && w>480) {
