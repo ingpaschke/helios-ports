@@ -1,0 +1,60 @@
+{
+  "format": 1,
+  "name": "tzdata",
+  "version": "2026e",
+  "upstream": {
+    "kind": "archive",
+    "url": "https://data.iana.org/time-zones/releases/tzdata2026e.tar.gz",
+    "filename": "tzdata2026e.tar.gz",
+    "sha256": "b26882805f26aac59d5b222978e6580484b834ccdc98be89df2f05a6dc53a652",
+    "subdirectory": "",
+    "tree_sha256": "09e610d029ff3b2f4e4ef1210fb3b0d8546a2dc3d1ce289c1c17db7b3da8378b"
+  },
+  "patched_tree_sha256": "09e610d029ff3b2f4e4ef1210fb3b0d8546a2dc3d1ce289c1c17db7b3da8378b",
+  "patches": [],
+  "dependencies": [],
+  "host_tools": [
+    "zic"
+  ],
+  "build": {
+    "prepare": [
+      {
+        "type": "run",
+        "command": [
+          "zic",
+          "-b",
+          "fat",
+          "-d",
+          "${stage}/etc/zoneinfo",
+          "africa",
+          "antarctica",
+          "asia",
+          "australasia",
+          "europe",
+          "northamerica",
+          "southamerica",
+          "etcetera",
+          "backward"
+        ]
+      }
+    ],
+    "targets": [],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/LICENSE",
+        "destination": "${stage}/local/share/tzdata/LICENSE"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/version",
+        "destination": "${stage}/local/share/tzdata/version"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/zone1970.tab",
+        "destination": "${stage}/etc/zoneinfo/zone.tab"
+      }
+    ]
+  }
+}
