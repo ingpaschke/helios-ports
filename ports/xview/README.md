@@ -111,7 +111,8 @@ python3 ports/xview/tests/build.py --work work --sdk /path/to/sdk/prod/TRAN \
 Copy `work/xview/tests/adapters` to Helios and run it with an existing writable
 test directory as its only argument. It checks allocating current-directory
 lookup, public headers, timers, distinct-file identity, aliases, descriptors
-beyond the notifier mask, filter input/output/EOF and failed-launch cleanup.
+beyond the notifier mask, filter input/output/EOF, failed-launch cleanup and
+sorting an empty array.
 It creates and removes files named `identity.a`, `identity.b` and
 `identity.missing` in that directory.
 

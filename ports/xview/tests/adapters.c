@@ -18,7 +18,9 @@ extern int xvh_setitimer(int, const struct itimerval *, struct itimerval *);
 extern int notify_select(int, fd_set *, fd_set *, fd_set *, const struct timeval *);
 extern int xvh_fcntl(int, int, ...);
 static volatile int alarms;
+static int comparisons;
 static void alarmed(int sig) { (void)sig; ++alarms; }
+static int counted_compare(const void *a, const void *b) { (void)a; (void)b; ++comparisons; return 0; }
 #define CHECK(c) do { if (!(c)) { fprintf(stderr,"FAIL line %d errno %d\n",__LINE__,errno); return 1; } } while (0)
 
 static int fd_count(void)
@@ -88,5 +90,13 @@ int main(int argc, char **argv)
     CHECK(alarms==1);
     memset(&timer,0,sizeof(timer)); CHECK(xvh_setitimer(ITIMER_REAL,&timer,NULL)==0);
     puts("PASS notifier timer and public headers");
+
+    {
+        int values[4] = { 4, 3, 2, 1 };
+        comparisons = 0;
+        qsort(values, 0, sizeof(values[0]), counted_compare);
+        CHECK(comparisons == 0);
+    }
+    puts("PASS qsort of an empty array");
     return 0;
 }

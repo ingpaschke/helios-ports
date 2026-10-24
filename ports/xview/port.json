@@ -117,9 +117,14 @@
       "file": "19-event-lifetime.patch",
       "sha256": "7fcc5b5720c99bb257f822aa05aa31c17c18eb6f62d46fe5028da9cb86c14955",
       "description": "Translate caller-owned events without returning stack-local storage"
+    },
+    {
+      "file": "20-empty-directory-sort.patch",
+      "sha256": "3945150be61736e893eb14b9176343e7f15be9a85fbf74bd31ca591a83361790",
+      "description": "Do not pass an empty row list to qsort in the file chooser"
     }
   ],
-  "patched_tree_sha256": "50578f7ad01300e9271164193e2806b13b600a7f8db07d1cea254d014d6c148b",
+  "patched_tree_sha256": "82d794ff55e493d6eefa66481fa5720fcf8b1290ad24ece8780c2f0a02dd2620",
   "dependencies": [
     "x11",
     "olgx",

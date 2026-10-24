@@ -1,0 +1,15 @@
+Subject: Do not pass an empty row list to qsort in the file chooser
+
+diff --git a/lib/libxview/file_chooser/file_list.c b/lib/libxview/file_chooser/file_list.c
+index 2b614b12e0d5ccdb064111ca41d3f71cf8fc4313..c8d5c08b461b7ef05c5ca89010a0238a1d960e35 100644
+--- a/lib/libxview/file_chooser/file_list.c
++++ b/lib/libxview/file_chooser/file_list.c
+@@ -957,7 +957,7 @@ flist_load_dir( private, directory )
+      * turned on FILE_LIST_WCHAR_NOTIFY, then the strings will be filled
+      * in as wchar_t *.
+      */
+-    if ( private->compare_func )
++    if ( private->compare_func && row_num > 1 )
+ 	qsort(&rows[1], row_num-1, sizeof(File_list_row), private->compare_func);
+ 
+ 
