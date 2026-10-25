@@ -16,6 +16,7 @@ writing your own recipe.
 | Port | Version | Contents |
 | --- | --- | --- |
 | [x11](ports/x11/port.json) | X11R4, patch level 18 | X libraries, clients and demos |
+| [xterm](ports/xterm/README.md) | 412 | UTF-8 and 256-colour terminal, installed as xterm412 |
 | [fvwm](ports/fvwm/port.json) | 1.24r | Window manager, GoodStuff and FvwmPager |
 | [irssi](ports/irssi/port.json), [glib](ports/glib/port.json) | 0.8.10 / 1.2.10 | IRC client and support library |
 | [links](ports/links/port.json) | 2.30 | Text browser with HTTP and HTTPS |

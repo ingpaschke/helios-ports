@@ -1,0 +1,3 @@
+# Legacy Helios termcap applications use the existing xterm capabilities.
+xterm-256color|Maintained xterm compatibility entry:\
+	:tc=xterm:

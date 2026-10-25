@@ -1,0 +1,55 @@
+Subject: Adapt X11R4 translations and selection introspection
+
+--- a/button.c
++++ b/button.c
+@@ -416,7 +416,13 @@
+ 		  XtNtranslations, &xlations,
+ 		  XtNaccelerators, &xcelerat,
+ 		  (XtPointer) 0);
++#ifdef helios
++    /* X11R4 lacks Xt's private translation introspection. Keep the
++     * normal button bindings without inspecting custom translations. */
++    result = NULL;
++#else
+     result = _XtPrintXlations(w, xlations, xcelerat, True);
++#endif
+     if (result) {
+ 	static const char *table[] =
+ 	{
+--- a/charproc.c
++++ b/charproc.c
+@@ -15062,18 +15062,9 @@
+ 	),
+ 	DATA("popup-menu",
+ "\
+-                !Ctrl <Btn1Down>:popup-menu(mainMenu) \n\
+-           !Lock Ctrl <Btn1Down>:popup-menu(mainMenu) \n\
+- !Lock Ctrl @Num_Lock <Btn1Down>:popup-menu(mainMenu) \n\
+-     ! @Num_Lock Ctrl <Btn1Down>:popup-menu(mainMenu) \n\
+-                !Ctrl <Btn2Down>:popup-menu(vtMenu) \n\
+-           !Lock Ctrl <Btn2Down>:popup-menu(vtMenu) \n\
+- !Lock Ctrl @Num_Lock <Btn2Down>:popup-menu(vtMenu) \n\
+-     ! @Num_Lock Ctrl <Btn2Down>:popup-menu(vtMenu) \n\
+-                !Ctrl <Btn3Down>:popup-menu(fontMenu) \n\
+-           !Lock Ctrl <Btn3Down>:popup-menu(fontMenu) \n\
+- !Lock Ctrl @Num_Lock <Btn3Down>:popup-menu(fontMenu) \n\
+-     ! @Num_Lock Ctrl <Btn3Down>:popup-menu(fontMenu) \n\
++                 Ctrl <Btn1Down>:popup-menu(mainMenu) \n\
++                 Ctrl <Btn2Down>:popup-menu(vtMenu) \n\
++                 Ctrl <Btn3Down>:popup-menu(fontMenu) \n\
+ "
+ 	),
+ 	/* PROCURA added "Meta <Btn2Down>:clear-saved-lines()" */
+@@ -15118,12 +15109,10 @@
+ "\
+                      <BtnMotion>:pointer-motion() \n\
+                        <BtnDown>:pointer-button() \n\
+-                         <BtnUp>:pointer-button() \n\
+ "
+ 	),
+ 	DATA("default",
+ "\
+-                         <BtnUp>:ignore() \n\
+ "
+ 	)
+     };

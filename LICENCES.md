@@ -11,6 +11,7 @@ consult individual source and asset notices.
 
 | Component | Notices |
 | --- | --- |
+| xterm | `COPYING` and individual source notices; new native adapters are MIT licensed |
 | X11R4 | `COPYRIGHTS` and individual source notices |
 | FVWM | `fvwm/fvwm.c`; modules include their own notices, such as `modules/FvwmIconBox/COPYRIGHT` |
 | Irssi | `COPYING` |

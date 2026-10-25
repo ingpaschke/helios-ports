@@ -1,0 +1,182 @@
+{
+  "format": 1,
+  "name": "xterm",
+  "version": "412",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/ThomasDickey/xterm-snapshots.git",
+    "revision": "5c75ead9a75d4b2e666ca06fa94503b5766ed93f",
+    "subdirectory": "",
+    "tree_sha256": "5e614ebb90723755ef85a821f08770ff318482121636b5304b6a926b9fc4d634"
+  },
+  "patches": [
+    {
+      "file": "01-terminal.patch",
+      "description": "Connect task startup, terminal packets and resizing to the native Helios terminal service",
+      "sha256": "6400e69f763d9524175d3b3c282549322ebc629281e40d52c683ce48b011a981"
+    },
+    {
+      "file": "02-x11r4.patch",
+      "description": "Adapt X11R4 mouse translations and selection introspection",
+      "sha256": "d8e0bce5021a57ad259d63ec6b61674f885ba79cd7499b572b05868882d4193b"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "776f15a66ef080dcbf6c1e8111eab29aafe51bf6251869c72f5838399d46f2aa",
+  "dependencies": [
+    "x11",
+    "xterm-tty",
+    "ncurses"
+  ],
+  "requires_compat": true,
+  "build": {
+    "compile": {
+      "flags": [
+        "-std=gnu99",
+        "-Dhelios",
+        "-D_BSD",
+        "-DHAVE_CONFIG_H",
+        "-DNeedFunctionPrototypes=0",
+        "-DNeedWidePrototypes=0",
+        "-Wno-error=implicit-function-declaration",
+        "-Wno-error=int-conversion",
+        "-Wno-error=incompatible-pointer-types",
+        "-Wno-error=return-mismatch",
+        "-I${src}",
+        "-I${src}/helios/include",
+        "-I${dep:x11}/include",
+        "-I${dep:x11}/include/X11",
+        "-I${compat}/include/helios-unix",
+        "-I${dep:ncurses}/stage/local/include",
+        "-I${dep:ncurses}/stage/local/include/ncurses",
+        "-include",
+        "${src:x11}/helios/x11-platform.h",
+        "-include",
+        "${src}/helios/platform.h",
+        "-Wno-error=implicit-int"
+      ]
+    },
+    "groups": [
+      {
+        "name": "xterm",
+        "sources": [
+          "${src}/button.c",
+          "${src}/cachedGCs.c",
+          "${src}/charproc.c",
+          "${src}/charsets.c",
+          "${src}/cursor.c",
+          "${src}/data.c",
+          "${src}/doublechr.c",
+          "${src}/fontutils.c",
+          "${src}/input.c",
+          "${src}/keysym2ucs.c",
+          "${src}/linedata.c",
+          "${src}/main.c",
+          "${src}/menu.c",
+          "${src}/misc.c",
+          "${src}/print.c",
+          "${src}/ptydata.c",
+          "${src}/scrollback.c",
+          "${src}/screen.c",
+          "${src}/scrollbar.c",
+          "${src}/tabs.c",
+          "${src}/util.c",
+          "${src}/version.c",
+          "${src}/xstrings.c",
+          "${src}/xtermcap.c",
+          "${src}/VTPrsTbl.c",
+          "${src}/helios/helios-pty.c",
+          "${src}/charclass.c",
+          "${src}/wcwidth.c",
+          "${src}/xutf8.c",
+          "${src}/helios/xlib.c",
+          "${src}/precompose.c"
+        ]
+      },
+      {
+        "name": "terminal-check",
+        "sources": [
+          "${src}/helios/tests-terminal.c"
+        ],
+        "flags": [
+          "-DObject=HeliosObject"
+        ]
+      }
+    ],
+    "link": {
+      "stack": 131072,
+      "heap": 262144,
+      "libraries": [
+        "${dep:x11}/lib/libXaw.a",
+        "${dep:x11}/lib/libXmu.a",
+        "${dep:x11}/lib/libXt.a",
+        "${dep:x11}/lib/libXext.a",
+        "${dep:x11}/lib/libX11.a",
+        "${dep:x11}/lib/libXau.a",
+        "${dep:x11}/lib/libXdmcp.a",
+        "${dep:ncurses}/stage/local/lib/ncurses.lib",
+        "${compat}/lib/helios-unix.lib",
+        "${sdk}/lib/netutils.lib",
+        "${sdk}/lib/bsd.lib",
+        "${sdk}/lib/c.lib",
+        "${sdk}/lib/helios.lib",
+        "${runtime}"
+      ]
+    },
+    "targets": [
+      {
+        "name": "xterm412",
+        "type": "executable",
+        "groups": [
+          "xterm"
+        ],
+        "output": "${work}/bin/xterm412"
+      },
+      {
+        "name": "terminal-check",
+        "type": "executable",
+        "groups": [
+          "terminal-check"
+        ],
+        "output": "${work}/tests/terminal-check",
+        "libraries": [
+          "${compat}/lib/helios-unix.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ]
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${work}/bin/xterm412",
+        "destination": "${stage}/bin/x11/xterm412"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/XTerm412",
+        "destination": "${stage}/lib/x11/app-defa/XTerm412"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYING",
+        "destination": "${stage}/local/share/xterm/COPYING"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/helios/xterm.tc",
+        "destination": "${stage}/local/share/xterm/helios.tc"
+      }
+    ],
+    "prepare": [
+      {
+        "type": "run",
+        "command": [
+          "${python}",
+          "helios/prepare.py"
+        ]
+      }
+    ]
+  }
+}

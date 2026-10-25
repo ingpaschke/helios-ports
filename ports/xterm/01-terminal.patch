@@ -1,0 +1,91 @@
+Subject: Connect xterm to the native Helios terminal service
+
+--- a/main.c
++++ b/main.c
+@@ -118,6 +118,9 @@
+ #include <xstrings.h>
+ #include <xtermcap.h>
+ #include <xterm_io.h>
++#ifdef helios
++#include "helios/helios-pty.h"
++#endif
+ 
+ #if OPT_WIDE_CHARS
+ #include <charclass.h>
+@@ -2374,7 +2377,7 @@
+ int
+ get_tty_lnext(int fd, int default_lnext, const char *tag)
+ {
+-#ifdef TERMIO_STRUCT
++#if defined(TERMIO_STRUCT) && !defined(helios)
+     TERMIO_STRUCT my_tio;
+     int rc = ttyGetAttr(fd, &my_tio);
+     int result = (rc == 0) ? my_tio.c_cc[VLNEXT] : default_lnext;
+@@ -4013,6 +4016,9 @@
+  *  Does not close fd Xsocket.
+  *  If slave, the pty named in passedPty is already open for use
+  */
++#ifdef helios
++#include "helios/spawn.inc"
++#else
+ static int
+ spawnXTerm(XtermWidget xw, unsigned line_speed)
+ {
+@@ -5580,6 +5586,8 @@
+ 
+     return 0;
+ }				/* end spawnXTerm */
++#endif
++
+ 
+ #if defined(__GNUC__) && defined(HAVE__GCOV_EXIT)
+ extern void __gcov_exit(void);
+@@ -5598,6 +5606,10 @@
+ void
+ Exit(int n)
+ {
++#ifdef helios
++    helios_pty_close();
++#endif
++
+     XtermWidget xw = term;
+     TScreen *screen = TScreenOf(xw);
+ 
+--- a/ptydata.c
++++ b/ptydata.c
+@@ -31,6 +31,9 @@
+  */
+ 
+ #include <data.h>
++#ifdef helios
++#include "helios/helios-pty.h"
++#endif
+ 
+ #if OPT_WIDE_CHARS
+ #include <menu.h>
+@@ -255,7 +258,11 @@
+ 	int save_err;
+ 	trimPtyData(xw, data);
+ 
+-	size = (int) read(screen->respond, (char *) data->last, (size_t) FRG_SIZE);
++	#ifdef helios
++        size = helios_pty_read(screen->respond, (char *)data->last, FRG_SIZE);
++#else
++        size = (int) read(screen->respond, (char *) data->last, (size_t) FRG_SIZE);
++#endif
+ 	save_err = errno;
+ #if (defined(i386) && defined(SVR4) && defined(sun)) || defined(__CYGWIN__)
+ 	/*
+--- a/screen.c
++++ b/screen.c
+@@ -2535,7 +2535,9 @@
+     }
+ #endif
+ 
+-#ifdef TTYSIZE_STRUCT
++#ifdef helios
++    helios_pty_resize(screen->respond, cols, rows);
++#elif defined(TTYSIZE_STRUCT)
+     if (update_winsize(screen, rows, cols, height, width) == 0) {
+ #if defined(SIGWINCH) && defined(TIOCGPGRP)
+ 	if (screen->pid > 1) {
