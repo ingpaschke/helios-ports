@@ -1,0 +1,87 @@
+Subject: Preserve pasted input and release the input handler on shutdown
+
+--- a/ttyserv/input.c
++++ b/ttyserv/input.c
+@@ -23,6 +23,7 @@
+ 
+ #include "tty.h"
+ extern word device_read(void *buf, int size, word timeout);
++extern int terminating;
+ 
+ /*************************************************************************
+  * READ A SINGLE CHARACTER FROM THE INPUT LINE
+@@ -54,6 +55,7 @@
+     timelimit = (timeout < 0 || timeout > 10 * OneSec) ? 10 * OneSec : timeout;
+     do
+     {
++	if (terminating) return -1;
+ 	error = device_read (data, 1, timelimit);
+ #ifdef	DEBUG
+ 	Debug (INPUT_ALL) ("%s : read returned %08x", fname, error);
+@@ -119,6 +121,14 @@
+     int 	*head	= &t->in_head;	/* via the t parameter.		*/
+ 
+     Wait (lock);			/* lock the raw buffer		*/
++    /* A pseudo-terminal producer can outrun the reader during a paste.
++     * Leave bytes in the device ring until the application makes room. */
++    while (((*head + 1) & InBufMask) == *tail) {
++        if (terminating) { Signal(lock); return; }
++        Signal(lock);
++        Delay(OneSec / 1000);
++        Wait(lock);
++    }
+ 
+ #ifdef	DEBUG
+     Debug (INPUT_ALL) ("%s before : head = %02x, tail = %02x ", fname, *head, *tail);
+@@ -157,25 +167,24 @@
+ static void
+ PutRawString (char *str, Keyboard *term)
+ {
+-    int	    saved_head; 		/* save old head pointer	*/
+-    int     overflow = FALSE;
+-    int     *head = &term->in_head;	/* a local pointer acts faster	*/
+-
+-    Wait (&term->raw_lock);		/* lock the raw buffer		*/
+-    saved_head = *head;
+-    do
+-    {
+-	term->in_raw[*head] = *str++;	/* add the character and	*/
+-	*head = (*head + 1) & InBufMask;	/* increment head ptr	*/
+-
+-	overflow = *head == term->in_tail;	/* buffer overflow ?	*/
+-    }
+-    until (overflow || *str == '\0');
+-
+-    if (overflow)			/* if overflow, restore head	*/
+-	*head = saved_head;
+-
+-    Signal (&term->raw_lock);		/* release the raw buffer	*/
++    int count = strlen(str);
++    if (count > InBufMask) {
++        while (*str) PutRaw(*str++, term);
++        return;
++    }
++    Wait(&term->raw_lock);
++    while (((term->in_tail - term->in_head - 1) & InBufMask) < count) {
++        if (terminating) { Signal(&term->raw_lock); return; }
++        Signal(&term->raw_lock);
++        Delay(OneSec / 1000);
++        Wait(&term->raw_lock);
++    }
++    /* Publish the complete translated key sequence as one input batch. */
++    while (*str) {
++        term->in_raw[term->in_head] = *str++;
++        term->in_head = (term->in_head + 1) & InBufMask;
++    }
++    Signal(&term->raw_lock);
+ }
+ 
+ 
+@@ -278,6 +287,7 @@
+ #endif
+ 
+ 	chw = GetKey (NoTimeout);	/* get next character	*/
++        if (terminating) return;
+ 
+ #ifdef	DEBUG
+ 	Debug (INPUT) ("%s : read char %x", fname, chw);

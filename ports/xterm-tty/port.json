@@ -6,43 +6,54 @@
     "kind": "git",
     "url": "https://github.com/axelmuhr/Helios-NG.git",
     "revision": "1fe8f65ee15407945e5a1a25f39f88de64de0d50",
-    "subdirectory": "servers/ttyserv/ttyserv",
+    "subdirectory": "servers/ttyserv",
     "include": [
-      "ttylib.c",
-      "setterm.c",
-      "input.c",
-      "termcap.c",
-      "globals.c",
-      "ttydev.c",
-      "terminal.c",
-      "tty.c",
-      "ansi.c",
-      "ttydev.h",
-      "tty.h"
+      "ttyserv/ttylib.c",
+      "ttyserv/setterm.c",
+      "ttyserv/input.c",
+      "ttyserv/termcap.c",
+      "ttyserv/globals.c",
+      "ttyserv/ttydev.c",
+      "ttyserv/terminal.c",
+      "ttyserv/tty.c",
+      "ttyserv/ansi.c",
+      "ttyserv/ttydev.h",
+      "ttyserv/tty.h",
+      "devs/tpseudev.h"
     ],
-    "tree_sha256": "255134bf76e8b417be55ae37c9478ca9ff909d7e20a9a06ede3653734075a028"
+    "tree_sha256": "65f5c1683d83e644acb56dd089fb0a6290123212eaacf496ad54e8abdd7ac97e"
   },
   "patches": [
     {
       "file": "01-helios.patch",
       "description": "Report terminal dimensions and deliver resize notifications",
-      "sha256": "374ed08d4db85b6aed7503a7e6e168d33c0262215bacc88db06783cb6c86227f"
+      "sha256": "e51b654ffc18447d4db86342c218392cbf79658bc2d12428c0b3f7ceb246f0ac"
+    },
+    {
+      "file": "02-input-backpressure.patch",
+      "description": "Backpressure terminal input instead of dropping bytes during pastes",
+      "sha256": "bb160f4e000721249c75ace267b49c0788beacd708ee50ab232d470ed397af09"
+    },
+    {
+      "file": "03-ssh-shutdown.patch",
+      "description": "Stop an SSH terminal task before freeing its live pseudo-terminal state",
+      "sha256": "0ef8a572178b538120f28fe8da11fe56758f68c4590687f91d658e1d329b8425"
     }
   ],
-  "patched_tree_sha256": "113d63aff935d892e4120c565e05b848b51a63edfcdd7bdf5eca36d3654efa24",
+  "patched_tree_sha256": "d1b2f9acfdba6675f9af560903dd673bd346d5f087ee45811885fd0006078ea4",
   "dependencies": [],
   "build": {
     "groups": [
       {
         "name": "tty",
         "sources": [
-          "${src}/globals.c",
-          "${src}/termcap.c",
-          "${src}/input.c",
-          "${src}/terminal.c",
-          "${src}/ansi.c",
-          "${src}/tty.c",
-          "${src}/ttydev.c"
+          "${src}/ttyserv/globals.c",
+          "${src}/ttyserv/termcap.c",
+          "${src}/ttyserv/input.c",
+          "${src}/ttyserv/terminal.c",
+          "${src}/ttyserv/ansi.c",
+          "${src}/ttyserv/tty.c",
+          "${src}/ttyserv/ttydev.c"
         ],
         "flags": [
           "-D_BSD",
@@ -53,7 +64,33 @@
         "compiler": "hcc",
         "includes": [
           "${sdk}/include",
-          "${src}"
+          "${src}/ttyserv",
+          "${src}/devs"
+        ]
+      },
+      {
+        "name": "ssh-tty",
+        "sources": [
+          "${src}/ttyserv/globals.c",
+          "${src}/ttyserv/termcap.c",
+          "${src}/ttyserv/input.c",
+          "${src}/ttyserv/terminal.c",
+          "${src}/ttyserv/ansi.c",
+          "${src}/ttyserv/tty.c",
+          "${src}/ttyserv/ttydev.c"
+        ],
+        "flags": [
+          "-D_BSD",
+          "-D__HELIOS",
+          "-D__TRAN",
+          "-D__HELIOSTRAN",
+          "-DSSH_TTY"
+        ],
+        "compiler": "hcc",
+        "includes": [
+          "${sdk}/include",
+          "${src}/ttyserv",
+          "${src}/devs"
         ]
       }
     ],
@@ -76,6 +113,25 @@
         "objects": [
           "${sdk}/lib/servlib.def"
         ]
+      },
+      {
+        "name": "ssh-tty",
+        "type": "executable",
+        "groups": [
+          "ssh-tty"
+        ],
+        "libraries": [
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${work}/ssh-tty",
+        "heap": 4000,
+        "start": "${sdk}/lib/cstart.o",
+        "objects": [
+          "${sdk}/lib/servlib.def"
+        ]
       }
     ],
     "install": [
@@ -83,6 +139,11 @@
         "type": "copy",
         "source": "${work}/xterm-ttyserv",
         "destination": "${stage}/lib/xterm-ttyserv"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/ssh-tty",
+        "destination": "${stage}/lib/ssh-tty"
       }
     ]
   }

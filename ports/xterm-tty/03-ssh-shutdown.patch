@@ -1,0 +1,44 @@
+Subject: Stop SSH terminal tasks before releasing their pseudo-terminal device
+
+--- a/ttyserv/tty.c
++++ b/ttyserv/tty.c
+@@ -33,6 +33,9 @@
+ #define	DEBUG_MAIN
+ 
+ #include    "tty.h"
++#ifdef SSH_TTY
++#include "tpseudev.h"
++#endif
+ 
+ extern word	device_init_info_req( void );
+ 
+@@ -346,6 +349,15 @@
+     signal(SIGTERM, SIG_IGN);
+     signal(SIGHUP, SIG_IGN);
+ 
++#ifdef SSH_TTY
++    /* This terminal belongs to one SSH connection. Remove both published
++     * names, then let the kernel stop the task's threads before freeing
++     * its device memory. Legacy CloseDevice can free the pseudo-terminal
++     * while its read/write threads still hold pointers into that memory. */
++    if (nte) Delete(nte, NULL);
++    if (termdcb) Delete(((TermDCB *)termdcb)->nte, NULL);
++    Exit(0);
++#endif
+     if (done) {
+ /*	IOdebug("%s: Tidyup already", name); */
+     	Delay(OneSec*100);
+--- a/ttyserv/ttydev.h
++++ b/ttyserv/ttydev.h
+@@ -1,3 +1,5 @@
++#ifndef HELIOS_TTYDEV_H
++#define HELIOS_TTYDEV_H
+ /*************************************************************************
+ **									**
+ **	       T E R M I N A L   W I N D O W   S E R V E R		**
+@@ -48,3 +50,5 @@
+ 
+ /* end of ttydev.h */
+ 
++
++#endif

@@ -1,9 +1,9 @@
 Subject: Report terminal dimensions and deliver resize notifications
 
-diff --git a/terminal.c b/terminal.c
+diff --git a/ttyserv/terminal.c b/ttyserv/terminal.c
 index 3b3ea0b6c1bd9c6611c9d983f28d808dae38bebc..34632c18c291aefe49ee22207fc221bfea29955f 100644
---- a/terminal.c
-+++ b/terminal.c
+--- a/ttyserv/terminal.c
++++ b/ttyserv/terminal.c
 @@ -133,7 +133,7 @@ TermPutString (char *str)
   *
   ************************************************************************/
@@ -13,10 +13,10 @@ index 3b3ea0b6c1bd9c6611c9d983f28d808dae38bebc..34632c18c291aefe49ee22207fc221bf
  TermPutData (char *data, int count)
  {
  #ifdef	DEBUG
-diff --git a/tty.c b/tty.c
+diff --git a/ttyserv/tty.c b/ttyserv/tty.c
 index 8a22dc19ce53c3c926b7fe4b105d7b69c1fb1895..c1bbd4b513e6f44b565a161d655c72687dbb1b95 100644
---- a/tty.c
-+++ b/tty.c
+--- a/ttyserv/tty.c
++++ b/ttyserv/tty.c
 @@ -1208,6 +1208,10 @@ ReadRaw (Window *w, char *buffer, int count, int timeout, word *rc)
  	    	return result;
  	    }
@@ -71,10 +71,10 @@ index 8a22dc19ce53c3c926b7fe4b105d7b69c1fb1895..c1bbd4b513e6f44b565a161d655c7268
  }
  
  
-diff --git a/tty.h b/tty.h
+diff --git a/ttyserv/tty.h b/ttyserv/tty.h
 index 98333f1ad7704cfbdba43063701a153be2b1ad09..2a32c442014c6d4c36b55f1b809a0d0c3746a7b8 100644
---- a/tty.h
-+++ b/tty.h
+--- a/ttyserv/tty.h
++++ b/ttyserv/tty.h
 @@ -344,3 +344,5 @@ extern void		WindowEnableEvents ( MCB *m, Window *w, int *id );
  #endif
  
