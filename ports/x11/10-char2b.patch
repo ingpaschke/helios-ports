@@ -1,0 +1,19 @@
+Subject: Preserve the two-byte XChar2b wire representation on Helios
+
+--- a/lib/X/Xlib.h
++++ b/lib/X/Xlib.h
+@@ -1061,7 +1061,13 @@
+     Font font;			/* font to print it in, None don't change */
+ } XTextItem;
+ 
+-typedef struct {		/* normal 16 bit characters are two bytes */
++/* XChar2b is also the two-byte character representation on the X wire.
++ * The Helios ABI otherwise rounds small structures up to a word. */
++#ifdef helios
++typedef struct __attribute__((packed)) {
++#else
++typedef struct {
++#endif
+     unsigned char byte1;
+     unsigned char byte2;
+ } XChar2b;

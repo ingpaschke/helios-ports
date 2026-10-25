@@ -54,10 +54,15 @@
       "file": "09-xterm-fonts.patch",
       "description": "Pair normal and bold terminal fonts and reject incompatible bold font metrics",
       "sha256": "ac1910fd8545981796928fdb370d2a7d5b4574123b66a930a5c9f912f0ddc3f7"
+    },
+    {
+      "file": "10-char2b.patch",
+      "description": "Keep XChar2b two bytes so UTF-8 terminals send correct X11 text requests",
+      "sha256": "37e24f15f84feeabb5d463b0975c4b3897668ed71d9f895dc064be6d05fce9fe"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "01f5c929d47252a10ea92d2894f64c7f9665c652ceaa558ae29d210a7e065a97",
+  "patched_tree_sha256": "7c3fd64fb46a46144be9bb877a3b6778b51508c2f6b5d07ce9f173f4909bce8e",
   "dependencies": [
     "xterm-tty"
   ],
