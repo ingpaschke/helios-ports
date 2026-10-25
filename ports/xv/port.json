@@ -1,0 +1,356 @@
+{
+  "format": 1,
+  "name": "xv",
+  "version": "3.10a",
+  "upstream": {
+    "kind": "archive",
+    "url": "https://ftp.netbsd.org/pub/pkgsrc/distfiles/xv-3.10a.tar.gz",
+    "filename": "xv-3.10a.tar.gz",
+    "sha256": "03eb26b1e8f315c3093f4ae794862ba46637d16c055e8efbe5e3beb5d40fc451",
+    "subdirectory": "xv-3.10a",
+    "tree_sha256": "880dd9beb5ef6cfc6064082622467737a45fdcb80b1a5ce3a97ce9afefd7a0af"
+  },
+  "patches": [
+    {
+      "file": "01-helios.patch",
+      "sha256": "e7c0009c5065915e3a4f38d8ef60158b291349c1554690002081eb100978def4",
+      "description": "Skip the legacy malloc.h declarations that conflict with the Helios C library"
+    },
+    {
+      "file": "02-file-operations.patch",
+      "sha256": "fb8258e798114626184e39624b14160472aeb55bebd472c98071ff9fcbf62fe6",
+      "description": "Reserve native temporary files and handle browser removal and decompression without shell-expanded paths"
+    },
+    {
+      "file": "03-temp-directory.patch",
+      "sha256": "ecbb04ec3516e62c5270ac60a98f9eb71f9f63fe18143b1886a58fec8f48d93e",
+      "description": "Use the native Helios temporary directory when TMPDIR is unset"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "7028424df5b830eff7f75bdd3f63921bbd0b9b05362d79e285b9a2d1135c11d1",
+  "dependencies": [
+    "x11"
+  ],
+  "build": {
+    "compile": {
+      "flags": [
+        "-std=gnu89",
+        "-Dhelios",
+        "-D_BSD",
+        "-DNO_RANDOM",
+        "-DUSE_GETCWD",
+        "-I${src}",
+        "-I${src}/helios",
+        "-I${dep:x11}/include",
+        "-include",
+        "${src}/helios/xv-platform.h",
+        "-Wno-error=implicit-function-declaration",
+        "-Wno-error=int-conversion",
+        "-Wno-error=incompatible-pointer-types",
+        "-Wno-error=return-mismatch",
+        "-Wno-error=implicit-int"
+      ]
+    },
+    "groups": [
+      {
+        "name": "xv",
+        "sources": [
+          "${src}/helios/mktemp.c",
+          "${src}/helios/platform.c",
+          "${src}/helios/files.c",
+          "${src}/vprintf.c",
+          "${src}/xv.c",
+          "${src}/xv24to8.c",
+          "${src}/xvalg.c",
+          "${src}/xvbmp.c",
+          "${src}/xvbrowse.c",
+          "${src}/xvbutt.c",
+          "${src}/xvcolor.c",
+          "${src}/xvctrl.c",
+          "${src}/xvcut.c",
+          "${src}/xvdflt.c",
+          "${src}/xvdial.c",
+          "${src}/xvdir.c",
+          "${src}/xvevent.c",
+          "${src}/xvfits.c",
+          "${src}/xvgam.c",
+          "${src}/xvgif.c",
+          "${src}/xvgifwr.c",
+          "${src}/xvgraf.c",
+          "${src}/xvgrab.c",
+          "${src}/xviff.c",
+          "${src}/xvimage.c",
+          "${src}/xvinfo.c",
+          "${src}/xviris.c",
+          "${src}/xvjpeg.c",
+          "${src}/xvmisc.c",
+          "${src}/xvpbm.c",
+          "${src}/xvpcx.c",
+          "${src}/xvpds.c",
+          "${src}/xvpm.c",
+          "${src}/xvpopup.c",
+          "${src}/xvps.c",
+          "${src}/xvroot.c",
+          "${src}/xvrle.c",
+          "${src}/xvscrl.c",
+          "${src}/xvsmooth.c",
+          "${src}/xvsunras.c",
+          "${src}/xvtarga.c",
+          "${src}/xvtext.c",
+          "${src}/xvtiff.c",
+          "${src}/xvtiffwr.c",
+          "${src}/xvxbm.c",
+          "${src}/xvxpm.c",
+          "${src}/xvxwd.c"
+        ],
+        "flags": [
+          "-DDOJPEG",
+          "-DDOTIFF",
+          "-I${src}/jpeg",
+          "-I${src}/tiff"
+        ]
+      },
+      {
+        "name": "bggen",
+        "sources": [
+          "${src}/bggen.c"
+        ]
+      },
+      {
+        "name": "xcmap",
+        "sources": [
+          "${src}/xcmap.c"
+        ]
+      },
+      {
+        "name": "xvpictoppm",
+        "sources": [
+          "${src}/xvpictoppm.c"
+        ]
+      },
+      {
+        "name": "jpeg",
+        "sources": [
+          "${src}/jpeg/jcapi.c",
+          "${src}/jpeg/jcparam.c",
+          "${src}/jpeg/jdatadst.c",
+          "${src}/jpeg/jcmaster.c",
+          "${src}/jpeg/jcmarker.c",
+          "${src}/jpeg/jcmainct.c",
+          "${src}/jpeg/jcprepct.c",
+          "${src}/jpeg/jccoefct.c",
+          "${src}/jpeg/jccolor.c",
+          "${src}/jpeg/jcsample.c",
+          "${src}/jpeg/jchuff.c",
+          "${src}/jpeg/jcdctmgr.c",
+          "${src}/jpeg/jfdctfst.c",
+          "${src}/jpeg/jfdctflt.c",
+          "${src}/jpeg/jfdctint.c",
+          "${src}/jpeg/jdapi.c",
+          "${src}/jpeg/jdatasrc.c",
+          "${src}/jpeg/jdmaster.c",
+          "${src}/jpeg/jdmarker.c",
+          "${src}/jpeg/jdmainct.c",
+          "${src}/jpeg/jdcoefct.c",
+          "${src}/jpeg/jdpostct.c",
+          "${src}/jpeg/jddctmgr.c",
+          "${src}/jpeg/jidctfst.c",
+          "${src}/jpeg/jidctflt.c",
+          "${src}/jpeg/jidctint.c",
+          "${src}/jpeg/jidctred.c",
+          "${src}/jpeg/jdhuff.c",
+          "${src}/jpeg/jdsample.c",
+          "${src}/jpeg/jdcolor.c",
+          "${src}/jpeg/jquant1.c",
+          "${src}/jpeg/jquant2.c",
+          "${src}/jpeg/jdmerge.c",
+          "${src}/jpeg/jcomapi.c",
+          "${src}/jpeg/jutils.c",
+          "${src}/jpeg/jerror.c",
+          "${src}/jpeg/jmemmgr.c",
+          "${src}/jpeg/jmemnobs.c"
+        ],
+        "flags": [
+          "-I${src}/jpeg"
+        ]
+      },
+      {
+        "name": "tiff",
+        "sources": [
+          "${src}/tiff/tif_fax3.c",
+          "${src}/tiff/tif_fax4.c",
+          "${src}/tiff/tif_aux.c",
+          "${src}/tiff/tif_ccittrle.c",
+          "${src}/tiff/tif_close.c",
+          "${src}/tiff/tif_compress.c",
+          "${src}/tiff/tif_dir.c",
+          "${src}/tiff/tif_dirinfo.c",
+          "${src}/tiff/tif_dirread.c",
+          "${src}/tiff/tif_dirwrite.c",
+          "${src}/tiff/tif_dumpmode.c",
+          "${src}/tiff/tif_error.c",
+          "${src}/tiff/tif_getimage.c",
+          "${src}/tiff/tif_jpeg.c",
+          "${src}/tiff/tif_flush.c",
+          "${src}/tiff/tif_lzw.c",
+          "${src}/tiff/tif_next.c",
+          "${src}/tiff/tif_open.c",
+          "${src}/tiff/tif_packbits.c",
+          "${src}/tiff/tif_print.c",
+          "${src}/tiff/tif_read.c",
+          "${src}/tiff/tif_swab.c",
+          "${src}/tiff/tif_strip.c",
+          "${src}/tiff/tif_thunder.c",
+          "${src}/tiff/tif_tile.c",
+          "${src}/tiff/tif_unix.c",
+          "${src}/tiff/tif_version.c",
+          "${src}/tiff/tif_warning.c",
+          "${src}/tiff/tif_write.c"
+        ],
+        "flags": [
+          "-I${src}/tiff",
+          "-DUSE_PROTOTYPES=1",
+          "-DUSE_VARARGS=0",
+          "-DUSE_CONST=1"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "xv",
+        "type": "executable",
+        "groups": [
+          "xv",
+          "jpeg",
+          "tiff"
+        ],
+        "libraries": [
+          "${dep:x11}/lib/libX11.a",
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${stage}/bin/x11/xv",
+        "stack": 65536,
+        "heap": 524288
+      },
+      {
+        "name": "bggen",
+        "type": "executable",
+        "groups": [
+          "bggen"
+        ],
+        "libraries": [
+          "${dep:x11}/lib/libX11.a",
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${stage}/bin/x11/bggen",
+        "stack": 32768,
+        "heap": 65536
+      },
+      {
+        "name": "xcmap",
+        "type": "executable",
+        "groups": [
+          "xcmap"
+        ],
+        "libraries": [
+          "${dep:x11}/lib/libX11.a",
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${stage}/bin/x11/xcmap",
+        "stack": 32768,
+        "heap": 65536
+      },
+      {
+        "name": "xvpictoppm",
+        "type": "executable",
+        "groups": [
+          "xvpictoppm"
+        ],
+        "libraries": [
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${stage}/bin/x11/xvpictoppm",
+        "stack": 16384,
+        "heap": 32768
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/docs/xv.man",
+        "destination": "${stage}/local/share/xv/xv.1"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/docs/bggen.man",
+        "destination": "${stage}/local/share/xv/bggen.1"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/docs/xcmap.man",
+        "destination": "${stage}/local/share/xv/xcmap.1"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/docs/xvp2p.man",
+        "destination": "${stage}/local/share/xv/xvpictoppm.1"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/README",
+        "destination": "${stage}/local/share/xv/README"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/copyright.h",
+        "destination": "${stage}/local/share/xv/copyright.h"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/jpeg/README",
+        "destination": "${stage}/local/share/xv/jpeg.txt"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/tiff/tiff.h",
+        "destination": "${stage}/local/share/xv/tiff.txt"
+      }
+    ],
+    "prepare": [
+      {
+        "type": "run",
+        "command": [
+          "cc",
+          "-w",
+          "-I${src}/tiff",
+          "${src}/tiff/mkg3states.c",
+          "-o",
+          "${work}/mkg3states"
+        ]
+      },
+      {
+        "type": "run",
+        "command": [
+          "${work}/mkg3states"
+        ],
+        "stdout": "${src}/tiff/g3states.h"
+      }
+    ]
+  },
+  "host_tools": [
+    "cc"
+  ]
+}

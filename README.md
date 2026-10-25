@@ -28,6 +28,7 @@ writing your own recipe.
 | [regexp](ports/regexp/README.md) | Helios implementation | Regular expressions for XView file chooser filters |
 | [frotz](ports/frotz/port.json) | 2.55 | Z-machine interpreter |
 | [nethack](ports/nethack/port.json) | 3.1.3 | NetHack with the X11 interface |
+| [xv](ports/xv/README.md) | 3.10a | Image viewer with JPEG, TIFF and classic bitmap formats |
 | [telnet](ports/telnet/port.json) | Helios port | Telnet client with terminal and window-size translation |
 | [xterm-tty](ports/xterm-tty/port.json) | Helios terminal server | Native terminal service for xterm |
 

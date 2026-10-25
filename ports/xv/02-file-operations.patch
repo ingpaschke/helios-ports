@@ -1,0 +1,206 @@
+Subject: Reserve native temporary files and handle browser removal and decompression without shell-expanded paths
+
+diff --git a/xv.c b/xv.c
+index 7dad71c97683fd5b430aefac1de159bb79d478d2..0209a4ee33d18fc5ee747e4b3547a191f2a06d40 100644
+--- a/xv.c
++++ b/xv.c
+@@ -1972,7 +1972,10 @@ static int openPic(filenum)
+ 
+       clearerr(stdin);
+       fp = fopen(filename,"w");
+-      if (!fp) FatalError("openPic(): can't write temporary file");
++      if (!fp) {
++        unlink(filename);
++        FatalError("openPic(): can't write temporary file");
++      }
+     
+       while ( (i=getchar()) != EOF) putc(i,fp);
+       fclose(fp);
+@@ -2691,85 +2694,22 @@ int UncompressFile(name, uncompname)
+   /* returns '1' on success, with name of uncompressed file in uncompname
+      returns '0' on failure */
+ 
+-  char namez[128], *fname, buf[512];
+-
+-  fname = name;
+-  namez[0] = '\0';
+-
+-
+-#if !defined(VMS) && !defined(GUNZIP)
+-  /* see if compressed file name ends with '.Z'.  If it *doesn't* we need
+-     temporarily rename it so it *does*, uncompress it, and rename *back*
+-     to what it was.  necessary because uncompress doesn't handle files
+-     that don't end with '.Z' */
+-
+-  if (strlen(name) >= (size_t) 2            && 
+-      strcmp(name + strlen(name)-2,".Z")!=0 &&
+-      strcmp(name + strlen(name)-2,".z")!=0) {
+-    strcpy(namez, name);
+-    strcat(namez,".Z");
+-
+-    if (rename(name, namez) < 0) {
+-      sprintf(buf, "Error renaming '%s' to '%s':  %s",
+-	      name, namez, ERRSTR(errno));
+-      ErrPopUp(buf, "\nBummer!");
+-      return 0;
+-    }
+-
+-    fname = namez;
+-  }
+-#endif   /* not VMS and not GUNZIP */
+-
+-
+-  
+-#ifndef VMS
+   sprintf(uncompname, "%s/xvuXXXXXX", tmpdir);
+   mktemp(uncompname);
+-  sprintf(buf,"%s -c %s >%s", UNCOMPRESS, fname, uncompname);
+-#else /* it IS VMS */
+-  strcpy(uncompname, "[]xvuXXXXXX");
+-  mktemp(uncompname);
+-#  ifdef GUNZIP
+-  sprintf(buf,"%s %s %s", UNCOMPRESS, fname, uncompname);
+-#  else
+-  sprintf(buf,"%s %s", UNCOMPRESS, fname);
+-#  endif
+-#endif
+-
+-  SetISTR(ISTR_INFO, "Uncompressing '%s'...", BaseName(fname));
+-#ifndef VMS
+-  if (system(buf)) {
+-#else
+-  if (!system(buf)) {
+-#endif
+-    SetISTR(ISTR_INFO, "Unable to uncompress '%s'.", BaseName(fname));
++  if (!uncompname[0]) {
++    SetISTR(ISTR_INFO, "Unable to create temporary file.");
+     Warning();
+     return 0;
+   }
+ 
+-#ifndef VMS  
+-  /* if we renamed the file to end with a .Z for the sake of 'uncompress', 
+-     rename it back to what it once was... */
+-
+-  if (strlen(namez)) {
+-    if (rename(namez, name) < 0) {
+-      sprintf(buf, "Error renaming '%s' to '%s':  %s",
+-	      namez, name, ERRSTR(errno));
+-      ErrPopUp(buf, "\nBummer!");
+-    }
+-  }
+-#else
+-  /*
+-    sprintf(buf,"Rename %s %s", fname, uncompname);
+-    SetISTR(ISTR_INFO,"Renaming '%s'...", fname);
+-    if (!system(buf)) {
+-    SetISTR(ISTR_INFO,"Unable to rename '%s'.", fname);
++  SetISTR(ISTR_INFO, "Uncompressing '%s'...", BaseName(name));
++  /* Read stdin instead of renaming the input to satisfy suffix checks.
++     The adapter executes uncompress from PATH without a shell. */
++  if (xv_uncompress(name, uncompname) < 0) {
++    SetISTR(ISTR_INFO, "Unable to uncompress '%s'.", BaseName(name));
+     Warning();
+     return 0;
+-    }
+-   */
+-#endif /* not VMS */
+-  
++  }
+   return 1;
+ }
+ 
+@@ -2789,6 +2729,14 @@ void KillPageFiles(bname, numpages)
+     sprintf(tmp, "%s%d", bname, i);
+     unlink(tmp);
+   }
++
++  /* FITS retains the reserved basename until all page files are gone. */
++  strcpy(tmp, bname);
++  i = strlen(tmp);
++  if (i && tmp[i-1] == '.') {
++    tmp[i-1] = '\0';
++    unlink(tmp);
++  }
+ }
+ 
+ 
+diff --git a/xvbrowse.c b/xvbrowse.c
+index 1f573a3cbd789889e9dfef234cb5d796dd650fbb..46763e2663f2a4b5cc36777e2edd2aa9007d0531 100644
+--- a/xvbrowse.c
++++ b/xvbrowse.c
+@@ -4835,8 +4835,7 @@ static int moveFile(src,dst)
+ 
+     if (dstdir) {
+ #ifndef VMS  /* we don't delete directories in VMS */
+-      sprintf(buf, "rm -rf %s", dst);
+-      if (system(buf)) {     /* okay, so it's cheating... */
++      if (xv_remove_tree(dst) < 0) {
+ 	SetISTR(ISTR_WARNING, "Unable to remove directory %s", dst);
+ 	return 1;
+       }
+@@ -4859,9 +4858,8 @@ static int moveFile(src,dst)
+   if (i == 0) {    /* copied okay, kill the original */
+     if (srcdir) {
+ #ifndef VMS   /* we don't delete directories in VMS */
+-      sprintf(buf, "rm -rf %s", src);
+-      if (system(buf)) {     /* okay, so it's cheating... */
+-	SetISTR(ISTR_WARNING, "Unable to remove directory %s", dst);
++      if (xv_remove_tree(src) < 0) {
++	SetISTR(ISTR_WARNING, "Unable to remove directory %s", src);
+ 	return 1;
+       }
+ #endif /* VMS */
+diff --git a/xvdir.c b/xvdir.c
+index de2cf07394efed780b5de3e63db1bdcf8eb3afc4..ed524270a4c02c4d3681f4633ac17a5d61068284 100644
+--- a/xvdir.c
++++ b/xvdir.c
+@@ -1602,7 +1602,7 @@ FILE *OpenOutFile(filename)
+ 
+ 
+   /* see if file exists (ie, we're overwriting) */
+-  if (stat(outFName, &st)==0) {   /* stat succeeded, file must exist */
++  if (!dopipe && stat(outFName, &st)==0) { /* temporary output is reserved */
+     static char *foo[] = { "\nOk", "\033Cancel" };
+     char str[512];
+ 
+@@ -1616,6 +1616,7 @@ FILE *OpenOutFile(filename)
+   if (!fp) {
+     char  str[512];
+     sprintf(str,"Can't write file '%s'\n\n  %s.",outFName, ERRSTR(errno));
++    if (dopipe) unlink(outFName);
+     ErrPopUp(str, "\nBummer");
+     return NULL;
+   }
+diff --git a/xvfits.c b/xvfits.c
+index 2101354dc9cc9b5f9604db834eb063912d467a22..c069567d931c23ae153ffc03d2a7fd48bd69899a 100644
+--- a/xvfits.c
++++ b/xvfits.c
+@@ -273,6 +273,12 @@ static int splitfits(image, comment, nx, ny, nz, basename)
+ 
+ 
+   /* at this point, i is the number of files created */
++  if (i <= 1) {
++    /* No persistent pages: release the reserved basename as well. */
++    basename[strlen(basename)-1] = '\0';
++    unlink(basename);
++    strcat(basename, ".");
++  }
+   if (i == 0) return 1;
+   if (i == 1) {
+     sprintf(filename, "%s1", basename);
+diff --git a/xvimage.c b/xvimage.c
+index b0405f471eb02a24e34ce54bd92fff320958906f..26b913b1878519d60a1e023776f5e661211dc7fb 100644
+--- a/xvimage.c
++++ b/xvimage.c
+@@ -2698,6 +2698,10 @@ static int doPadBggen(str, wide, high, opaque,omode)
+   strcpy(fname, "Sys$Disk:[]xvuXXXXXX");
+ #endif
+   mktemp(fname);
++  if (!fname[0]) {
++    ErrPopUp("Unable to create temporary file.", "\nOk");
++    return 0;
++  }
+ 
+   /* run bggen to generate the background */
+   sprintf(syscmd, "bggen -g %dx%d %s > %s", wide, high, str, fname);

@@ -1,0 +1,16 @@
+Subject: Skip the legacy malloc.h declarations that conflict with the Helios C library
+
+diff --git a/xv.h b/xv.h
+index b7e6e3fc3932ac8d1310b1f58a47ab3e5d55ea88..ddb18575173d033d9a47a0f995403c297f73b242 100644
+--- a/xv.h
++++ b/xv.h
+@@ -159,7 +159,8 @@
+      !defined(bsd43)                     && \
+      !defined(aux)                       && \
+      !defined(__bsdi__)                  && \
+-     !defined(sequent)
++     !defined(sequent)                   && \
++     !defined(helios)
+ 
+ #  if defined(hp300) || defined(hp800) || defined(NeXT)
+ #   include <sys/malloc.h>                /* it's in 'sys' on HPs and NeXT */

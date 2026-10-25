@@ -1,0 +1,18 @@
+Subject: Use the native Helios temporary directory when TMPDIR is unset
+
+diff --git a/xv.c b/xv.c
+index 0209a4ee33d18fc5ee747e4b3547a191f2a06d40..20fefaf6791dc43a0d5dd361cb38d87e12401acc 100644
+--- a/xv.c
++++ b/xv.c
+@@ -222,7 +222,11 @@ int main(argc, argv)
+   if (!cmd) cmd = argv[0]; else cmd++;
+ 
+   tmpstr = (char *) getenv("TMPDIR");
++#ifdef helios
++  if (!tmpstr) tmpdir = "/helios/tmp";
++#else
+   if (!tmpstr) tmpdir = "/tmp";
++#endif
+   else {
+     tmpdir = (char *) malloc(strlen(tmpstr) + 1);
+     if (!tmpdir) FatalError("can't malloc 'tmpdir'\n");
