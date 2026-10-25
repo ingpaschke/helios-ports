@@ -1,0 +1,234 @@
+{
+  "format": 1,
+  "name": "nethack5",
+  "version": "5.0.1",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/ingpaschke/NetHack.git",
+    "revision": "91ecb9d5e998fcafbb33bf42caad1ed1d37f3c8c",
+    "subdirectory": "",
+    "tree_sha256": "a6b91055d9c8b0941543185f5e31c768e29a31e3f423582b9926951c0ab96b17"
+  },
+  "patches": [
+    {
+      "file": "01-helios.patch",
+      "sha256": "0bdd4055163f04542e63307d64b368d721ed60946463aec38986ca7502ed4b2e",
+      "description": "Run NetHack 5.0 as a Helios program with the tty interface"
+    },
+    {
+      "file": "02-x11-tiles.patch",
+      "sha256": "1df91a692a00577c17b5f500ed4ea8ac9e56b5bacd040d8144e40bf6b6359c46",
+      "description": "Build the tiled X11 interface against the shared X11R4 libraries and keep version-specific resources separate"
+    },
+    {
+      "file": "03-tile-format.patch",
+      "sha256": "0075d37f348d0229a14075927346c9bf7749fc19a4fbdfdb41c5241bbcde9820",
+      "description": "Keep the generated tile header 32-bit on LP64 hosts and reject invalid tile dimensions"
+    },
+    {
+      "file": "04-terminal.patch",
+      "sha256": "81fabe83900ce2fca42095373ff7ab4e8007c3d47f8b2cd0668e4ecded724560",
+      "description": "Use native terminal dimensions and the shared key decoder for the tty interface"
+    },
+    {
+      "file": "05-status-columns.patch",
+      "sha256": "cf2a0959677c23fe93f774dc34e88094031c2012ea38c3e45839734e510b33c2",
+      "description": "Reserve both width slots after each fancy-status column sentinel"
+    },
+    {
+      "file": "06-terminal-capabilities.patch",
+      "sha256": "ea838e45e07042ebdca89416e587b95d81176ba315c70059d76237fe61f51dc6",
+      "description": "Use ncurses termcap compatibility for xterm and modern terminal profiles"
+    },
+    {
+      "file": "07-terminal-size.patch",
+      "sha256": "1a34bd80258e20d9020446cce5794a272217470ac5d6080221262350a732d4eb",
+      "description": "Preserve native window dimensions when entering character-at-a-time input mode"
+    },
+    {
+      "file": "08-defer-redraw.patch",
+      "sha256": "06d89c7170e088d63c9138777738a0ddae6c58deb7d8622660cacd8c4443291a",
+      "description": "Defer terminal redraw while a dungeon level is being generated or restored"
+    }
+  ],
+  "patched_tree_sha256": "9d25d942e59627be15cf4cd3720358456667acecddec2d91fad3554e54c7efc4",
+  "dependencies": [
+    "x11",
+    "ncurses"
+  ],
+  "host_tools": [
+    "make",
+    "cc"
+  ],
+  "build_inputs": [
+    "${toolchain}/bin/llvm-link",
+    "${toolchain}/bin/opt"
+  ],
+  "build": {
+    "prepare": [
+      {
+        "type": "run",
+        "command": [
+          "sh",
+          "sys/unix/setup.sh",
+          "sys/unix/hints/linux.501"
+        ]
+      },
+      {
+        "type": "run",
+        "command": [
+          "make",
+          "-j${jobs}",
+          "HELIOS_CURSES=${dep:ncurses}/stage/local/lib/ncurses.lib",
+          "HELIOS_UNIX_ROOT=${compat}",
+          "HELIOS_X11_ROOT=${dep:x11}",
+          "CROSS_TO_HELIOS=1",
+          "CC=cc",
+          "LLVMBIN=${toolchain}/bin",
+          "HELIOS_ROOT=${sdk}",
+          "HELIOS_ASM=${asm}",
+          "HELIOS_RTLIB=${runtime}",
+          "all"
+        ]
+      },
+      {
+        "type": "run",
+        "comment": "host tile tool: dat/x11tiles from win/share/*.txt",
+        "command": [
+          "make",
+          "-j${jobs}",
+          "HELIOS_CURSES=${dep:ncurses}/stage/local/lib/ncurses.lib",
+          "HELIOS_UNIX_ROOT=${compat}",
+          "HELIOS_X11_ROOT=${dep:x11}",
+          "CROSS_TO_HELIOS=1",
+          "CC=cc",
+          "LLVMBIN=${toolchain}/bin",
+          "HELIOS_ROOT=${sdk}",
+          "HELIOS_ASM=${asm}",
+          "HELIOS_RTLIB=${runtime}",
+          "x11tiles"
+        ]
+      },
+      {
+        "type": "run",
+        "command": [
+          "${python}",
+          "${src}/sys/helios/resources.py"
+        ]
+      }
+    ],
+    "outputs": [
+      "${work}/src/targets/helios/nethack",
+      "${work}/src/dat/nhdat",
+      "${work}/src/dat/x11tiles"
+    ],
+    "install": [
+      {
+        "type": "run",
+        "command": [
+          "mkdir",
+          "-p",
+          "${stage}/local/games/nh50/save"
+        ]
+      },
+      {
+        "type": "copy",
+        "source": "${src}/targets/helios/nethack",
+        "destination": "${stage}/local/games/nh50/nethack"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/dat/nhdat",
+        "destination": "${stage}/local/games/nh50/nhdat"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/dat/symbols",
+        "destination": "${stage}/local/games/nh50/symbols"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/dat/license",
+        "destination": "${stage}/local/games/nh50/license"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/sys/helios/sysconf",
+        "destination": "${stage}/local/games/nh50/sysconf"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/sys/helios/nethack.cnf",
+        "destination": "${stage}/local/games/nh50/nethack.cnf"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/sys/helios/README.txt",
+        "destination": "${stage}/local/games/nh50/README.txt"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/dat/x11tiles",
+        "destination": "${stage}/local/games/nh50/x11tiles"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/win/X11/pet_mark.xbm",
+        "destination": "${stage}/local/games/nh50/pet_mark.xbm"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/win/X11/pilemark.xbm",
+        "destination": "${stage}/local/games/nh50/pilemark.xbm"
+      },
+      {
+        "type": "run",
+        "command": [
+          "mkdir",
+          "-p",
+          "${stage}/lib/x11/app-defa"
+        ]
+      },
+      {
+        "type": "copy",
+        "source": "${src}/NetHack5",
+        "destination": "${stage}/lib/x11/app-defa/NetHack5"
+      },
+      {
+        "type": "run",
+        "command": [
+          "touch",
+          "${stage}/local/games/nh50/perm",
+          "${stage}/local/games/nh50/record",
+          "${stage}/local/games/nh50/logfile",
+          "${stage}/local/games/nh50/xlogfile"
+        ]
+      },
+      {
+        "type": "symlink",
+        "source": "../games/nh50/nethack",
+        "destination": "${stage}/local/bin/nethack5"
+      },
+      {
+        "type": "run",
+        "command": [
+          "chmod",
+          "755",
+          "${stage}/local/games/nh50/nethack"
+        ]
+      },
+      {
+        "type": "copy",
+        "source": "${src}/nhlua/lua/src/lua.h",
+        "destination": "${stage}/local/share/nh50/lua.h"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/sys/amiga/regex/COPYRIGHT",
+        "destination": "${stage}/local/share/nh50/regex.txt"
+      }
+    ]
+  },
+  "files": "files",
+  "requires_compat": true
+}

@@ -1,0 +1,24 @@
+Subject: Use ncurses termcap compatibility for xterm and modern terminal profiles
+
+diff --git a/sys/unix/hints/include/cross-post.501 b/sys/unix/hints/include/cross-post.501
+index 07c3c6b9472810779285d5befa8f36a9847872d9..8da2d2f4ac72c55a7312342a510aeeb28926db1d 100644
+--- a/sys/unix/hints/include/cross-post.501
++++ b/sys/unix/hints/include/cross-post.501
+@@ -930,7 +930,7 @@ HELIOS_X11LIBS = -l$(HELIOS_UNIX_ROOT)/lib/helios-unix.lib \
+ # (targets/helios, targets/helios-small) each relink when needed
+ ifndef HELIOS_SMALL
+ HELIOS_LIBS = -l$(TARGET_HACKLIB) -l$(LUACROSSLIB) \
+-	-l$(HELIOS_ROOT)/lib/termcap.lib $(HELIOS_X11LIBS) -l$(HELIOS_RTLIB)
++	-l$(HELIOS_CURSES) $(HELIOS_X11LIBS) -l$(HELIOS_RTLIB)
+ $(TARGETPFX)Syshelios: $(HOBJ) $(TARGETPFX)date.o $(TARGET_HACKLIB) \
+ 		$(LUACROSSLIB) $(BUILDMORE) Makefile
+ 	@echo "Linking $(GAME) for Helios."
+@@ -949,7 +949,7 @@ else
+ # generates code for the one module.
+ HELIOS_BC = $(sort $(HOBJ) $(TARGETPFX)date.o $(TARGETPFX)hacklib.o \
+ 	$(LUALIBOBJS))
+-HELIOS_LIBS = -l$(HELIOS_ROOT)/lib/termcap.lib $(HELIOS_X11LIBS) \
++HELIOS_LIBS = -l$(HELIOS_CURSES) $(HELIOS_X11LIBS) \
+ 	-l$(HELIOS_RTLIB)
+ $(TARGETPFX)Syshelios: $(HELIOS_BC) $(BUILDMORE) Makefile
+ 	@echo "Linking $(GAME) for Helios (whole program)."

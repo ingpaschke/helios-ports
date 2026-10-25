@@ -25,6 +25,7 @@ consult individual source and asset notices.
 | regexp | Henry Spencer / University of Toronto notice in `regexp.c` and `LICENCE` |
 | Frotz | `COPYING` |
 | NetHack | `dat/license`, `sys/share/random.c` |
+| NetHack 5 | `dat/license`, `nhlua/`, `sys/amiga/regex/COPYRIGHT` |
 | XV 3.10a | Shareware terms in `copyright.h` and `README`; bundled JPEG `jpeg/README`, TIFF notices in `tiff/tiff.h` |
 | Telnet | Berkeley notices in `telnet.c` and other sources |
 | xterm-tty | Parsytec notices in `tty.c` and other sources |

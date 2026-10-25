@@ -1,0 +1,671 @@
+Subject: Add the X11 interface (X11R4, core-font text path) with the binary x11tiles tile set; tty and X11 in one binary, -w selects
+
+diff --git a/sys/unix/hints/include/cross-post.501 b/sys/unix/hints/include/cross-post.501
+index 6f2e4f318d7b1c33af1e8ec2c08f53cfd917c0e5..7162281f074243aaac72c7605c717fbd292ffd59 100644
+--- a/sys/unix/hints/include/cross-post.501
++++ b/sys/unix/hints/include/cross-post.501
+@@ -916,11 +916,20 @@ $(TARGETPFX)tile.o : $(SRCDIR)/tile.c
+ # 0.65 MB least free in the same wizard-mode script; levels are random).
+ HELIOS_STACK ?= 131072
+ HELIOS_HEAP ?= 8192
++# X11R4 scanned libraries from the Helios tree (widget set before
++# toolkit before core; Xau for the authentication lookups in libX11;
++# xlib.def indexes the core Xlib modules, bsd.lib supplies the BSD
++# primitives the X libraries call; same set as the 3.1.3 X11 link)
++HELIOS_X11LIBS = -l$(HELIOS_X11_ROOT)/lib/libXaw.a \
++	-l$(HELIOS_X11_ROOT)/lib/libXmu.a -l$(HELIOS_X11_ROOT)/lib/libXt.a \
++	-l$(HELIOS_X11_ROOT)/lib/libXext.a -l$(HELIOS_X11_ROOT)/lib/libX11.a \
++	-l$(HELIOS_X11_ROOT)/lib/libXau.a -l$(HELIOS_ROOT)/lib/bsd.lib \
++	-l$(HELIOS_ROOT)/lib/fplib.def
+ # the link stamp lives in the target directory, so the two variants
+ # (targets/helios, targets/helios-small) each relink when needed
+ ifndef HELIOS_SMALL
+ HELIOS_LIBS = -l$(TARGET_HACKLIB) -l$(LUACROSSLIB) \
+-	-l$(HELIOS_ROOT)/lib/termcap.lib -l$(HELIOS_RTLIB)
++	-l$(HELIOS_ROOT)/lib/termcap.lib $(HELIOS_X11LIBS) -l$(HELIOS_RTLIB)
+ $(TARGETPFX)Syshelios: $(HOBJ) $(TARGETPFX)date.o $(TARGET_HACKLIB) \
+ 		$(LUACROSSLIB) $(BUILDMORE) Makefile
+ 	@echo "Linking $(GAME) for Helios."
+@@ -939,7 +948,8 @@ else
+ # generates code for the one module.
+ HELIOS_BC = $(sort $(HOBJ) $(TARGETPFX)date.o $(TARGETPFX)hacklib.o \
+ 	$(LUALIBOBJS))
+-HELIOS_LIBS = -l$(HELIOS_ROOT)/lib/termcap.lib -l$(HELIOS_RTLIB)
++HELIOS_LIBS = -l$(HELIOS_ROOT)/lib/termcap.lib $(HELIOS_X11LIBS) \
++	-l$(HELIOS_RTLIB)
+ $(TARGETPFX)Syshelios: $(HELIOS_BC) $(BUILDMORE) Makefile
+ 	@echo "Linking $(GAME) for Helios (whole program)."
+ 	$(LLVM_LINK) -o $(TARGETPFX)whole.bc $(HELIOS_BC)
+diff --git a/sys/unix/hints/include/cross-pre2.501 b/sys/unix/hints/include/cross-pre2.501
+index c833524fcfb12d98d5a39faa6a4ec553fc43dc9b..6c1ac443abc0a50f489604a4c44eec383fb60ead 100644
+--- a/sys/unix/hints/include/cross-pre2.501
++++ b/sys/unix/hints/include/cross-pre2.501
+@@ -1227,7 +1227,8 @@ HELIOS_ASM ?= asm
+ HELIOS_RTLIB ?= $(LLVMBIN)/../sysroots/helios/lib/llvmrt-generic.lib
+ # where the game lives on the Helios machine (/helios is the Helios
+ # tree's root): data, sysconf, save files, record
+-HELIOS_HACKDIR ?= /helios/local/games/nethack
++HELIOS_HACKDIR ?= /helios/local/games/nh50
++HELIOS_X11_ROOT ?= $(HELIOS_ROOT)
+ LLVM_LINK ?= $(LLVMBIN)/llvm-link
+ OPT ?= $(LLVMBIN)/opt
+ # -Os: see the atw800 recipe; HELIOS_OPT=-Oz for the smallest image
+@@ -1255,7 +1256,8 @@ override TARGET_CFLAGS = $(HELIOS_OPT) -std=gnu99 -w \
+ 	-I../include -I../win/share -I../sys/helios -I../sys/helios/include \
+ 	-I../sys/amiga/regex $(LUAINCL) -DLUA_32BITS \
+ 	-DCROSSCOMPILE -DCROSSCOMPILE_TARGET -DCROSS_TO_HELIOS -DHELIOS \
+-	-DTTY_GRAPHICS -DDEFAULT_WINDOW_SYS=\"tty\" -DDLB -DNO_TERMCAP_HEADERS \
++	-DTTY_GRAPHICS -DX11_GRAPHICS -Dhelios -DDEFAULT_WINDOW_SYS=\"tty\" \
++	-DDLB -DNO_TERMCAP_HEADERS \
+ 	-DHACKDIR=\"$(HELIOS_HACKDIR)\" -DSYSCF -DSYSCF_FILE=\"sysconf\" \
+ 	-DNOPANICTRACE -DNOCRASHREPORT \
+ 	-DNOSTATICFN
+@@ -1286,12 +1288,29 @@ override GITBRANCH =
+ override GITPREFIX =
+ 
+ # the Unix main, tty and file code, plus what Helios's C library lacks
++# heliosx.c supplies the effective-uid compatibility call.
+ override SYSSRC = ../sys/share/ioctl.c ../sys/share/unixtty.c \
+-	../sys/unix/unixmain.c ../sys/unix/unixunix.c ../sys/helios/helios.c
++	../sys/unix/unixmain.c ../sys/unix/unixunix.c \
++	../sys/helios/helios.c ../sys/helios/heliosx.c
+ override SYSOBJ = $(TARGETPFX)ioctl.o $(TARGETPFX)unixtty.o \
+-	$(TARGETPFX)unixmain.o $(TARGETPFX)unixunix.o $(TARGETPFX)helios.o
+-override WINSRC = $(WINTTYSRC)
+-override WINOBJ = $(WINTTYOBJ)
++	$(TARGETPFX)unixmain.o $(TARGETPFX)unixunix.o \
++	$(TARGETPFX)helios.o $(TARGETPFX)heliosx.o
++# X11 headers from the toolchain sysroot (proper case; the Helios tree
++# copies carry 8.3 names) and _BSD for Helios's sys/file.h (Xos.h).
++# X11_BUILD keeps tradstdc.h's unavailable index()/rindex() declarations
++# out (Xos.h maps index to strchr).  Kept out of TARGET_CFLAGS: the rest
++# of the game builds as before.
++override X11CFLAGS = -I$(HELIOS_X11_ROOT)/include -D_BSD -DX11_BUILD \
++	-DNeedFunctionPrototypes=0 -DNeedWidePrototypes=0
++# tty and X11 in one binary: the window system is chosen at run time
++# (-w x11 or OPTIONS=window:x11); the default stays tty.  X11 uses the
++# X11R4 libraries in the Helios tree; Xft/Xpm/PNG are not built, so the
++# core-font text path and the binary x11tiles format carry the tiles.
++# tile.c (generated by the tilemap host tool) carries glyphmap[] and
++# friends with TILES_IN_GLYPHMAP, which X11_GRAPHICS turns on: tile.o
++# goes into WINOBJ, as include/config.h directs for that configuration
++override WINSRC = $(WINTTYSRC) $(WINX11SRC) $(SRCDIR)/tile.c
++override WINOBJ = $(WINTTYOBJ) $(WINX11OBJ) $(TARGETPFX)tile.o
+ override WINLIB =
+ override LUALIB =
+ override LUALIBS =
+@@ -1315,6 +1334,11 @@ $(TARGETPFX)%.o : ../sys/share/%.c
+ 	$(TARGET_CC) $(TARGET_CFLAGS) -c -o$@ $<
+ $(TARGETPFX)%.o : ../win/tty/%.c
+ 	$(TARGET_CC) $(TARGET_CFLAGS) -c -o$@ $<
++$(TARGETPFX)%.o : ../win/X11/%.c
++	$(TARGET_CC) $(TARGET_CFLAGS) $(X11CFLAGS) -c -o$@ $<
++# the effective-uid adapter uses the same platform declarations
++$(TARGETPFX)heliosx.o : ../sys/helios/heliosx.c
++	$(TARGET_CC) $(TARGET_CFLAGS) $(X11CFLAGS) -c -o$@ $<
+ endif  # CROSS_TO_HELIOS
+ #=================================================================
+ 
+diff --git a/win/X11/NetHack.ad b/win/X11/NetHack.ad
+index 10f1e7a738680797c99894f60e423edb053f7bb5..4d2cc97ebde2671cf0d8d4ba297b2ee3370acdb2 100644
+--- a/win/X11/NetHack.ad
++++ b/win/X11/NetHack.ad
+@@ -2,7 +2,9 @@
+ ! Copyright (c) 2017 by Pasi Kallinen
+ ! NetHack may be freely redistributed.  See license for details.
+ 
+-#define NETHACK_FONT       -*-fixed-medium-*-*-*-15-*-*-*-*-*-*-*
++/* Helios X11R4 font path: the "fixed" alias of /lib/x11/fonts/misc
++   (its bold companion is the one boldify() looks for) */
++#define NETHACK_FONT       9x15
+ #define NETHACK_CLR_FG     grey
+ #define NETHACK_CLR_BG     black
+ #define NETHACK_CLR_QUIT   red
+@@ -18,26 +20,26 @@
+ ! The rip window applies if the GRAPHIC_TOMBSTONE option is turned on, and
+ ! requires a 12 pixel font for correct appearance.
+ !
+-NetHack*font:              NETHACK_FONT
+-NetHack*display_file*font: NETHACK_FONT
+-NetHack*map*font:          NETHACK_FONT
+-NetHack*text*font:         NETHACK_FONT
+-NetHack*menu*font:         NETHACK_FONT
+-NetHack*tombstone*font:    NETHACK_FONT
+-NetHack*text*rip*font:     -*-times-medium-r-*-*-12-*-*-*-*-*-*-*
+-NetHack*text*borderWidth:  0
++NetHack5*font:              NETHACK_FONT
++NetHack5*display_file*font: NETHACK_FONT
++NetHack5*map*font:          NETHACK_FONT
++NetHack5*text*font:         NETHACK_FONT
++NetHack5*menu*font:         NETHACK_FONT
++NetHack5*tombstone*font:    NETHACK_FONT
++NetHack5*text*rip*font:     -*-times-medium-r-*-*-12-*-*-*-*-*-*-*
++NetHack5*text*borderWidth:  0
+ 
+ ! Vector font to be used if Xft support is enabled
+ ! These correspond to the .nethackrc settings font_map, font_menu,
+ ! font_message, font_status and font_text
+-NetHack.font_map:     mono-10
+-NetHack.font_menu:    sans-10
+-NetHack.font_message: sans-10
+-NetHack.font_status:  sans-10
+-NetHack.font_text:    mono-10
++NetHack5.font_map:     mono-10
++NetHack5.font_menu:    sans-10
++NetHack5.font_message: sans-10
++NetHack5.font_status:  sans-10
++NetHack5.font_text:    mono-10
+ 
+ ! No .nethackrc setting for this, but it gets the right size
+-NetHack.font_rip:     sans-9
++NetHack5.font_rip:     sans-9
+ 
+ ! tile_file names a file containing full-color tiles for the map.
+ ! If you use a 100dpi (or greater) monitor you may wish to double the
+@@ -49,7 +51,7 @@ NetHack.font_rip:     sans-9
+ ! the custom format - to enlarge an XPM file, use processing tools
+ ! such as XV or preferably PBMplus.
+ !
+-NetHack.tile_file: x11tiles
++NetHack5.tile_file: x11tiles
+ !NetHack.double_tile_size: True
+ 
+ ! The annotation of pets.
+@@ -69,7 +71,7 @@ NetHack.tile_file: x11tiles
+ !NetHack.tombtext_dx: 0
+ !NetHack.tombtext_dy: 13
+ ! The color to use for the text on the tombstone of the hero (end of game).
+-NetHack*rip*foreground: black
++NetHack5*rip*foreground: black
+ 
+ ! The icon to use; supported values are nh72, nh56, and nh32; nh72 is the
+ ! default.  Some window managers may not support the larger icon sizes.
+@@ -96,7 +98,7 @@ NetHack*rip*foreground: black
+ ! as part of the map when no prompt is active, then invert foreground and
+ ! background to stand out when a prompt is issued and waiting for a response.
+ ! If 'slow' is False, 'highlight_prompt' will have no effect.
+-NetHack*highlight_prompt: False
++NetHack5*highlight_prompt: False
+ 
+ ! The number of lines the message window will show without scrolling.
+ !NetHack*message_lines: 12
+@@ -118,7 +120,7 @@ NetHack*highlight_prompt: False
+ ! uses XLookupString to translate your keypress into a command.  You can
+ ! optionally give it parameters to change the behavior, see the example below.
+ ! Note that you have to specify the translations in every appropriate window.
+-NetHack*message*translations:	<KeyPress>: input()
++NetHack5*message*translations:	<KeyPress>: input()
+ !
+ ! Example extra translations for the map window.
+ !NetHack*map*translations:	#override \
+@@ -133,28 +135,28 @@ NetHack*message*translations:	<KeyPress>: input()
+ !NetHack*map*rows:	21
+ !NetHack*map*columns:	80
+ 
+-NetHack*background: NETHACK_CLR_BG
+-NetHack*foreground: NETHACK_CLR_FG
++NetHack5*background: NETHACK_CLR_BG
++NetHack5*foreground: NETHACK_CLR_FG
+ 
+-NetHack*yn_prompt*borderWidth: 0
++NetHack5*yn_prompt*borderWidth: 0
+ 
+-NetHack*Scrollbar*foreground: gray40
+-NetHack*Scrollbar*background: gray10
++NetHack5*Scrollbar*foreground: gray40
++NetHack5*Scrollbar*background: gray10
+ 
+-NetHack*fancy_status*background: NETHACK_CLR_BG
+-NetHack*fancy_status*foreground: NETHACK_CLR_FG
+-NetHack*fancy_status.skipAdjust: True
++NetHack5*fancy_status*background: NETHACK_CLR_BG
++NetHack5*fancy_status*foreground: NETHACK_CLR_FG
++NetHack5*fancy_status.skipAdjust: True
+ 
+-NetHack*showGrip: False
++NetHack5*showGrip: False
+ 
+ ! text input prompt window
+-NetHack*response*textSink*background: red
+-NetHack*textSink*background: red
++NetHack5*response*textSink*background: red
++NetHack5*textSink*background: red
+ 
+-NetHack*response*foreground:  NETHACK_CLR_FG
+-NetHack*response*background:  NETHACK_CLR_BG
+-NetHack*response*borderColor: NETHACK_CLR_FG
+-NetHack*response*borderWidth: 1
++NetHack5*response*foreground:  NETHACK_CLR_FG
++NetHack5*response*background:  NETHACK_CLR_BG
++NetHack5*response*borderColor: NETHACK_CLR_FG
++NetHack5*response*borderWidth: 1
+ 
+ ! player selection dialog (OPTIONS=player_selection:dialog)
+ !NetHack*player_selection_dialog.height:   420
+@@ -162,182 +164,182 @@ NetHack*response*borderWidth: 1
+ 
+ !NetHack*player_selection_dialog*foreground:   black
+ !NetHack*player_selection_dialog*background:   white
+-NetHack*player_selection_dialog*name_label.borderWidth:   0
+-NetHack*player_selection_dialog*race_label.borderWidth:   0
+-NetHack*player_selection_dialog*role_label.borderWidth:   0
+-NetHack*player_selection_dialog*gender_label.borderWidth: 0
+-NetHack*player_selection_dialog*align_label.borderWidth:  0
+-NetHack*player_selection_dialog*button_vp.borderWidth:    0
+-
+-NetHack*player_selection_dialog*name_input.borderWidth:   1
+-NetHack*player_selection_dialog*name_input.borderColor:   NETHACK_CLR_FG
+-
+-NetHack*player_selection_dialog*role_vp.borderColor:   NETHACK_CLR_FG
+-NetHack*player_selection_dialog*race_vp.borderColor:   NETHACK_CLR_FG
+-NetHack*player_selection_dialog*gender_vp.borderColor: NETHACK_CLR_FG
+-NetHack*player_selection_dialog*align_vp.borderColor:  NETHACK_CLR_FG
+-
+-NetHack*player_selection_dialog*random.foreground:   NETHACK_CLR_RANDOM
+-NetHack*player_selection_dialog*random.borderColor:  NETHACK_CLR_RANDOM
+-NetHack*player_selection_dialog*random.borderWidth:  1
+-NetHack*player_selection_dialog*random.shapeStyle:   NETHACK_BTN_SHAPE
+-NetHack*player_selection_dialog*random.cornerRoundPercent: NETHACK_BTN_ROUND
+-
+-NetHack*player_selection_dialog*quit.foreground:     NETHACK_CLR_QUIT
+-NetHack*player_selection_dialog*quit.borderColor:    NETHACK_CLR_QUIT
+-NetHack*player_selection_dialog*quit.borderWidth:    1
+-NetHack*player_selection_dialog*quit.shapeStyle:     NETHACK_BTN_SHAPE
+-NetHack*player_selection_dialog*quit.cornerRoundPercent: NETHACK_BTN_ROUND
+-
+-NetHack*player_selection_dialog*play.foreground:     NETHACK_CLR_PLAY
+-NetHack*player_selection_dialog*play.borderColor:    NETHACK_CLR_PLAY
+-NetHack*player_selection_dialog*play.borderWidth:    1
+-NetHack*player_selection_dialog*play.shapeStyle:     NETHACK_BTN_SHAPE
+-NetHack*player_selection_dialog*play.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*player_selection_dialog*name_label.borderWidth:   0
++NetHack5*player_selection_dialog*race_label.borderWidth:   0
++NetHack5*player_selection_dialog*role_label.borderWidth:   0
++NetHack5*player_selection_dialog*gender_label.borderWidth: 0
++NetHack5*player_selection_dialog*align_label.borderWidth:  0
++NetHack5*player_selection_dialog*button_vp.borderWidth:    0
++
++NetHack5*player_selection_dialog*name_input.borderWidth:   1
++NetHack5*player_selection_dialog*name_input.borderColor:   NETHACK_CLR_FG
++
++NetHack5*player_selection_dialog*role_vp.borderColor:   NETHACK_CLR_FG
++NetHack5*player_selection_dialog*race_vp.borderColor:   NETHACK_CLR_FG
++NetHack5*player_selection_dialog*gender_vp.borderColor: NETHACK_CLR_FG
++NetHack5*player_selection_dialog*align_vp.borderColor:  NETHACK_CLR_FG
++
++NetHack5*player_selection_dialog*random.foreground:   NETHACK_CLR_RANDOM
++NetHack5*player_selection_dialog*random.borderColor:  NETHACK_CLR_RANDOM
++NetHack5*player_selection_dialog*random.borderWidth:  1
++NetHack5*player_selection_dialog*random.shapeStyle:   NETHACK_BTN_SHAPE
++NetHack5*player_selection_dialog*random.cornerRoundPercent: NETHACK_BTN_ROUND
++
++NetHack5*player_selection_dialog*quit.foreground:     NETHACK_CLR_QUIT
++NetHack5*player_selection_dialog*quit.borderColor:    NETHACK_CLR_QUIT
++NetHack5*player_selection_dialog*quit.borderWidth:    1
++NetHack5*player_selection_dialog*quit.shapeStyle:     NETHACK_BTN_SHAPE
++NetHack5*player_selection_dialog*quit.cornerRoundPercent: NETHACK_BTN_ROUND
++
++NetHack5*player_selection_dialog*play.foreground:     NETHACK_CLR_PLAY
++NetHack5*player_selection_dialog*play.borderColor:    NETHACK_CLR_PLAY
++NetHack5*player_selection_dialog*play.borderWidth:    1
++NetHack5*player_selection_dialog*play.shapeStyle:     NETHACK_BTN_SHAPE
++NetHack5*player_selection_dialog*play.cornerRoundPercent: NETHACK_BTN_ROUND
+ 
+ 
+ ! role selection window  (OPTIONS=player_selection:prompts)
+-NetHack*player_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
+-NetHack*player_selection*btn_random.background:   black
+-NetHack*player_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
+-NetHack*player_selection*btn_random.borderWidth:  1
+-NetHack*player_selection*btn_random.shapeStyle: NETHACK_BTN_SHAPE
+-NetHack*player_selection*btn_random.cornerRoundPercent: NETHACK_BTN_ROUND
+-NetHack*player_selection*btn_quit.foreground:     NETHACK_CLR_QUIT
+-NetHack*player_selection*btn_quit.borderColor:    NETHACK_CLR_QUIT
+-NetHack*player_selection*btn_quit.borderWidth:    1
+-NetHack*player_selection*btn_quit.shapeStyle: NETHACK_BTN_SHAPE
+-NetHack*player_selection*btn_quit.cornerRoundPercent: NETHACK_BTN_ROUND
+-NetHack*player_selection*Command.foreground:  NETHACK_CLR_FG
+-NetHack*player_selection*Command.borderColor: NETHACK_CLR_FG
+-NetHack*player_selection*Command.borderWidth: NETHACK_CMD_BORDER
++NetHack5*player_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
++NetHack5*player_selection*btn_random.background:   black
++NetHack5*player_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
++NetHack5*player_selection*btn_random.borderWidth:  1
++NetHack5*player_selection*btn_random.shapeStyle: NETHACK_BTN_SHAPE
++NetHack5*player_selection*btn_random.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*player_selection*btn_quit.foreground:     NETHACK_CLR_QUIT
++NetHack5*player_selection*btn_quit.borderColor:    NETHACK_CLR_QUIT
++NetHack5*player_selection*btn_quit.borderWidth:    1
++NetHack5*player_selection*btn_quit.shapeStyle: NETHACK_BTN_SHAPE
++NetHack5*player_selection*btn_quit.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*player_selection*Command.foreground:  NETHACK_CLR_FG
++NetHack5*player_selection*Command.borderColor: NETHACK_CLR_FG
++NetHack5*player_selection*Command.borderWidth: NETHACK_CMD_BORDER
+ 
+ ! race selection window
+-NetHack*race_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
+-NetHack*race_selection*btn_random.background:   black
+-NetHack*race_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
+-NetHack*race_selection*btn_random.borderWidth:  1
+-NetHack*race_selection*btn_random.shapeStyle:   NETHACK_BTN_SHAPE
+-NetHack*race_selection*btn_random.cornerRoundPercent: NETHACK_BTN_ROUND
+-NetHack*race_selection*btn_quit.foreground:     NETHACK_CLR_QUIT
+-NetHack*race_selection*btn_quit.borderColor:    NETHACK_CLR_QUIT
+-NetHack*race_selection*btn_quit.borderWidth:    1
+-NetHack*race_selection*btn_quit.shapeStyle:     NETHACK_BTN_SHAPE
+-NetHack*race_selection*btn_quit.cornerRoundPercent: NETHACK_BTN_ROUND
+-NetHack*race_selection*Command.foreground:  NETHACK_CLR_FG
+-NetHack*race_selection*Command.borderColor: NETHACK_CLR_FG
+-NetHack*race_selection*Command.borderWidth: NETHACK_CMD_BORDER
++NetHack5*race_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
++NetHack5*race_selection*btn_random.background:   black
++NetHack5*race_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
++NetHack5*race_selection*btn_random.borderWidth:  1
++NetHack5*race_selection*btn_random.shapeStyle:   NETHACK_BTN_SHAPE
++NetHack5*race_selection*btn_random.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*race_selection*btn_quit.foreground:     NETHACK_CLR_QUIT
++NetHack5*race_selection*btn_quit.borderColor:    NETHACK_CLR_QUIT
++NetHack5*race_selection*btn_quit.borderWidth:    1
++NetHack5*race_selection*btn_quit.shapeStyle:     NETHACK_BTN_SHAPE
++NetHack5*race_selection*btn_quit.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*race_selection*Command.foreground:  NETHACK_CLR_FG
++NetHack5*race_selection*Command.borderColor: NETHACK_CLR_FG
++NetHack5*race_selection*Command.borderWidth: NETHACK_CMD_BORDER
+ 
+ ! gender selection window
+-NetHack*gender_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
+-NetHack*gender_selection*btn_random.background:   black
+-NetHack*gender_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
+-NetHack*gender_selection*btn_random.borderWidth:  1
+-NetHack*gender_selection*btn_random.shapeStyle:   NETHACK_BTN_SHAPE
+-NetHack*gender_selection*btn_random.cornerRoundPercent: NETHACK_BTN_ROUND
+-NetHack*gender_selection*btn_quit.foreground:     NETHACK_CLR_QUIT
+-NetHack*gender_selection*btn_quit.borderColor:    NETHACK_CLR_QUIT
+-NetHack*gender_selection*btn_quit.borderWidth:    1
+-NetHack*gender_selection*btn_quit.shapeStyle:     NETHACK_BTN_SHAPE
+-NetHack*gender_selection*btn_quit.cornerRoundPercent: NETHACK_BTN_ROUND
+-NetHack*gender_selection*Command.foreground:  NETHACK_CLR_FG
+-NetHack*gender_selection*Command.borderColor: NETHACK_CLR_FG
+-NetHack*gender_selection*Command.borderWidth: NETHACK_CMD_BORDER
++NetHack5*gender_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
++NetHack5*gender_selection*btn_random.background:   black
++NetHack5*gender_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
++NetHack5*gender_selection*btn_random.borderWidth:  1
++NetHack5*gender_selection*btn_random.shapeStyle:   NETHACK_BTN_SHAPE
++NetHack5*gender_selection*btn_random.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*gender_selection*btn_quit.foreground:     NETHACK_CLR_QUIT
++NetHack5*gender_selection*btn_quit.borderColor:    NETHACK_CLR_QUIT
++NetHack5*gender_selection*btn_quit.borderWidth:    1
++NetHack5*gender_selection*btn_quit.shapeStyle:     NETHACK_BTN_SHAPE
++NetHack5*gender_selection*btn_quit.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*gender_selection*Command.foreground:  NETHACK_CLR_FG
++NetHack5*gender_selection*Command.borderColor: NETHACK_CLR_FG
++NetHack5*gender_selection*Command.borderWidth: NETHACK_CMD_BORDER
+ 
+ ! alignment selection window
+-NetHack*alignment_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
+-NetHack*alignment_selection*btn_random.background:   black
+-NetHack*alignment_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
+-NetHack*alignment_selection*btn_random.borderWidth:  1
+-NetHack*alignment_selection*btn_random.shapeStyle:   NETHACK_BTN_SHAPE
+-NetHack*alignment_selection*btn_random.cornerRoundPercent: NETHACK_BTN_ROUND
+-NetHack*alignment_selection*btn_quit.foreground:     NETHACK_CLR_QUIT
+-NetHack*alignment_selection*btn_quit.borderColor:    NETHACK_CLR_QUIT
+-NetHack*alignment_selection*btn_quit.borderWidth:    1
+-NetHack*alignment_selection*btn_quit.shapeStyle:     NETHACK_BTN_SHAPE
+-NetHack*alignment_selection*btn_quit.cornerRoundPercent: NETHACK_BTN_ROUND
+-NetHack*alignment_selection*Command.foreground:  NETHACK_CLR_FG
+-NetHack*alignment_selection*Command.borderColor: NETHACK_CLR_FG
+-NetHack*alignment_selection*Command.borderWidth: NETHACK_CMD_BORDER
++NetHack5*alignment_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
++NetHack5*alignment_selection*btn_random.background:   black
++NetHack5*alignment_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
++NetHack5*alignment_selection*btn_random.borderWidth:  1
++NetHack5*alignment_selection*btn_random.shapeStyle:   NETHACK_BTN_SHAPE
++NetHack5*alignment_selection*btn_random.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*alignment_selection*btn_quit.foreground:     NETHACK_CLR_QUIT
++NetHack5*alignment_selection*btn_quit.borderColor:    NETHACK_CLR_QUIT
++NetHack5*alignment_selection*btn_quit.borderWidth:    1
++NetHack5*alignment_selection*btn_quit.shapeStyle:     NETHACK_BTN_SHAPE
++NetHack5*alignment_selection*btn_quit.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*alignment_selection*Command.foreground:  NETHACK_CLR_FG
++NetHack5*alignment_selection*Command.borderColor: NETHACK_CLR_FG
++NetHack5*alignment_selection*Command.borderWidth: NETHACK_CMD_BORDER
+ 
+ ! extended commands window
+-NetHack*extended_commands*btn_dismiss.foreground:  NETHACK_CLR_QUIT
+-NetHack*extended_commands*btn_dismiss.borderColor: NETHACK_CLR_QUIT
+-NetHack*extended_commands*btn_dismiss.borderWidth: 1
+-NetHack*extended_commands*btn_dismiss.shapeStyle:  NETHACK_BTN_SHAPE
+-NetHack*extended_commands*btn_dismiss.cornerRoundPercent: NETHACK_BTN_ROUND
+-NetHack*extended_commands*btn_help.foreground:     NETHACK_CLR_HELP
+-NetHack*extended_commands*btn_help.borderColor:    NETHACK_CLR_HELP
+-NetHack*extended_commands*btn_help.borderWidth:    1
+-NetHack*extended_commands*btn_help.shapeStyle:     NETHACK_BTN_SHAPE
+-NetHack*extended_commands*btn_help.cornerRoundPercent: NETHACK_BTN_ROUND
+-NetHack*extended_commands*Command.foreground:  NETHACK_CLR_FG
+-NetHack*extended_commands*Command.borderColor: NETHACK_CLR_FG
+-NetHack*extended_commands*Command.borderWidth: NETHACK_CMD_BORDER
++NetHack5*extended_commands*btn_dismiss.foreground:  NETHACK_CLR_QUIT
++NetHack5*extended_commands*btn_dismiss.borderColor: NETHACK_CLR_QUIT
++NetHack5*extended_commands*btn_dismiss.borderWidth: 1
++NetHack5*extended_commands*btn_dismiss.shapeStyle:  NETHACK_BTN_SHAPE
++NetHack5*extended_commands*btn_dismiss.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*extended_commands*btn_help.foreground:     NETHACK_CLR_HELP
++NetHack5*extended_commands*btn_help.borderColor:    NETHACK_CLR_HELP
++NetHack5*extended_commands*btn_help.borderWidth:    1
++NetHack5*extended_commands*btn_help.shapeStyle:     NETHACK_BTN_SHAPE
++NetHack5*extended_commands*btn_help.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*extended_commands*Command.foreground:  NETHACK_CLR_FG
++NetHack5*extended_commands*Command.borderColor: NETHACK_CLR_FG
++NetHack5*extended_commands*Command.borderWidth: NETHACK_CMD_BORDER
+ ! The extended command menu may be too big to fit on the screen so need
+ ! a vertical scroll bar.  When truncated, its height will be as tall as
+ ! possible unless height_delta is non-zero, in which case there will be
+ ! that many pixels of margin left unused.  On OSX, this can be used to
+ ! avoid overlapping with the desktop docking tray to prevent that from
+ ! obscuring the bottom of the menu.
+-NetHack*extcmd_height_delta: 75
++NetHack5*extcmd_height_delta: 75
+ 
+ ! menu buttons
+-NetHack*OK.foreground:  green
+-NetHack*OK.borderColor: green
+-NetHack*OK.shapeStyle: NETHACK_BTN_SHAPE
+-NetHack*OK.cornerRoundPercent: NETHACK_BTN_ROUND
+-
+-NetHack*okay.foreground:  green
+-NetHack*okay.borderColor: green
+-NetHack*okay.shapeStyle: NETHACK_BTN_SHAPE
+-NetHack*okay.cornerRoundPercent: NETHACK_BTN_ROUND
+-
+-NetHack*cancel.foreground:  red
+-NetHack*cancel.borderColor: red
+-NetHack*cancel.shapeStyle: NETHACK_BTN_SHAPE
+-NetHack*cancel.cornerRoundPercent: NETHACK_BTN_ROUND
+-
+-NetHack*all.foreground:  green
+-NetHack*all.borderColor: green
+-NetHack*all.shapeStyle: NETHACK_BTN_SHAPE
+-NetHack*all.cornerRoundPercent: NETHACK_BTN_ROUND
+-
+-NetHack*none.foreground:  green
+-NetHack*none.borderColor: green
+-NetHack*none.shapeStyle: NETHACK_BTN_SHAPE
+-NetHack*none.cornerRoundPercent: NETHACK_BTN_ROUND
+-
+-NetHack*invert.foreground:  green
+-NetHack*invert.borderColor: green
+-NetHack*invert.shapeStyle: NETHACK_BTN_SHAPE
+-NetHack*invert.cornerRoundPercent: NETHACK_BTN_ROUND
+-
+-NetHack*search.foreground:  green
+-NetHack*search.borderColor: green
+-NetHack*search.shapeStyle: NETHACK_BTN_SHAPE
+-NetHack*search.cornerRoundPercent: NETHACK_BTN_ROUND
++NetHack5*OK.foreground:  green
++NetHack5*OK.borderColor: green
++NetHack5*OK.shapeStyle: NETHACK_BTN_SHAPE
++NetHack5*OK.cornerRoundPercent: NETHACK_BTN_ROUND
++
++NetHack5*okay.foreground:  green
++NetHack5*okay.borderColor: green
++NetHack5*okay.shapeStyle: NETHACK_BTN_SHAPE
++NetHack5*okay.cornerRoundPercent: NETHACK_BTN_ROUND
++
++NetHack5*cancel.foreground:  red
++NetHack5*cancel.borderColor: red
++NetHack5*cancel.shapeStyle: NETHACK_BTN_SHAPE
++NetHack5*cancel.cornerRoundPercent: NETHACK_BTN_ROUND
++
++NetHack5*all.foreground:  green
++NetHack5*all.borderColor: green
++NetHack5*all.shapeStyle: NETHACK_BTN_SHAPE
++NetHack5*all.cornerRoundPercent: NETHACK_BTN_ROUND
++
++NetHack5*none.foreground:  green
++NetHack5*none.borderColor: green
++NetHack5*none.shapeStyle: NETHACK_BTN_SHAPE
++NetHack5*none.cornerRoundPercent: NETHACK_BTN_ROUND
++
++NetHack5*invert.foreground:  green
++NetHack5*invert.borderColor: green
++NetHack5*invert.shapeStyle: NETHACK_BTN_SHAPE
++NetHack5*invert.cornerRoundPercent: NETHACK_BTN_ROUND
++
++NetHack5*search.foreground:  green
++NetHack5*search.borderColor: green
++NetHack5*search.shapeStyle: NETHACK_BTN_SHAPE
++NetHack5*search.cornerRoundPercent: NETHACK_BTN_ROUND
+ 
+ ! map colors
+ ! The foreground color is used as "no color".
+-NetHack*map*foreground: NETHACK_CLR_FG
+-NetHack*map*background: NETHACK_CLR_BG
+-
+-NetHack*map*black:          grey15
+-NetHack*map*red:            red3
+-NetHack*map*green:          green3
+-NetHack*map*brown:          DarkOrange3
+-NetHack*map*blue:           blue3
+-NetHack*map*magenta:        magenta3
+-NetHack*map*cyan:           Dark cyan
+-NetHack*map*gray:           gray50
+-NetHack*map*orange:         orange
+-NetHack*map*bright_green:   green
+-NetHack*map*yellow:         yellow
+-NetHack*map*bright_blue:    Royal blue
+-NetHack*map*bright_magenta: magenta
+-NetHack*map*bright_cyan:    cyan
+-NetHack*map*white:          white
++NetHack5*map*foreground: NETHACK_CLR_FG
++NetHack5*map*background: NETHACK_CLR_BG
++
++NetHack5*map*black:          grey15
++NetHack5*map*red:            red3
++NetHack5*map*green:          green3
++NetHack5*map*brown:          DarkOrange3
++NetHack5*map*blue:           blue3
++NetHack5*map*magenta:        magenta3
++NetHack5*map*cyan:           Dark cyan
++NetHack5*map*gray:           gray50
++NetHack5*map*orange:         orange
++NetHack5*map*bright_green:   green
++NetHack5*map*yellow:         yellow
++NetHack5*map*bright_blue:    Royal blue
++NetHack5*map*bright_magenta: magenta
++NetHack5*map*bright_cyan:    cyan
++NetHack5*map*white:          white
+ !
+ ! The following are the default 15 colors that the nethack map uses.
+ !NetHack*map*black:		black
+diff --git a/win/X11/winX.c b/win/X11/winX.c
+index e66172f5bbb49b731375d12edac2080b151de768..01d4bd682d13cc945d29477795af1a262ca3f4b8 100644
+--- a/win/X11/winX.c
++++ b/win/X11/winX.c
+@@ -58,6 +58,12 @@
+ #include "hack.h"
+ #undef X11_BUILD
+ 
++/* X11R4 exposes the toolkit's merged resources through XtDatabase. */
++#ifdef HELIOS
++#define XrmGetDatabase XtDatabase
++extern int seteuid(uid_t);
++#endif
++
+ #include "winX.h"
+ #include "dlb.h"
+ #include "xwindow.h"
+@@ -389,11 +395,11 @@ init_menu_nhcolors(struct xwindow *wp)
+ 
+     for (color = 0; color < CLR_MAX; color++) {
+         Sprintf(clr_name, "nethack.%s.%s", wtn, mapCLR_to_res[color]);
+-        Sprintf(clrclass, "NetHack.%s.%s", wtn_up, mapCLR_to_res[color]);
++        Sprintf(clrclass, "NetHack5.%s.%s", wtn_up, mapCLR_to_res[color]);
+ 
+         if (!XrmGetResource(rDB, clr_name, clrclass, ret_type, &value)) {
+             Sprintf(clr_name, "nethack.map.%s", mapCLR_to_res[color]);
+-            Sprintf(clrclass, "NetHack.Map.%s", mapCLR_to_res[color]);
++            Sprintf(clrclass, "NetHack5.Map.%s", mapCLR_to_res[color]);
+         }
+ 
+         if (!XrmGetResource(rDB, clr_name, clrclass, ret_type, &value)) {
+@@ -1678,9 +1684,9 @@ X11_init_nhwindows(int *argcp, char **argv)
+ 
+     num_args = 0;
+     XtSetArg(args[num_args], XtNallowShellResize, True); num_args++;
+-    XtSetArg(args[num_args], XtNtitle, "NetHack"); num_args++;
++    XtSetArg(args[num_args], XtNtitle, "NetHack5"); num_args++;
+ 
+-    toplevel = XtAppInitialize(&app_context, "NetHack",     /* application  */
++    toplevel = XtAppInitialize(&app_context, "NetHack5",     /* application  */
+                                (XrmOptionDescList) 0, 0,    /* options list */
+                                argcp, (String *) argv,      /* command line */
+                                default_resource_data, /* fallback resources */
+diff --git a/win/X11/winmap.c b/win/X11/winmap.c
+index 0d2c6b70954ec20136b58fb4cab6bf235a4a187c..dee5e0cf0fde8bd38783bbc9d70ca1cac43a375c 100644
+--- a/win/X11/winmap.c
++++ b/win/X11/winmap.c
+@@ -45,6 +45,18 @@
+ #include <X11/xpm.h>
+ #endif
+ 
++/* Helios X11R4's Viewport has no panner and no report callback (that
++   is the Xaw3d widget set's), so the callback can never fire; supply
++   just enough of the Xaw3d declarations for the code above to compile
++   and skip registering it (see create_nhwindow below). */
++#ifndef XtNreportCallback
++typedef struct {
++    int changed;
++} XawPannerReport;
++#define XawPRSliderWidth  1
++#define XawPRSliderHeight 2
++#endif
++
+ /* from tile.c */
+ extern int total_tiles_used, Tile_corr;
+ 
+@@ -2006,7 +2018,9 @@ create_map_window(
+         num_args);         /* number of values to set */
+ 
+     XtAddCallback(map, XtNexposeCallback, map_exposed, (XtPointer) 0);
++#ifndef CROSS_TO_HELIOS
+     XtAddCallback(viewport, XtNreportCallback, report_callback, wp);
++#endif /* CROSS_TO_HELIOS */
+ 
+     map_info = wp->map_information =
+         (struct map_info_t *) alloc(sizeof (struct map_info_t));
+diff --git a/win/X11/winstat.c b/win/X11/winstat.c
+index 5224522b3bf4c8f8e6118050788c8b77aee9032a..8d4ef702460edf63f37fdbee182ac9ef5c71d204 100644
+--- a/win/X11/winstat.c
++++ b/win/X11/winstat.c
+@@ -26,6 +26,9 @@
+ #include <X11/Xaw/Viewport.h>
+ /*#include <X11/Xatom.h>*/
+ 
++/* X11R4's Xlib has no XPointer typedef (later Xlib adds it) */
++typedef void *XPointer;
++
+ #ifdef PRESERVE_NO_SYSV
+ #ifdef SYSV
+ #undef SYSV

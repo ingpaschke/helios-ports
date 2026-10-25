@@ -1,0 +1,18 @@
+Subject: Preserve native window dimensions when entering character-at-a-time input mode
+
+diff --git a/sys/share/unixtty.c b/sys/share/unixtty.c
+index 8856be1cce96384aafd157e37996db8ae2582e4e..46ba3177d60ea7bb83f908728f42abd1caa4a96f 100644
+--- a/sys/share/unixtty.c
++++ b/sys/share/unixtty.c
+@@ -267,9 +267,11 @@ setftty(void)
+         curttyb.cbrkflgs &= ~CBRKMASK;
+         curttyb.cbrkflgs |= cf;
+ #ifdef USG
++#ifndef HELIOS
+         /* be satisfied with one character; no timeout */
+         curttyb.c_cc[VMIN] = 1;  /* was VEOF */
+         curttyb.c_cc[VTIME] = 0; /* was VEOL */
++#endif /* Helios uses these fields for the window dimensions. */
+ #ifdef POSIX_JOB_CONTROL
+ /* turn off system suspend character
+  * due to differences in structure layout, this has to be

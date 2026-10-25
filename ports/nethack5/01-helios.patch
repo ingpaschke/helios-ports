@@ -1,0 +1,461 @@
+Subject: Run NetHack 5.0 as a Helios program with the tty interface
+
+diff --git a/.gitignore b/.gitignore
+index 40e5b289b7e9d9f31a967deea68b9b18da7bbd41..6330e046959c7d3e2a7c95cad7692d629db37f39 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -102,3 +102,5 @@ sys/amiga/regex/
+ __pycache__/
+ src/Sysatw800
+ build-atw/
++src/Syshelios
++build-helios*.log
+diff --git a/include/dlb.h b/include/dlb.h
+index c51c9bace0050bede3400744fc767a38a7f56427..2e25bd908f5514bbba4bf86447887a9645acef14 100644
+--- a/include/dlb.h
++++ b/include/dlb.h
+@@ -136,7 +136,7 @@ long rsrc_dlb_ftell(dlb *dp);
+ #define WRTMODE "w+"
+ #endif
+ #if (defined(MICRO) && !defined(AMIGA)) || defined(THINK_C) \
+-    || defined(__MWERKS__) || defined(WIN32)
++    || defined(__MWERKS__) || defined(WIN32) || defined(HELIOS)
+ #define RDBMODE "rb"
+ #define WRBMODE "w+b"
+ #else
+diff --git a/include/unixconf.h b/include/unixconf.h
+index ffe5d7a0341d36e1a78c4c1104d82f7d905eeffa..727a3d7f40a343e78f6f10fe1178e534dc6ff7d3 100644
+--- a/include/unixconf.h
++++ b/include/unixconf.h
+@@ -32,10 +32,12 @@
+                      /* use SYSV for < v6.5 */
+ 
+ /* define any of the following that are appropriate */
++#ifndef HELIOS /* Helios: see heliosconf.h */
+ #define SVR4           /* use in addition to SYSV for System V Release 4 */
+                        /* including Solaris 2+ */
+ #define NETWORK        /* if running on a networked system */
+                        /* e.g. Suns sharing a playground through NFS */
++#endif
+ /* #define SUNOS4 */   /* SunOS 4.x */
+ #ifdef __linux__
+ #define LINUX    /* Another Unix clone */
+@@ -49,6 +51,7 @@
+                         * job control (note that AIX is SYSV otherwise)
+                         * Also define this for AIX 3.2 */
+ 
++#ifndef HELIOS /* Helios has termcap and no job control */
+ #define TERMINFO       /* uses terminfo rather than termcap */
+                        /* Should be defined for most SYSV, SVR4 (including
+                         * Solaris 2+), HPUX, and Linux systems.  In
+@@ -57,6 +60,7 @@
+                         * the Makefile */
+ #define POSIX_JOB_CONTROL /* use System V / Solaris 2.x / POSIX job control
+                            * (e.g., VSUSP) */
++#endif /* !HELIOS */
+ #define POSIX_TYPES /* use POSIX types for system calls and termios */
+                     /* Define for many recent OS releases, including
+                      * those with specific defines (since types are
+@@ -437,5 +441,9 @@
+ # endif
+ #endif
+ 
++#ifdef HELIOS
++#include "heliosconf.h"
++#endif
++
+ #endif /* UNIXCONF_H */
+ #endif /* UNIX */
+diff --git a/src/cfgfiles.c b/src/cfgfiles.c
+index 3e6007695712e1b7b5a4958071bca62acafe3000..057c9ff10dee5b44a60429ebc20c8d8ad04eb5ae 100644
+--- a/src/cfgfiles.c
++++ b/src/cfgfiles.c
+@@ -128,7 +128,7 @@ static boolean ignore_errors_on_unmatched = FALSE,
+ 
+ /* used for messaging. Also used in options.c */
+ static const char *default_configfile =
+-#ifdef ATW800
++#if defined(ATW800) || defined(HELIOS)
+     "nethack.cnf"; /* FAT host: .nethackrc is not a valid 8.3 name */
+ #else
+ #ifdef UNIX
+@@ -330,6 +330,16 @@ fopen_config_file(const char *filename, int src)
+     /* FAT host, no HOME: read nethack.cnf from HACKDIR (the run dir) */
+     nhUse(envp);
+     Strcpy(tmp_config, "nethack.cnf");
++#elif defined(HELIOS)
++    /* 8.3 host file systems: $HOME/nethack.cnf, then the playground's
++       nethack.cnf (the current directory once HACKDIR is entered) */
++    if (envp && *envp) {
++        Sprintf(tmp_config, "%s/%s", envp, "nethack.cnf");
++        set_configfile_name(tmp_config);
++        if ((fp = fopen(configfile, "r")) != (FILE *) 0)
++            return fp;
++    }
++    Strcpy(tmp_config, "nethack.cnf");
+ #else
+     if (!envp)
+         Strcpy(tmp_config, ".nethackrc");
+diff --git a/src/files.c b/src/files.c
+index 8502a67afca7baac81aa691f72ecf4fc4d6e3a9b..d5f386890d6cbf98ebe9d0ff16caa7c020946354 100644
+--- a/src/files.c
++++ b/src/files.c
+@@ -1049,6 +1049,9 @@ set_savefile_name(boolean regularize_it)
+ #endif
+ #ifdef UNIX
+     Sprintf(gs.SAVEF, "save/%d%s", (int) getuid(), svp.plname);
++#ifdef HELIOS
++    gs.SAVEF[5 + 8] = '\0'; /* 8.3 host file systems */
++#endif
+     regoffset = 5;
+     indicator_spot = 2;
+ #endif
+@@ -2238,8 +2241,12 @@ make_lockname(const char *filename UNUSED_conditional, char *lockname)
+             *semi_colon = '\0';
+     }
+     Strcat(lockname, ".lock;1");
++#else
++#ifdef HELIOS
++    Strcat(lockname, ".lck"); /* 8.3: perm.lck, record.lck, ... */
+ #else
+     Strcat(lockname, "_lock");
++#endif
+ #endif
+     return lockname;
+ #else /* !(UNIX || VMS || AMIGA || WIN32 || MSDOS) */
+@@ -2434,9 +2441,16 @@ unlock_file(const char *filename)
+ #endif
+ 
+ #if defined(UNIX) || defined(VMS)
++#ifdef HELIOS
++        /* Close before unlinking: on the ATW800 the game directory is a
++         * GEMDOS disk behind the I/O Server, and GEMDOS does not delete
++         * a file that is still open, so the lock file would stay and
++         * the next game would wait for it. */
++        (void) nhclose(lockfd), lockfd = -1;
++#endif
+         if (unlink(lockname) < 0)
+             HUP raw_printf("Can't unlink %s.", lockname);
+-#ifdef NO_FILE_LINKS
++#if defined(NO_FILE_LINKS) && !defined(HELIOS)
+         (void) nhclose(lockfd), lockfd = -1;
+ #endif
+ 
+diff --git a/src/sfstruct.c b/src/sfstruct.c
+index 4eb9a8ed242390974617598362e099322d1af530..ebc1842f5e5846278b64264f2d2f287cbaea838d 100644
+--- a/src/sfstruct.c
++++ b/src/sfstruct.c
+@@ -432,7 +432,14 @@ bufon(int fd)
+         if (bw_buffered[idx])
+             panic("buffering already enabled");
+         if (!bw_FILE[idx]) {
++#ifdef HELIOS
++            /* binary: on the ATW800 the save directory is a GEMDOS disk,
++               and Helios stdio inserts a CR before every LF in a text
++               stream on such a file (Flags_MSdos) */
++            if ((bw_FILE[idx] = fdopen(fd, "wb")) == 0)
++#else
+             if ((bw_FILE[idx] = fdopen(fd, "w")) == 0)
++#endif
+                 panic("buffering of file %d failed", fd);
+ #ifdef SFSTRUCT_BUFFERING
+             (void) setvbuf(bw_FILE[idx], (char *) 0, _IOFBF,
+diff --git a/sys/share/unixtty.c b/sys/share/unixtty.c
+index aa62a477d821922cb5fb649eb1e2badbdf6ec1e9..8856be1cce96384aafd157e37996db8ae2582e4e 100644
+--- a/sys/share/unixtty.c
++++ b/sys/share/unixtty.c
+@@ -310,6 +310,16 @@ setftty(void)
+         change++;
+     }
+ 
++#ifdef HELIOS
++    /* Helios console windows interpret escape sequences only in raw
++     * output mode (ConsoleRawOutput); Helios termios maps a cleared
++     * OPOST to it (posix/termios.c).  settty() restores the cooked
++     * mode of inittyb on exit. */
++    if (curttyb.c_oflag & OPOST) {
++        curttyb.c_oflag &= ~OPOST;
++        change++;
++    }
++#endif
+     if (change)
+         setctty();
+ 
+diff --git a/sys/unix/hints/include/cross-post.501 b/sys/unix/hints/include/cross-post.501
+index d3c14b646c4eb0c02c5611a9bda8c285808eceeb..6f2e4f318d7b1c33af1e8ec2c08f53cfd917c0e5 100644
+--- a/sys/unix/hints/include/cross-post.501
++++ b/sys/unix/hints/include/cross-post.501
+@@ -899,6 +899,92 @@ atw800pkg: $(ATWTILES) $(ATWGEN) ../util/uudecode
+ 	@echo "atw800 release -> ../build-atw/NETHACK/ and ../build-atw/nethack-atw.zip"
+ endif  # CROSS_TO_ATW800
+ 
++ifdef CROSS_TO_HELIOS
++# tile.c is not used by tty; date.o and the objects as for the others
++$(TARGETPFX)tile.o : $(SRCDIR)/tile.c
++	$(TARGET_CC) $(TARGET_CFLAGS) -c -o$@ $<
++
++# Link through clang's Helios driver: asm -o nethack -nnethack c0.o
++# <objects> <libraries> c.lib helios.lib.  The -s (stack) and -h (heap
++# growth granule) sizes are in bytes and land in the program's image
++# header; Helios's C library does not grow the stack, so -s must cover
++# the deepest call chain (Lua's parser and the level generator).
++# The heap grows in 8 KB steps: with 64 KB the last heap extension of
++# the small build found no contiguous free block on a 4 MB T805 ("cannot
++# extend to 68 bytes" on level 1); on a 5 MB T425 the default build
++# keeps as much free with 8 KB steps as with 64 KB (0.64-0.67 MB vs
++# 0.65 MB least free in the same wizard-mode script; levels are random).
++HELIOS_STACK ?= 131072
++HELIOS_HEAP ?= 8192
++# the link stamp lives in the target directory, so the two variants
++# (targets/helios, targets/helios-small) each relink when needed
++ifndef HELIOS_SMALL
++HELIOS_LIBS = -l$(TARGET_HACKLIB) -l$(LUACROSSLIB) \
++	-l$(HELIOS_ROOT)/lib/termcap.lib -l$(HELIOS_RTLIB)
++$(TARGETPFX)Syshelios: $(HOBJ) $(TARGETPFX)date.o $(TARGET_HACKLIB) \
++		$(LUACROSSLIB) $(BUILDMORE) Makefile
++	@echo "Linking $(GAME) for Helios."
++	$(TARGET_CC) \
++		-Wl,-s$(HELIOS_STACK) -Wl,-h$(HELIOS_HEAP) -o $(GAMEBIN) \
++		$(HOBJ) $(TARGETPFX)date.o $(HELIOS_LIBS)
++	@touch $@
++	@ls -l $(GAMEBIN)
++else
++# Whole-program link (HELIOS_SMALL): every .o in targets/helios-small is
++# LLVM bitcode.  The modules are linked in name order (the order the
++# variant was measured and tested with); hacklib.o and the Lua objects
++# are used directly, not through hacklib.a / lua.a.  internalize +
++# globaldce drop everything main does not reach, constmerge shares equal
++# constants (string literals) across files, then clang optimises and
++# generates code for the one module.
++HELIOS_BC = $(sort $(HOBJ) $(TARGETPFX)date.o $(TARGETPFX)hacklib.o \
++	$(LUALIBOBJS))
++HELIOS_LIBS = -l$(HELIOS_ROOT)/lib/termcap.lib -l$(HELIOS_RTLIB)
++$(TARGETPFX)Syshelios: $(HELIOS_BC) $(BUILDMORE) Makefile
++	@echo "Linking $(GAME) for Helios (whole program)."
++	$(LLVM_LINK) -o $(TARGETPFX)whole.bc $(HELIOS_BC)
++	$(OPT) -passes=internalize,globaldce \
++		-internalize-public-api-list=main \
++		-o $(TARGETPFX)whole-int.bc $(TARGETPFX)whole.bc
++	$(OPT) -passes=constmerge -o $(TARGETPFX)whole-cm.bc \
++		$(TARGETPFX)whole-int.bc
++	$(TARGET_CC) $(HELIOS_OPT) $(HELIOS_SMALL_CGFLAGS) -S \
++		-o $(TARGETPFX)whole.s $(TARGETPFX)whole-cm.bc
++	$(TARGET_CC) \
++		-Wl,-s$(HELIOS_STACK) -Wl,-h$(HELIOS_HEAP) -o $(GAMEBIN) \
++		$(TARGETPFX)whole.s $(HELIOS_LIBS)
++	@touch $@
++	@ls -l $(GAMEBIN)
++endif
++
++# a change in the port header recompiles every target object
++$(HOBJ): ../include/heliosconf.h
++
++# Copy-ready tree for a Helios root (8.3 names, upper case for a GEMDOS
++# host file system): LOCAL/GAMES/NETHACK holds the program and its data.
++# One package for both variants: NETHACK is the default build
++# (targets/helios), NETHACKS the HELIOS_SMALL build (targets/helios-small);
++# each is included when it has been built.
++HELREL = ../targets/helios/pkg
++HELGAME = $(HELREL)/LOCAL/GAMES/NETHACK
++.PHONY: heliospkg
++heliospkg: $(GAMEBIN)
++	rm -rf $(HELREL) ; mkdir -p $(HELGAME)/SAVE
++	if [ -f ../targets/helios/nethack ]; then \
++		cp ../targets/helios/nethack $(HELGAME)/NETHACK ; fi
++	if [ -f ../targets/helios-small/nethack ]; then \
++		cp ../targets/helios-small/nethack $(HELGAME)/NETHACKS ; fi
++	cp ../dat/nhdat $(HELGAME)/NHDAT
++	cp ../dat/license $(HELGAME)/LICENSE
++	cp ../dat/symbols $(HELGAME)/SYMBOLS
++	cp ../sys/helios/sysconf $(HELGAME)/SYSCONF
++	cp ../sys/helios/nethack.cnf $(HELGAME)/NETHACK.CNF
++	: > $(HELGAME)/PERM ; : > $(HELGAME)/RECORD ; : > $(HELGAME)/LOGFILE
++	: > $(HELGAME)/XLOGFILE
++	cp ../sys/helios/README.txt $(HELREL)/README.TXT
++	@echo "helios package -> $(HELREL)"
++endif  # CROSS_TO_HELIOS
++
+ ifdef CROSS_SHARED
+ # shared file dependencies
+ $(TARGETPFX)pcmain.o : ../sys/share/pcmain.c $(HACK_H)
+diff --git a/sys/unix/hints/include/cross-pre1.501 b/sys/unix/hints/include/cross-pre1.501
+index 852a1c685c03c8298a9da73b2dc417880d1d5def..b91b83260d810a6895ba5c8b2fb031ef960d8418 100644
+--- a/sys/unix/hints/include/cross-pre1.501
++++ b/sys/unix/hints/include/cross-pre1.501
+@@ -89,6 +89,21 @@ override TARGETPFX = $(TARGETDIR)/
+ override TARGET_LIBS=
+ endif
+ 
++ifdef CROSS_TO_HELIOS
++CROSS=1
++BUILD_TARGET_LUA=1
++CROSS_SHARED=1
++override TARGET = helios
++ifdef HELIOS_SMALL
++# whole-program build (bitcode objects): see cross-pre2.501
++override TARGETDIR=../targets/helios-small
++else
++override TARGETDIR=../targets/$(TARGET)
++endif
++override TARGETPFX = $(TARGETDIR)/
++override TARGET_LIBS=
++endif
++
+ ifdef CROSS
+ CROSSCOMPILE=1
+ override PREGAME=
+diff --git a/sys/unix/hints/include/cross-pre2.501 b/sys/unix/hints/include/cross-pre2.501
+index d3265963464c900216deaa57e0d4aaf31daeba14..c833524fcfb12d98d5a39faa6a4ec553fc43dc9b 100644
+--- a/sys/unix/hints/include/cross-pre2.501
++++ b/sys/unix/hints/include/cross-pre2.501
+@@ -1188,6 +1188,134 @@ $(TARGETPFX)pcunix.o : ../sys/share/pcunix.c
+ # the pcmain.o rule (-Dmain=nh_main) is in cross-post.501 so it wins
+ # over the base recipe in Makefile.src
+ endif  # CROSS_TO_ATW800
++
++ifdef CROSS_TO_HELIOS
++#=================================================================
++# Helios (transputer OS) cross-compile recipe
++#=================================================================
++# NetHack as a Helios program (the tty window port on termcap), built
++# with clang's Helios mode (--target=t800-unknown-helios) and linked by
++# the Helios assembler/linker `asm` against a Helios tree's c0.o, c.lib,
++# helios.lib and termcap.lib.
++#
++#   sys/unix/setup.sh sys/unix/hints/linux.501
++#   make CROSS_TO_HELIOS=1 fetch-regex
++#   make CROSS_TO_HELIOS=1 all
++#   make CROSS_TO_HELIOS=1 heliospkg
++#
++# HELIOS_SMALL=1 (with CROSS_TO_HELIOS=1, on every make command) builds
++# the small whole-program variant in targets/helios-small instead: each
++# source file to LLVM bitcode at -Oz, llvm-link of all of them (NetHack,
++# hacklib, Lua) into one module, internalize + globaldce (only main
++# stays external) and constmerge with opt, then one -Oz code generation
++# of that module without stack checks and procedure names, and the
++# Helios link.  About 0.5 MB less image than the default build; it fits
++# a 4 MB T805.  Recipe in cross-post.501 (Syshelios).
++#
++# Override on the make command line:
++#   LLVMBIN      the llvm-t800 build or install's bin (clang)
++#   HELIOS_ROOT  a Helios tree (include/, lib/c0.o, c.lib, helios.lib,
++#                termcap.lib)
++#   HELIOS_ASM   the Helios assembler/linker (64-bit helios-asm)
++#   HELIOS_RTLIB compiler-rt builtins as a Helios scanned library (i64
++#                division and the like that the backend calls)
++#   LLVM_LINK, OPT  llvm-link and opt (HELIOS_SMALL only)
++#=================================================================
++LLVMBIN ?= /opt/llvm-t800/bin
++HELIOS_ROOT ?= /opt/llvm-t800/sysroots/helios
++HELIOS_ASM ?= asm
++HELIOS_RTLIB ?= $(LLVMBIN)/../sysroots/helios/lib/llvmrt-generic.lib
++# where the game lives on the Helios machine (/helios is the Helios
++# tree's root): data, sysconf, save files, record
++HELIOS_HACKDIR ?= /helios/local/games/nethack
++LLVM_LINK ?= $(LLVMBIN)/llvm-link
++OPT ?= $(LLVMBIN)/opt
++# -Os: see the atw800 recipe; HELIOS_OPT=-Oz for the smallest image
++# (the HELIOS_SMALL variant uses -Oz)
++ifdef HELIOS_SMALL
++HELIOS_OPT ?= -Oz
++else
++HELIOS_OPT ?= -Os
++endif
++
++CFLAGS += -DCROSSCOMPILE
++
++# generic transputer code (the T425 and the T805 run it); floating point
++# goes through Helios's FpLib, which uses the FPU where there is one
++override TARGET_CC = $(LLVMBIN)/clang --target=t800-unknown-helios \
++	--sysroot=$(HELIOS_ROOT) -B$(dir $(HELIOS_ASM))
++override TARGET_CXX = $(TARGET_CC)
++# Helios has no ar: a scanned library is its objects concatenated
++override TARGET_AR = sh ../sys/helios/hlibar.sh
++override TARGET_ARFLAGS = rcs
++override TARGET_STUBEDIT=
++override TARGET_CFLAGS = $(HELIOS_OPT) -std=gnu99 -w \
++	-Wno-error=implicit-function-declaration -Wno-error=implicit-int \
++	-Wno-error=incompatible-pointer-types -Wno-error=int-conversion \
++	-I../include -I../win/share -I../sys/helios -I../sys/helios/include \
++	-I../sys/amiga/regex $(LUAINCL) -DLUA_32BITS \
++	-DCROSSCOMPILE -DCROSSCOMPILE_TARGET -DCROSS_TO_HELIOS -DHELIOS \
++	-DTTY_GRAPHICS -DDEFAULT_WINDOW_SYS=\"tty\" -DDLB -DNO_TERMCAP_HEADERS \
++	-DHACKDIR=\"$(HELIOS_HACKDIR)\" -DSYSCF -DSYSCF_FILE=\"sysconf\" \
++	-DNOPANICTRACE -DNOCRASHREPORT \
++	-DNOSTATICFN
++ifdef HELIOS_SMALL
++# the same compile lines, but every "object" is LLVM bitcode for the
++# whole-program link in cross-post.501
++override TARGET_CFLAGS += -emit-llvm
++# code generation of the one module: no stack checks (no overflow
++# detection) and no procedure names (none in Helios debuggers)
++HELIOS_SMALL_CGFLAGS ?= -mllvm -t800-helios-stack-check=0 \
++	-mllvm -t800-helios-proc-names=0
++endif
++override TARGET_CXXFLAGS = $(TARGET_CFLAGS)
++LUA_TARGET_CFLAGS = $(TARGET_CFLAGS) -DLUA_USE_JUMPTABLE=0
++override TARGET_LINK = $(TARGET_CC)
++
++# POSIX regex over the BSD engine in sys/amiga/regex (make fetch-regex)
++override REGEXOBJ = $(TARGETPFX)posixregex.o $(TARGETPFX)regcomp.o \
++	$(TARGETPFX)regexec.o $(TARGETPFX)regerror.o $(TARGETPFX)regfree.o
++override RANDOBJ =
++override HINTOBJ =
++override SNDLIBOBJ =
++override UUIDOBJ =
++
++# no git version stamps in the target image
++override GITHASH =
++override GITBRANCH =
++override GITPREFIX =
++
++# the Unix main, tty and file code, plus what Helios's C library lacks
++override SYSSRC = ../sys/share/ioctl.c ../sys/share/unixtty.c \
++	../sys/unix/unixmain.c ../sys/unix/unixunix.c ../sys/helios/helios.c
++override SYSOBJ = $(TARGETPFX)ioctl.o $(TARGETPFX)unixtty.o \
++	$(TARGETPFX)unixmain.o $(TARGETPFX)unixunix.o $(TARGETPFX)helios.o
++override WINSRC = $(WINTTYSRC)
++override WINOBJ = $(WINTTYOBJ)
++override WINLIB =
++override LUALIB =
++override LUALIBS =
++override TOPLUALIB =
++override DLLIB =
++override GAMEBIN = $(TARGETPFX)nethack
++# link recipe in cross-post.501
++override SYSTEM = $(TARGETPFX)Syshelios
++override TARGET_LFLAGS =
++override PACKAGE = heliospkg
++override PREGAME += mkdir -p $(TARGETDIR) ;
++override CLEANMORE += rm -r $(TARGETDIR) ;
++
++$(TARGETPFX)%.o : ../sys/helios/%.c
++	$(TARGET_CC) $(TARGET_CFLAGS) -c -o$@ $<
++$(TARGETPFX)%.o : ../sys/amiga/regex/%.c
++	$(TARGET_CC) $(TARGET_CFLAGS) -c -o$@ $<
++$(TARGETPFX)%.o : ../sys/unix/%.c
++	$(TARGET_CC) $(TARGET_CFLAGS) -c -o$@ $<
++$(TARGETPFX)%.o : ../sys/share/%.c
++	$(TARGET_CC) $(TARGET_CFLAGS) -c -o$@ $<
++$(TARGETPFX)%.o : ../win/tty/%.c
++	$(TARGET_CC) $(TARGET_CFLAGS) -c -o$@ $<
++endif  # CROSS_TO_HELIOS
+ #=================================================================
+ 
+ ifdef WANT_WIN_CURSES
+diff --git a/sys/unix/unixunix.c b/sys/unix/unixunix.c
+index a7fb3f92e7b8f13007b5cc50bfc8750bf6bc0bbe..065190ed01a0fe106a92329dc73753f536f8f884 100644
+--- a/sys/unix/unixunix.c
++++ b/sys/unix/unixunix.c
+@@ -133,6 +133,11 @@ getlock(void)
+        if we aren't restricting the number of simultaneous games */
+     if (!gl.locknum)
+         Sprintf(gl.lock, "%u%s", (unsigned) getuid(), svp.plname);
++#ifdef HELIOS
++    /* 8.3 host file systems (GEMDOS via the I/O Server): the level
++       files are <lock>.<n>, so keep <lock> to 8 characters */
++    gl.lock[8] = '\0';
++#endif
+ 
+     regularize(gl.lock);
+     set_levelfile_name(gl.lock, 0);

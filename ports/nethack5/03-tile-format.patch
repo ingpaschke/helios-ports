@@ -1,0 +1,54 @@
+Subject: Keep the generated tile header 32-bit on LP64 hosts and reject invalid tile dimensions
+
+diff --git a/include/tile2x11.h b/include/tile2x11.h
+index d801c5a87d61d31410d395cc1e9821cb08a8621a..1a71e74369bb4d146f8a1873c1aa0f74bf40b184 100644
+--- a/include/tile2x11.h
++++ b/include/tile2x11.h
+@@ -11,16 +11,21 @@
+  * dat/x11tiles is used by Qt for fallback if nhtiles.bmp is inaccessible,
+  * so this header is used by Qt as well as by X11.
+  */
++#include <stdint.h>
++
+ typedef struct {
+-    unsigned long version;
+-    unsigned long ncolors;
+-    unsigned long tile_width;
+-    unsigned long tile_height;
+-    unsigned long ntiles;
+-    unsigned long per_row;
++    uint32_t version;
++    uint32_t ncolors;
++    uint32_t tile_width;
++    uint32_t tile_height;
++    uint32_t ntiles;
++    uint32_t per_row;
+ } x11_header;
+ 
+ /* how wide each row in the tile file is, in tiles */
+ #define TILES_PER_ROW (40)
+ 
+ #endif /* TILE2X11_H */
++
++/* Tile tools and the target must agree even on a 64-bit build host. */
++typedef char nh_x11_header_size[(sizeof(x11_header) == 24) ? 1 : -1];
+diff --git a/win/X11/winmap.c b/win/X11/winmap.c
+index dee5e0cf0fde8bd38783bbc9d70ca1cac43a375c..3f3687fb2db546636414c6f423b23ecda26d3339 100644
+--- a/win/X11/winmap.c
++++ b/win/X11/winmap.c
+@@ -709,6 +709,15 @@ ntiles %ld\n",
+             header.tile_height, header.per_row, header.ntiles);
+ #endif
+ 
++    if (!header.ncolors || header.ncolors > 256 || !header.tile_width
++        || header.tile_width > 256 || !header.tile_height
++        || header.tile_height > 256 || !header.per_row
++        || header.per_row > 1024 || !header.ntiles
++        || header.ntiles > 65536) {
++        X11_raw_print("invalid tile file dimensions");
++        goto tiledone;
++    }
++
+     size = 3 * header.ncolors;
+     colormap = (unsigned char *) alloc((unsigned) size);
+     if ((int) fread((char *) colormap, 1, size, fp) != size) {

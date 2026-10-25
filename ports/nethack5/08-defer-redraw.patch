@@ -1,0 +1,19 @@
+Subject: Defer terminal redraw while a dungeon level is being generated or restored
+
+diff --git a/win/tty/wintty.c b/win/tty/wintty.c
+index 9b545d8fd545baf3a5c0bfb41eb9798cb807516c..bb79991edbe57cd1355d43cd2501aa0477535386 100644
+--- a/win/tty/wintty.c
++++ b/win/tty/wintty.c
+@@ -395,6 +395,12 @@ resize_tty(void)
+     boolean map_active;
+     struct WinDesc *cw;
+ 
++    /* A resize can interrupt the first level's Lua generator or a restore.
++     * Redrawing the map then would consult unfinished room/shop state.
++     * Keep resize_pending set for the next safe tty input boundary. */
++    if (level_status.making || level_status.loading)
++        return;
++
+     /* reset to 0 rather than just decrement */
+     program_state.resize_pending = 0;
+     resize_mesg = 0;

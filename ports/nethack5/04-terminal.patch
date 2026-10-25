@@ -1,0 +1,58 @@
+Subject: Use native terminal dimensions and the shared key decoder for the tty interface
+
+diff --git a/sys/share/ioctl.c b/sys/share/ioctl.c
+index ec76ec740b3cb68b910c00fb449b4afe95637dda..6f09676c5d83aacd36417703bf7e4840164da113 100644
+--- a/sys/share/ioctl.c
++++ b/sys/share/ioctl.c
+@@ -71,6 +71,8 @@ struct termio termio;
+  */
+ #if defined(TIOCGWINSZ) && !defined(AVOID_WIN_IOCTL)
+ #define USE_WIN_IOCTL
++#endif
++#if defined(USE_WIN_IOCTL) || defined(HELIOS)
+ #include "tcap.h" /* for LI and CO */
+ #endif
+ 
+@@ -95,7 +97,13 @@ catch_stp(void)
+ void
+ getwindowsz(void)
+ {
+-#ifdef USE_WIN_IOCTL
++#ifdef HELIOS
++    struct termios size;
++    if (tcgetattr(fileno(stdin), &size) == 0) {
++        if (size.c_min > 0) LI = size.c_min;
++        if (size.c_time > 0) CO = size.c_time;
++    }
++#elif defined(USE_WIN_IOCTL)
+     /*
+      * ttysize is found on Suns and BSD
+      * winsize is found on Suns, BSD, and Ultrix
+diff --git a/sys/unix/hints/include/cross-post.501 b/sys/unix/hints/include/cross-post.501
+index 7162281f074243aaac72c7605c717fbd292ffd59..07c3c6b9472810779285d5befa8f36a9847872d9 100644
+--- a/sys/unix/hints/include/cross-post.501
++++ b/sys/unix/hints/include/cross-post.501
+@@ -920,7 +920,8 @@ HELIOS_HEAP ?= 8192
+ # toolkit before core; Xau for the authentication lookups in libX11;
+ # xlib.def indexes the core Xlib modules, bsd.lib supplies the BSD
+ # primitives the X libraries call; same set as the 3.1.3 X11 link)
+-HELIOS_X11LIBS = -l$(HELIOS_X11_ROOT)/lib/libXaw.a \
++HELIOS_X11LIBS = -l$(HELIOS_UNIX_ROOT)/lib/helios-unix.lib \
++	-l$(HELIOS_X11_ROOT)/lib/libXaw.a \
+ 	-l$(HELIOS_X11_ROOT)/lib/libXmu.a -l$(HELIOS_X11_ROOT)/lib/libXt.a \
+ 	-l$(HELIOS_X11_ROOT)/lib/libXext.a -l$(HELIOS_X11_ROOT)/lib/libX11.a \
+ 	-l$(HELIOS_X11_ROOT)/lib/libXau.a -l$(HELIOS_ROOT)/lib/bsd.lib \
+diff --git a/sys/unix/hints/include/cross-pre2.501 b/sys/unix/hints/include/cross-pre2.501
+index 6c1ac443abc0a50f489604a4c44eec383fb60ead..2007baeb2db3f98d3e90c9b73bebb1b6963c96f0 100644
+--- a/sys/unix/hints/include/cross-pre2.501
++++ b/sys/unix/hints/include/cross-pre2.501
+@@ -1254,7 +1254,8 @@ override TARGET_CFLAGS = $(HELIOS_OPT) -std=gnu99 -w \
+ 	-Wno-error=implicit-function-declaration -Wno-error=implicit-int \
+ 	-Wno-error=incompatible-pointer-types -Wno-error=int-conversion \
+ 	-I../include -I../win/share -I../sys/helios -I../sys/helios/include \
+-	-I../sys/amiga/regex $(LUAINCL) -DLUA_32BITS \
++	-I../sys/amiga/regex -I$(HELIOS_UNIX_ROOT)/include/helios-unix \
++	$(LUAINCL) -DLUA_32BITS \
+ 	-DCROSSCOMPILE -DCROSSCOMPILE_TARGET -DCROSS_TO_HELIOS -DHELIOS \
+ 	-DTTY_GRAPHICS -DX11_GRAPHICS -Dhelios -DDEFAULT_WINDOW_SYS=\"tty\" \
+ 	-DDLB -DNO_TERMCAP_HEADERS \

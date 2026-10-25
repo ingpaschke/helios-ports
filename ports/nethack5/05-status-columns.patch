@@ -1,0 +1,33 @@
+Subject: Reserve both width slots after each fancy-status column sentinel
+
+diff --git a/win/X11/winstat.c b/win/X11/winstat.c
+index 8d4ef702460edf63f37fdbee182ac9ef5c71d204..6b8a6b69fc1d6bf478c54eef4e976533911a12d3 100644
+--- a/win/X11/winstat.c
++++ b/win/X11/winstat.c
+@@ -2482,20 +2482,20 @@ static int status_indices[][13] = {
+ /* used to fill up the empty space to right of last status condition column */
+ static int leftover_indices[] = { F_DUMMY, -1, 0, 0 };
+ /* -2: top two rows of these columns are reserved for title and location */
+-static int col1_indices[13 - 2] = {
++static int col1_indices[] = {
+     F_HP,    F_POWER,    F_AC,    F_XP_LEVL, F_GOLD,  F_DUMMY,
+     F_BAREH, F_WEAPON, F_DUMMY,
+-    -1
++    -1, 0, 0
+ };
+-static int col2_indices[13 - 2] = {
++static int col2_indices[] = {
+     F_MAXHP, F_MAXPOWER, F_ALIGN, F_EXP_PTS, F_SCORE, F_TIME,
+     F_DUMMY, F_ARMOR, F_DUMMY,
+-    -1
++    -1, 0, 0
+ };
+-static int characteristics_indices[13 - 2] = {
++static int characteristics_indices[] = {
+     F_STR, F_DEX, F_CON, F_INT, F_WIS, F_CHA,
+     F_DUMMY, F_TERRAIN, F_DUMMY,
+-    -1
++    -1, 0, 0
+ };
+ 
+ /*
