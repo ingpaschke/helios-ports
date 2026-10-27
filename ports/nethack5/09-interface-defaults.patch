@@ -1,0 +1,194 @@
+Subject: Give the Helios X11 interface readable controls and visible prompts
+
+--- a/win/X11/NetHack.ad
++++ b/win/X11/NetHack.ad
+@@ -2,18 +2,18 @@
+ ! Copyright (c) 2017 by Pasi Kallinen
+ ! NetHack may be freely redistributed.  See license for details.
+ 
+-/* Helios X11R4 font path: the "fixed" alias of /lib/x11/fonts/misc
+-   (its bold companion is the one boldify() looks for) */
++/* Bitmap fonts and colours for the Helios desktop.  Keep fixed-width
++   text for aligned menus, help and the tombstone. */
+ #define NETHACK_FONT       9x15
+-#define NETHACK_CLR_FG     grey
+-#define NETHACK_CLR_BG     black
+-#define NETHACK_CLR_QUIT   red
+-#define NETHACK_CLR_RANDOM yellow
+-#define NETHACK_CLR_PLAY   green
+-#define NETHACK_CLR_HELP   green
++#define NETHACK_CLR_FG     #253c43
++#define NETHACK_CLR_BG     #ece9dc
++#define NETHACK_CLR_QUIT   #a33131
++#define NETHACK_CLR_RANDOM #845b14
++#define NETHACK_CLR_PLAY   #24684a
++#define NETHACK_CLR_HELP   #23686b
+ #define NETHACK_BTN_SHAPE  roundedRectangle
+ #define NETHACK_BTN_ROUND  20
+-#define NETHACK_CMD_BORDER 0
++#define NETHACK_CMD_BORDER 1
+ 
+ ! The display_file, tombstone, and menu windows are all formatted assuming
+ ! a fixed width font.  Text windows may or may not be formatted as above.
+@@ -21,6 +21,10 @@
+ ! requires a 12 pixel font for correct appearance.
+ !
+ NetHack5*font:              NETHACK_FONT
++NetHack5*borderColor:       #879594
++NetHack5*Command.background: #d8d6c9
++NetHack5*Command.internalHeight: 4
++NetHack5*Command.internalWidth: 8
+ NetHack5*display_file*font: NETHACK_FONT
+ NetHack5*map*font:          NETHACK_FONT
+ NetHack5*text*font:         NETHACK_FONT
+@@ -91,20 +95,20 @@
+ ! If True, force keyboard to attach to popup windows.  Some window managers
+ ! enforce a click-to-focus-keyboard policy (e.g. the DECwindows wm).  NetHack
+ ! has a lot of popups and is almost unplayable without some kind of autofocus.
+-!NetHack*autofocus: True
++NetHack5*autofocus: True
+ 
+ ! If 'slow' is True, setting 'highlight_prompt' to True will cause the line
+ ! between map and message display that is used for prompting to be "hidden"
+ ! as part of the map when no prompt is active, then invert foreground and
+ ! background to stand out when a prompt is issued and waiting for a response.
+ ! If 'slow' is False, 'highlight_prompt' will have no effect.
+-NetHack5*highlight_prompt: False
++NetHack5*highlight_prompt: True
+ 
+ ! The number of lines the message window will show without scrolling.
+-!NetHack*message_lines: 12
++NetHack5*message_lines: 6
+ 
+ ! If True, the message window has a line that separates old and new messages.
+-!NetHack*message_line: True
++NetHack5*message_line: True
+ 
+ ! If True, the default, use a "fancy" style status area below the map.
+ ! Fancy status has some highlighting but does not honor HILITE_STATUS.
+@@ -140,18 +144,19 @@
+ 
+ NetHack5*yn_prompt*borderWidth: 0
+ 
+-NetHack5*Scrollbar*foreground: gray40
+-NetHack5*Scrollbar*background: gray10
++NetHack5*Scrollbar*foreground: #879594
++NetHack5*Scrollbar*background: #d8d6c9
+ 
+ NetHack5*fancy_status*background: NETHACK_CLR_BG
+ NetHack5*fancy_status*foreground: NETHACK_CLR_FG
+ NetHack5*fancy_status.skipAdjust: True
++NetHack5*fancy_status*borderWidth: 0
+ 
+ NetHack5*showGrip: False
+ 
+ ! text input prompt window
+-NetHack5*response*textSink*background: red
+-NetHack5*textSink*background: red
++NetHack5*response*textSink*background: NETHACK_CLR_BG
++NetHack5*textSink*background: NETHACK_CLR_BG
+ 
+ NetHack5*response*foreground:  NETHACK_CLR_FG
+ NetHack5*response*background:  NETHACK_CLR_BG
+@@ -200,7 +205,7 @@
+ 
+ ! role selection window  (OPTIONS=player_selection:prompts)
+ NetHack5*player_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
+-NetHack5*player_selection*btn_random.background:   black
++NetHack5*player_selection*btn_random.background:   NETHACK_CLR_BG
+ NetHack5*player_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
+ NetHack5*player_selection*btn_random.borderWidth:  1
+ NetHack5*player_selection*btn_random.shapeStyle: NETHACK_BTN_SHAPE
+@@ -216,7 +221,7 @@
+ 
+ ! race selection window
+ NetHack5*race_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
+-NetHack5*race_selection*btn_random.background:   black
++NetHack5*race_selection*btn_random.background:   NETHACK_CLR_BG
+ NetHack5*race_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
+ NetHack5*race_selection*btn_random.borderWidth:  1
+ NetHack5*race_selection*btn_random.shapeStyle:   NETHACK_BTN_SHAPE
+@@ -232,7 +237,7 @@
+ 
+ ! gender selection window
+ NetHack5*gender_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
+-NetHack5*gender_selection*btn_random.background:   black
++NetHack5*gender_selection*btn_random.background:   NETHACK_CLR_BG
+ NetHack5*gender_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
+ NetHack5*gender_selection*btn_random.borderWidth:  1
+ NetHack5*gender_selection*btn_random.shapeStyle:   NETHACK_BTN_SHAPE
+@@ -248,7 +253,7 @@
+ 
+ ! alignment selection window
+ NetHack5*alignment_selection*btn_random.foreground:   NETHACK_CLR_RANDOM
+-NetHack5*alignment_selection*btn_random.background:   black
++NetHack5*alignment_selection*btn_random.background:   NETHACK_CLR_BG
+ NetHack5*alignment_selection*btn_random.borderColor:  NETHACK_CLR_RANDOM
+ NetHack5*alignment_selection*btn_random.borderWidth:  1
+ NetHack5*alignment_selection*btn_random.shapeStyle:   NETHACK_BTN_SHAPE
+@@ -282,48 +287,48 @@
+ ! that many pixels of margin left unused.  On OSX, this can be used to
+ ! avoid overlapping with the desktop docking tray to prevent that from
+ ! obscuring the bottom of the menu.
+-NetHack5*extcmd_height_delta: 75
++NetHack5*extcmd_height_delta: 120
+ 
+ ! menu buttons
+-NetHack5*OK.foreground:  green
+-NetHack5*OK.borderColor: green
++NetHack5*OK.foreground:  NETHACK_CLR_PLAY
++NetHack5*OK.borderColor: NETHACK_CLR_PLAY
+ NetHack5*OK.shapeStyle: NETHACK_BTN_SHAPE
+ NetHack5*OK.cornerRoundPercent: NETHACK_BTN_ROUND
+ 
+-NetHack5*okay.foreground:  green
+-NetHack5*okay.borderColor: green
++NetHack5*okay.foreground:  NETHACK_CLR_PLAY
++NetHack5*okay.borderColor: NETHACK_CLR_PLAY
+ NetHack5*okay.shapeStyle: NETHACK_BTN_SHAPE
+ NetHack5*okay.cornerRoundPercent: NETHACK_BTN_ROUND
+ 
+-NetHack5*cancel.foreground:  red
+-NetHack5*cancel.borderColor: red
++NetHack5*cancel.foreground:  NETHACK_CLR_QUIT
++NetHack5*cancel.borderColor: NETHACK_CLR_QUIT
+ NetHack5*cancel.shapeStyle: NETHACK_BTN_SHAPE
+ NetHack5*cancel.cornerRoundPercent: NETHACK_BTN_ROUND
+ 
+-NetHack5*all.foreground:  green
+-NetHack5*all.borderColor: green
++NetHack5*all.foreground:  NETHACK_CLR_PLAY
++NetHack5*all.borderColor: NETHACK_CLR_PLAY
+ NetHack5*all.shapeStyle: NETHACK_BTN_SHAPE
+ NetHack5*all.cornerRoundPercent: NETHACK_BTN_ROUND
+ 
+-NetHack5*none.foreground:  green
+-NetHack5*none.borderColor: green
++NetHack5*none.foreground:  NETHACK_CLR_PLAY
++NetHack5*none.borderColor: NETHACK_CLR_PLAY
+ NetHack5*none.shapeStyle: NETHACK_BTN_SHAPE
+ NetHack5*none.cornerRoundPercent: NETHACK_BTN_ROUND
+ 
+-NetHack5*invert.foreground:  green
+-NetHack5*invert.borderColor: green
++NetHack5*invert.foreground:  NETHACK_CLR_PLAY
++NetHack5*invert.borderColor: NETHACK_CLR_PLAY
+ NetHack5*invert.shapeStyle: NETHACK_BTN_SHAPE
+ NetHack5*invert.cornerRoundPercent: NETHACK_BTN_ROUND
+ 
+-NetHack5*search.foreground:  green
+-NetHack5*search.borderColor: green
++NetHack5*search.foreground:  NETHACK_CLR_PLAY
++NetHack5*search.borderColor: NETHACK_CLR_PLAY
+ NetHack5*search.shapeStyle: NETHACK_BTN_SHAPE
+ NetHack5*search.cornerRoundPercent: NETHACK_BTN_ROUND
+ 
+ ! map colors
+ ! The foreground color is used as "no color".
+-NetHack5*map*foreground: NETHACK_CLR_FG
+-NetHack5*map*background: NETHACK_CLR_BG
++NetHack5*map*foreground: #eee7d1
++NetHack5*map*background: #142a2e
+ 
+ NetHack5*map*black:          grey15
+ NetHack5*map*red:            red3

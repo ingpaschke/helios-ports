@@ -1,17 +1,28 @@
-# NetHack 5.0 options for Helios (nethack.cnf).  NetHack reads
-# $HOME/nethack.cnf if it exists, else this file in the playground.
-#
-# The Helios console window and xterm under Helios X both understand the
-# ANSI cursor and attribute sequences from /helios/etc/termcap.  Map
-# symbols stay plain ASCII.
-OPTIONS=time,showexp,showscore,!autopickup
-# the new-player tutorial: delete this line to be asked for it
-OPTIONS=!tutorial
-OPTIONS=pickup_types:$?!/="+
-OPTIONS=number_pad:0
-OPTIONS=menustyle:traditional
-# The 25-line console window has room for the two status lines.
-# OPTIONS=color   (only if your terminal does ANSI colour; termcap has none)
+# NetHack 5 defaults for Helios, shared by the tty and X11 interfaces.
+# $HOME/nethack.cnf replaces this file if present. Copy it there to customise.
 
-# Use tiles when the X11 interface is selected.
+# Keep the familiar movement keys and manual pickup policy.
+OPTIONS=number_pad:0,!autopickup,pickup_types:$?!/="+
+OPTIONS=!tutorial
+
+# Use complete item-selection menus; group and sort inventory entries.
+OPTIONS=menustyle:full,menu_headings:bold,sortpack,sortloot:full
+# Include the full extended-command list when pressing # in X11.
+OPTIONS=extmenu
+# X11 uses a single dialog to choose name, role, race, gender and alignment.
+OPTIONS=player_selection:dialog
+
+# Keep useful game information and a longer recallable message history.
+OPTIONS=color,time,showexp,showscore,msghistory:100
+OPTIONS=hilite_pet,hilite_pile
+OPTIONS=hitpointbar,statushilites:3
+OPTIONS=hilite_status:hitpoints/100%/green/<100%/green
+OPTIONS=hilite_status:hitpoints/<50%/orange/<25%/red&inverse
+OPTIONS=hilite_status:power/<25%/orange
+OPTIONS=hilite_status:condition/major_troubles/red&inverse
+
+# The X11 interface uses tiles; tty falls back to its character map.
 OPTIONS=tiled_map
+
+# Optional: a separate persistent inventory window (toggle with O in X11).
+# OPTIONS=perm_invent

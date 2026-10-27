@@ -16,6 +16,17 @@ Options come from $HOME/nethack.cnf, falling back to nethack.cnf in the
 game directory. Use h/j/k/l/y/u/b/n to move, ? for help and S to save.
 The X11 interface supports mouse movement, menus and coloured tiles.
 Its application resource class is NetHack5. The tile file is x11tiles.
+Resources live in /helios/lib/x11/app-defa/NetHack5. They select ivory
+controls, a dark map, fixed-width text, six message lines, visible
+prompts and keyboard focus for popups.
+
+The supplied nethack.cnf enables full item menus, the extended-command
+menu (#), pet and item-pile markers and low-health status highlighting.
+Character creation uses a single dialog in X11. Manual pickup and the
+h/j/k/l movement keys are unchanged. Press O to change options, including
+perm_invent for a separate persistent inventory window. It is off by
+default. A home nethack.cnf replaces the supplied configuration; it is
+not merged with it. Saved games can retain options from an earlier run.
 
 The tty interface uses ncurses terminal profiles. An xterm should have
 TERM=xterm or xterm-256color; install the ncurses port's terminfo data.

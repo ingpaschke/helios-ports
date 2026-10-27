@@ -49,9 +49,14 @@
       "file": "08-defer-redraw.patch",
       "sha256": "06d89c7170e088d63c9138777738a0ddae6c58deb7d8622660cacd8c4443291a",
       "description": "Defer terminal redraw while a dungeon level is being generated or restored"
+    },
+    {
+      "file": "09-interface-defaults.patch",
+      "description": "Use the Helios desktop palette, focus popups and make prompts and message history easier to follow",
+      "sha256": "5ad2ae599d17fd1ad9ad82740d6f6408498023b04131937acf6b52c5ad47e1da"
     }
   ],
-  "patched_tree_sha256": "9d25d942e59627be15cf4cd3720358456667acecddec2d91fad3554e54c7efc4",
+  "patched_tree_sha256": "abf151577998cb17f7bf0b98d84728130a5fb7cab4e37ecc449868c57ffd4651",
   "dependencies": [
     "x11",
     "ncurses"

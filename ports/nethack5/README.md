@@ -38,9 +38,23 @@ launcher preserve an existing NetHack 3.1.3 installation. Use `NETHACKDIR`
 or `-d` to select another writable game directory.
 
 Options come from `$HOME/nethack.cnf`, falling back to the playground's
-`nethack.cnf`. The supplied defaults enable tiles for X11 and disable the
-new-player tutorial. Press `?` for help or `S` to save. `nethack5 -s` lists
-high scores. `sysconf` selects wizard-mode users.
+`nethack.cnf`. Copy the supplied file to your home directory to customise it.
+The defaults keep manual pickup and letter-key movement, enable full item
+menus, pet and item-pile markers, a hit-point bar and low-health warnings.
+X11 uses a character-creation dialog and a complete extended-command menu
+on `#`. The new-player tutorial remains disabled. Press `?` for help,
+`O` to change options or `S` to save; `nethack5 -s` lists high scores.
+`sysconf` selects wizard-mode users.
+
+The X11 resources use the desktop's ivory and teal colours, fixed-width
+`9x15` text, six visible message lines, a separator between old and new
+messages, highlighted prompts and automatic keyboard focus for popups.
+Tiles retain their original colours. A persistent inventory window is
+available with `perm_invent` (off by default); use `O` to enable it.
+For larger tiles on a large display, set `NetHack5.double_tile_size: True`
+in the X server's resources. This doubles the full map width to 2560 pixels.
+Game options and X resources apply to newly started games; options stored
+in a save may need to be changed through `O` after restoring it.
 
 The target filenames follow the Atari 8.3 convention. The data archive
 contains the Lua scripts; the target does not create individual Lua files.
@@ -66,6 +80,8 @@ termcap implementation, so ordinary xterms are recognized.
 character-at-a-time input mode; the native fields are not Unix read timers.
 `08-defer-redraw.patch` defers terminal redraw until a level is fully generated
 or restored, avoiding reads of incomplete shop state.
+`09-interface-defaults.patch` sets desktop colours, popup focus and prompt
+and message-display defaults in the upstream X resource template.
 
 ## Checks
 
