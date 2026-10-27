@@ -38,9 +38,14 @@
       "file": "03-ssh-shutdown.patch",
       "description": "Stop an SSH terminal task before freeing its live pseudo-terminal state",
       "sha256": "0ef8a572178b538120f28fe8da11fe56758f68c4590687f91d658e1d329b8425"
+    },
+    {
+      "file": "04-eof-line.patch",
+      "sha256": "d04e9856f5a4154d12cd417ffb6fb307777d1162945500d8afd16cbd62df7d61",
+      "description": "Deliver the final cooked input line before EOF even without a newline"
     }
   ],
-  "patched_tree_sha256": "d1b2f9acfdba6675f9af560903dd673bd346d5f087ee45811885fd0006078ea4",
+  "patched_tree_sha256": "0edaf910772cdda6d48ca07ee294bf2ac9540884c44cce85cb3b5ba4a02df16b",
   "dependencies": [],
   "build": {
     "groups": [

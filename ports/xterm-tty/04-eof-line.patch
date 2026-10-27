@@ -1,0 +1,14 @@
+Subject: Deliver the final cooked input line before EOF even without a newline
+
+diff --git a/ttyserv/tty.c b/ttyserv/tty.c
+index 98c442b92c9a70475d492eacdf741f7d33ea1058..dec0e9a8dcb66f97da07a5d806b53178c2bf6a77 100644
+--- a/ttyserv/tty.c
++++ b/ttyserv/tty.c
+@@ -1081,6 +1081,7 @@ Put_Cooked (Window *w, int timeout, word *sflags)
+ 
+ 	case 0x04 :			/* Ctrl-D : end of file		*/
+ 	    *sflags |= Cooked_EOF;	/* set EOF flag.		*/
++	    k->in_flags |= Cooked_Done; /* deliver the final partial line */
+ 	    return TRUE;
+ 
+ 	case 0x08 :			/* backspace			*/
