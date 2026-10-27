@@ -1,0 +1,79 @@
+Subject: Connect local displays through native Helios sockets
+
+diff --git a/lib/X/XConnDis.c b/lib/X/XConnDis.c
+index c1fc31fab41cfd59814833e745dc9181ffcf5774..13130e219bb44c589192de8d746894015c721284 100644
+--- a/lib/X/XConnDis.c
++++ b/lib/X/XConnDis.c
+@@ -32,6 +32,11 @@
+ #include "Xlibint.h"
+ #include <X11/Xauth.h>
+ #include <ctype.h>
++#ifdef helios
++/* Native namespace sockets also work without an /internet server. */
++#define UNIXCONN
++#define X_UNIX_PATH "X"
++#endif
+ #ifdef DNETCONN
+ #include <netdnet/dn.h>
+ #include <netdnet/dnetdb.h>
+@@ -222,6 +227,11 @@ int _XConnectDisplay (display_name, fullnamep, dpynump, screenp,
+     else if (strcmp (phostname, "unix") == 0) {
+ 	connfunc = MakeUNIXSocketConnection;
+     }
++#endif
++#ifdef helios
++    if (!phostname || !strcmp(phostname, "helios") ||
++        !strcmp(phostname, "local"))
++        connfunc = MakeUNIXSocketConnection;
+ #endif
+     if (!connfunc)
+ 	goto bad;
+@@ -445,11 +455,17 @@ static int MakeUNIXSocketConnection (phostname, idisplay, retries,
+     int oaddrlen;			/* length of addr */
+ #endif
+ 
++    memset(&unaddr, 0, sizeof(unaddr));
+     unaddr.sun_family = AF_UNIX;
+     sprintf (unaddr.sun_path, "%s%d", X_UNIX_PATH, idisplay);
+ 
+     addr = (struct sockaddr *) &unaddr;
++#ifdef helios
++    /* SysLib marshals a native pathname; include its terminating NUL. */
++    addrlen = sizeof(unaddr);
++#else
+     addrlen = strlen(unaddr.sun_path) + sizeof(unaddr.sun_family);
++#endif
+ 
+ #ifdef hpux /* this is disgusting */
+     ounaddr.sun_family = AF_UNIX;
+diff --git a/lib/X/XlibInt.c b/lib/X/XlibInt.c
+index 4b595775eb0de21211689a07df36a95294bd5301..4c4c7c555650e2e53b00e79583cc8997fa5444f2 100644
+--- a/lib/X/XlibInt.c
++++ b/lib/X/XlibInt.c
+@@ -16,6 +16,11 @@
+ #include "Xlibint.h"
+ #include "Xos.h"
+ #include <sys/socket.h>
++#ifdef helios
++#include <syslib.h>
++#include <gsp.h>
++extern Stream *fdstream(int);
++#endif
+ 
+ static void _EatData32();
+ 
+@@ -127,7 +132,13 @@ _XEventsQueued (dpy, mode)
+ 	if (BytesReadable(dpy->fd, (char *) &pend) < 0)
+ 	    _XIOError(dpy);
+ 
+-        if (pend == 0) {
++        if (pend == 0
++#ifdef helios
++            /* Native stream sockets become pipes after Connect. RecvMessage
++             * (and MSG_PEEK) is only defined for Type_Socket streams. */
++            && (fdstream(dpy->fd)->Type & ~Type_Flags) == Type_Socket
++#endif
++           ) {
+             char byte;
+             int n, saved_errno = errno;
+             do {

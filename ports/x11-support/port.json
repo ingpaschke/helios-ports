@@ -1,0 +1,80 @@
+{
+  "format": 1,
+  "name": "x11-support",
+  "version": "Helios BSD support for native X11 libraries",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/axelmuhr/Helios-NG.git",
+    "revision": "1fe8f65ee15407945e5a1a25f39f88de64de0d50",
+    "subdirectory": "scanlibs/bsd",
+    "include": [
+      "inetaddr.c",
+      "string.c",
+      "errlist.c",
+      "misc.c",
+      "ioctl.c",
+      "rwv.c"
+    ],
+    "tree_sha256": "4e5b47e14387c69d83eaa41465943d87a48fe435e7656e53e9c41a90171d017b"
+  },
+  "patches": [],
+  "files": "files",
+  "patched_tree_sha256": "c4dd10c66df3c22ece383310fa3079d515f1f283ef2731db6b90164788d63873",
+  "dependencies": [],
+  "build": {
+    "compile": {
+      "flags": [
+        "-std=gnu89",
+        "-D_BSD",
+        "-Wno-error=implicit-function-declaration",
+        "-Wno-error=incompatible-pointer-types",
+        "-Wno-error=int-conversion"
+      ]
+    },
+    "groups": [
+      {
+        "name": "bsd",
+        "sources": [
+          "${src}/inetaddr.c",
+          "${src}/string.c",
+          "${src}/errlist.c",
+          "${src}/misc.c",
+          "${src}/ioctl.c",
+          "${src}/rwv.c"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "bsd-static",
+        "type": "archive",
+        "groups": [
+          "bsd"
+        ],
+        "output": "${work}/lib/bsd-static.a"
+      },
+      {
+        "name": "Hxb",
+        "type": "shared",
+        "groups": [
+          "bsd"
+        ],
+        "interface": "${src}/helios/support.json",
+        "output": "${work}/lib/bsd.def",
+        "runtime": "${stage}/lib/Hxb",
+        "libraries": [
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ]
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/COPYING",
+        "destination": "${stage}/local/share/hxb/copying"
+      }
+    ]
+  }
+}

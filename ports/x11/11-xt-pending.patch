@@ -1,0 +1,18 @@
+Subject: Avoid redundant polling when Xt has no alternate input sources
+
+diff --git a/lib/Xt/NextEvent.c b/lib/Xt/NextEvent.c
+index 982f1d4130e953bdd583a9e2d1a74eb235b901d3..ea507e216fab55eb5af676a248c624085d55eda8 100644
+--- a/lib/Xt/NextEvent.c
++++ b/lib/Xt/NextEvent.c
+@@ -846,7 +846,10 @@ XtInputMask XtAppPending(app)
+ 	}
+ 
+ 	if (app->outstandingQueue != NULL) ret |= XtIMAlternateInput;
+-	else {
++	else if (app->fds.count > 0) {
++	    /* X events and timers were checked above. With no alternate input,
++	     * another select only repeats that work. On Helios an empty poll
++	     * waits for server replies, so repeated checks delay event delivery. */
+ 	    /* This won't cause a wait, but will enqueue any input */
+ 
+ 	    if(_XtwaitForSomething(TRUE, FALSE, FALSE, FALSE, (unsigned long *) NULL,

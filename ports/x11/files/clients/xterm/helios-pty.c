@@ -59,7 +59,7 @@ int helios_pty_open(int columns,int rows)
     if(hu_channel(pipefd)<0) return -1;
     hu_spawn_actions_init(&actions);
     error=hu_spawn_adddup2(&actions,pipefd[1],1);
-    if(!error)error=hu_spawn(&pid,"/helios/lib/xterm-ttyserv",
+    if(!error)error=hu_spawn(&pid,"/helios/lib/xttyserv",
                              &actions,&attr,args,NULL);
     hu_spawn_actions_destroy(&actions);
     close(pipefd[1]);

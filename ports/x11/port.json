@@ -59,12 +59,28 @@
       "file": "10-char2b.patch",
       "description": "Keep XChar2b two bytes so UTF-8 terminals send correct X11 text requests",
       "sha256": "37e24f15f84feeabb5d463b0975c4b3897668ed71d9f895dc064be6d05fce9fe"
+    },
+    {
+      "file": "11-xt-pending.patch",
+      "sha256": "81663666659722d4655736c003811b6405b3ac34f84de055e20abefa3dead68f",
+      "description": "Avoid redundant polling when Xt has no alternate input sources"
+    },
+    {
+      "file": "12-native-transport.patch",
+      "sha256": "256de2bbdbfa566b6ae78cc8eb36b6fc6bfeae4dfae59163d1b903be38f66827",
+      "description": "Connect local displays through native Helios sockets"
+    },
+    {
+      "file": "13-vt-only.patch",
+      "sha256": "7bba1adbcf6852b1313bdea6fdb8904f8da401ea4abad1c9e0bafdb8fd37f8d1",
+      "description": "Build a VT-only native terminal with no default scrollback"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "7c3fd64fb46a46144be9bb877a3b6778b51508c2f6b5d07ce9f173f4909bce8e",
+  "patched_tree_sha256": "7f775b9de01e97b78d924113519c54bfc89c4ee23c5b7433761931d3830c6203",
   "dependencies": [
-    "xterm-tty"
+    "xterm-tty",
+    "x11-support"
   ],
   "requires_compat": true,
   "host_tools": [
@@ -881,10 +897,8 @@
           "${src}/clients/xterm/screen.c",
           "${src}/clients/xterm/scrollbar.c",
           "${src}/clients/xterm/button.c",
-          "${src}/clients/xterm/Tekproc.c",
           "${src}/clients/xterm/misc.c",
           "${src}/clients/xterm/VTPrsTbl.c",
-          "${src}/clients/xterm/TekPrsTbl.c",
           "${src}/clients/xterm/data.c",
           "${src}/clients/xterm/menu.c",
           {
@@ -892,7 +906,11 @@
             "flags": [
               "-I${compat}/include/helios-unix"
             ]
-          }
+          },
+          "${src}/helios/xterm-vt.c"
+        ],
+        "flags": [
+          "-DHELIOS_VT_ONLY"
         ]
       },
       {
@@ -913,6 +931,19 @@
         "name": "xwud",
         "sources": [
           "${src}/clients/xwud/xwud.c"
+        ]
+      },
+      {
+        "name": "Xvendor",
+        "sources": [
+          "${src}/lib/Xaw/Vendor.c"
+        ],
+        "flags": []
+      },
+      {
+        "name": "native-memory-check",
+        "sources": [
+          "${src}/helios/tests/native-memory.c"
         ]
       }
     ],
@@ -957,7 +988,7 @@
         "groups": [
           "X"
         ],
-        "output": "${work}/lib/libX11.a"
+        "output": "${static_lib}/libX11.a"
       },
       {
         "name": "Xt",
@@ -965,7 +996,7 @@
         "groups": [
           "Xt"
         ],
-        "output": "${work}/lib/libXt.a"
+        "output": "${static_lib}/libXt.a"
       },
       {
         "name": "Xmu",
@@ -973,7 +1004,7 @@
         "groups": [
           "Xmu"
         ],
-        "output": "${work}/lib/libXmu.a"
+        "output": "${static_lib}/libXmu.a"
       },
       {
         "name": "Xaw",
@@ -981,7 +1012,7 @@
         "groups": [
           "Xaw"
         ],
-        "output": "${work}/lib/libXaw.a"
+        "output": "${static_lib}/libXaw.a"
       },
       {
         "name": "Xext",
@@ -989,7 +1020,108 @@
         "groups": [
           "Xext"
         ],
-        "output": "${work}/lib/libXext.a"
+        "output": "${static_lib}/libXext.a"
+      },
+      {
+        "name": "Hx11",
+        "type": "shared",
+        "groups": [
+          "X"
+        ],
+        "interface": "${src}/helios/shared/X11.json",
+        "output": "${work}/lib/libX11.a",
+        "runtime": "${stage}/lib/Hx11",
+        "libraries": [
+          "${dep:x11-support}/lib/bsd.def",
+          "${work}/lib/libXau.a",
+          "${work}/lib/libXdmcp.a",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "when": {
+          "linkage": "shared"
+        }
+      },
+      {
+        "name": "Hxext",
+        "type": "shared",
+        "groups": [
+          "Xext"
+        ],
+        "interface": "${src}/helios/shared/Xext.json",
+        "output": "${work}/lib/libXext.a",
+        "runtime": "${stage}/lib/Hxext",
+        "libraries": [
+          "${dep:x11-support}/lib/bsd.def",
+          "${work}/lib/libX11.a",
+          "${work}/lib/libXau.a",
+          "${work}/lib/libXdmcp.a",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "when": {
+          "linkage": "shared"
+        }
+      },
+      {
+        "name": "Hxt",
+        "type": "shared",
+        "groups": [
+          "Xt",
+          "Xmu",
+          "Xvendor"
+        ],
+        "interface": "${src}/helios/shared/Xt.json",
+        "output": "${work}/lib/libXt.a",
+        "runtime": "${stage}/lib/Hxt",
+        "libraries": [
+          "${dep:x11-support}/lib/bsd.def",
+          "${work}/lib/libX11.a",
+          "${work}/lib/libXext.a",
+          "${work}/lib/libXau.a",
+          "${work}/lib/libXdmcp.a",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "exclude_sources": [
+          "${src}/lib/Xt/Vendor.c"
+        ],
+        "aliases": [
+          "${work}/lib/libXmu.a"
+        ],
+        "when": {
+          "linkage": "shared"
+        }
+      },
+      {
+        "name": "Hxaw",
+        "type": "shared",
+        "groups": [
+          "Xaw"
+        ],
+        "interface": "${src}/helios/shared/Xaw.json",
+        "output": "${work}/lib/libXaw.a",
+        "runtime": "${stage}/lib/Hxaw",
+        "libraries": [
+          "${dep:x11-support}/lib/bsd.def",
+          "${work}/lib/libX11.a",
+          "${work}/lib/libXext.a",
+          "${work}/lib/libXt.a",
+          "${work}/lib/libXau.a",
+          "${work}/lib/libXdmcp.a",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "exclude_sources": [
+          "${src}/lib/Xaw/Vendor.c"
+        ],
+        "when": {
+          "linkage": "shared"
+        }
       },
       {
         "name": "appres",
@@ -1252,7 +1384,8 @@
           "${sdk}/lib/helios.lib",
           "${runtime}"
         ],
-        "output": "${work}/bin/xterm"
+        "output": "${work}/bin/xterm",
+        "heap": 16384
       },
       {
         "name": "xwd",
@@ -1277,6 +1410,15 @@
           "xwud"
         ],
         "output": "${work}/bin/xwud"
+      },
+      {
+        "name": "native-memory-check",
+        "type": "executable",
+        "groups": [
+          "native-memory-check"
+        ],
+        "output": "${work}/tests/x11check",
+        "heap": 16384
       }
     ],
     "install": [
@@ -1289,6 +1431,72 @@
         "type": "copy",
         "source": "${work}/lib",
         "destination": "${stage}/lib/x11r4"
+      },
+      {
+        "type": "copy",
+        "source": "${dep:x11-support}/stage/lib/Hxb",
+        "destination": "${stage}/lib/Hxb",
+        "when": {
+          "linkage": "shared"
+        }
+      },
+      {
+        "type": "copy",
+        "source": "${dep:x11-support}/lib/bsd.def",
+        "destination": "${stage}/lib/x11r4/bsd.def",
+        "when": {
+          "linkage": "shared"
+        }
+      },
+      {
+        "type": "copy",
+        "source": "${dep:x11-support}/stage/local/share/hxb",
+        "destination": "${stage}/local/share/hxb"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/clients/xclock/XClock.ad",
+        "destination": "${stage}/lib/x11/app-defa/XClock"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/clients/xedit/Xedit.ad",
+        "destination": "${stage}/lib/x11/app-defa/Xedit"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/clients/xlogo/XLogo.ad",
+        "destination": "${stage}/lib/x11/app-defa/XLogo"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/clients/xcalc/XCalc.ad",
+        "destination": "${stage}/lib/x11/app-defa/XCalc"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/clients/xfd/Xfd.ad",
+        "destination": "${stage}/lib/x11/app-defa/Xfd"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/clients/xterm/XTerm.ad",
+        "destination": "${stage}/lib/x11/app-defa/XTerm"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/clients/xfontsel/XFontSel.ad",
+        "destination": "${stage}/lib/x11/app-defa/XFontSel"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/clients/xman/Xman.ad",
+        "destination": "${stage}/lib/x11/app-defa/Xman"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYRIGHTS",
+        "destination": "${stage}/local/share/x11/COPYING"
       }
     ],
     "outputs": [

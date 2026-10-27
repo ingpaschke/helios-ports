@@ -1,0 +1,143 @@
+Subject: Build a VT-only native terminal with no default scrollback
+
+diff --git a/clients/xterm/main.c b/clients/xterm/main.c
+index 775829aded35fdc0e0122e4c77c2916cff9e1697..0186b398b1e46150e9ed685da06ae7e4177696b2 100644
+--- a/clients/xterm/main.c
++++ b/clients/xterm/main.c
+@@ -375,8 +375,10 @@ static XrmOptionDescRec optionDescList[] = {
+ {"-sk",		"*scrollKey",	XrmoptionNoArg,		(caddr_t) "on"},
+ {"+sk",		"*scrollKey",	XrmoptionNoArg,		(caddr_t) "off"},
+ {"-sl",		"*saveLines",	XrmoptionSepArg,	(caddr_t) NULL},
++#ifndef HELIOS_VT_ONLY
+ {"-t",		"*tekStartup",	XrmoptionNoArg,		(caddr_t) "on"},
+ {"+t",		"*tekStartup",	XrmoptionNoArg,		(caddr_t) "off"},
++#endif
+ {"-tm",		"*ttyModes",	XrmoptionSepArg,	(caddr_t) NULL},
+ {"-tn",		"*termName",	XrmoptionSepArg,	(caddr_t) NULL},
+ {"-ut",		"*utmpInhibit",	XrmoptionNoArg,		(caddr_t) "on"},
+@@ -387,7 +389,9 @@ static XrmOptionDescRec optionDescList[] = {
+ {"+wf",		"*waitForMap",	XrmoptionNoArg,		(caddr_t) "off"},
+ /* bogus old compatibility stuff for which there are
+    standard XtInitialize options now */
++#ifndef HELIOS_VT_ONLY
+ {"%",		"*tekGeometry",	XrmoptionStickyArg,	(caddr_t) NULL},
++#endif
+ {"#",		".iconGeometry",XrmoptionStickyArg,	(caddr_t) NULL},
+ {"-T",		"*title",	XrmoptionSepArg,	(caddr_t) NULL},
+ {"-n",		"*iconName",	XrmoptionSepArg,	(caddr_t) NULL},
+@@ -439,13 +443,17 @@ static struct _options {
+ { "-/+si",                 "turn on/off scroll-on-tty-output inhibit" },
+ { "-/+sk",                 "turn on/off scroll-on-keypress" },
+ { "-sl number",            "number of scrolled lines to save" },
++#ifndef HELIOS_VT_ONLY
+ { "-/+t",                  "turn on/off Tek emulation window" },
++#endif
+ { "-tm string",            "terminal mode keywords and characters" },
+ { "-tn name",              "TERM environment variable name" },
+ { "-/+ut",                 "turn on/off utmp inhibit" },
+ { "-/+vb",                 "turn on/off visual bell" },
+ { "-e command args",       "command to execute" },
++#ifndef HELIOS_VT_ONLY
+ { "%geom",                 "Tek window geometry" },
++#endif
+ { "#geom",                 "icon window geometry" },
+ { "-T string",             "title name for window" },
+ { "-n string",             "icon name for window" },
+@@ -742,7 +750,12 @@ char **argv;
+ 	inhibit = 0;
+ 	if (term->misc.logInhibit) 	    inhibit |= I_LOG;
+ 	if (term->misc.signalInhibit)		inhibit |= I_SIGNAL;
+-	if (term->misc.tekInhibit)			inhibit |= I_TEK;
++	/* This native build has no Tektronix parser or graphics window. */
++#ifdef HELIOS_VT_ONLY
++        inhibit |= I_TEK;
++        screen->TekEmu = FALSE;
++#endif
++        if (term->misc.tekInhibit)			inhibit |= I_TEK;
+ 
+ 	term->initflags = term->flags;
+ 
+@@ -847,9 +860,10 @@ char **argv;
+ 	XSetErrorHandler(xerror);
+ 	XSetIOErrorHandler(xioerror);
+ 	for( ; ; ) {
+-		if(screen->TekEmu) {
+-			TekRun();
+-		} else
++#ifndef HELIOS_VT_ONLY
++		if(screen->TekEmu) TekRun();
++		else
++#endif
+ 			VTRun();
+ 	}
+ }
+diff --git a/clients/xterm/menu.c b/clients/xterm/menu.c
+index 29034b5e255884adea0ae42ebf2c3c513a9a58e3..ee500cb19f74e801cd2649088b3abaf2c89184b5 100644
+--- a/clients/xterm/menu.c
++++ b/clients/xterm/menu.c
+@@ -63,11 +63,14 @@ MenuEntry vtMenuEntries[] = {
+     { "altscreen",	do_altscreen, NULL },		/* 14 */
+     { "line1",		NULL, NULL },			/* 15 */
+     { "softreset",	do_softreset, NULL },		/* 16 */
+-    { "hardreset",	do_hardreset, NULL },		/* 17 */
+-    { "line2",		NULL, NULL },			/* 18 */
++    { "hardreset",	do_hardreset, NULL }
++#ifndef HELIOS_VT_ONLY
++    , { "line2",		NULL, NULL },			/* 18 */
+     { "tekshow",	do_tekshow, NULL },		/* 19 */
+     { "tekmode",	do_tekmode, NULL },		/* 20 */
+-    { "vthide",		do_vthide, NULL }};		/* 21 */
++    { "vthide",		do_vthide, NULL }		/* 21 */
++#endif
++};
+ 
+ MenuEntry fontMenuEntries[] = {
+     { "fontdefault",	do_vtfont, NULL },		/*  0 */
+@@ -188,12 +191,16 @@ static Bool domenu (w, event, params, param_count)
+ 	break;
+ 
+       case 't':
++#ifdef HELIOS_VT_ONLY
++        return False;
++#else
+ 	if (!screen->tekMenu) {
+ 	    screen->tekMenu = create_menu (term, toplevel, "tekMenu",
+ 					   tekMenuEntries,
+ 					   XtNumber(tekMenuEntries));
+ 	    set_tekfont_menu_item (screen->cur.fontsize, TRUE);
+ 	}
++#endif
+ 	break;
+ 
+       default:
+diff --git a/clients/xterm/menu.h b/clients/xterm/menu.h
+index b34ffc5fbec3f4b8f237f7bb221cc4a3ab2825a3..d92cd23898536b85392326e379683b16536fd2de 100644
+--- a/clients/xterm/menu.h
++++ b/clients/xterm/menu.h
+@@ -262,3 +262,13 @@ extern void HandleAllowSends(), HandleVisualBell(),
+   update_menu_item (term->screen.fontMenu, \
+ 		    fontMenuEntries[term->screen.menu_font_number].widget, \
+ 		    (val))
++
++/* A VT-only menu has no Tek-mode, Tek-window or hide-VT entries. */
++#ifdef HELIOS_VT_ONLY
++#undef update_tekshow
++#undef update_vttekmode
++#undef set_vthide_sensitivity
++#define update_tekshow() ((void)0)
++#define update_vttekmode() ((void)0)
++#define set_vthide_sensitivity() ((void)0)
++#endif
+diff --git a/clients/xterm/ptyx.h b/clients/xterm/ptyx.h
+index 79fbff623b4802b301f0aafb25ae6f05f141570b..5891c4afcf9037cf2da5088288fed3e2cc6810e7 100644
+--- a/clients/xterm/ptyx.h
++++ b/clients/xterm/ptyx.h
+@@ -191,7 +191,7 @@ typedef struct {
+ 	int height;
+ } BitmapBits;
+ 
+-#define	SAVELINES		64      /* default # lines to save      */
++#define	SAVELINES		0      /* default # lines to save      */
+ #define SCROLLLINES 1			/* default # lines to scroll    */
+ 
+ typedef struct {

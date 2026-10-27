@@ -13,6 +13,7 @@ consult individual source and asset notices.
 | --- | --- |
 | xterm | `COPYING` and individual source notices; new native adapters are MIT licensed |
 | X11R4 | `COPYRIGHTS` and individual source notices |
+| x11-support | Helios-NG GPLv3, `COPYING`; individual BSD helper notices |
 | FVWM | `fvwm/fvwm.c`; modules include their own notices, such as `modules/FvwmIconBox/COPYRIGHT` |
 | Irssi | `COPYING` |
 | GLib | `COPYING`, `gmodule/COPYING` |

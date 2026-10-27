@@ -1,0 +1,42 @@
+{
+  "name": "Hxb",
+  "slot": 37,
+  "version": 1,
+  "function_capacity": 64,
+  "functions": [
+    "bcmp",
+    "bcopy",
+    "bzero",
+    "fchmod",
+    "ffs",
+    "getwd",
+    "gtty",
+    "index",
+    "inet_addr",
+    "initgroups",
+    "ioctl",
+    "isascii",
+    "readlink",
+    "readv",
+    "rindex",
+    "seekdir",
+    "setegid",
+    "seteuid",
+    "setgroups",
+    "setreuid",
+    "setrgid",
+    "setruid",
+    "strcasecmp",
+    "strncasecmp",
+    "strtoinaddr",
+    "stty",
+    "telldir",
+    "utimes",
+    "writev"
+  ],
+  "data": {
+    "sys_errlist": 66,
+    "sys_nerr": 1,
+    "sys_siglist": 33
+  }
+}
