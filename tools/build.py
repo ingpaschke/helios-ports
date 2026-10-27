@@ -14,12 +14,15 @@ import sources
 
 class Builder:
     def __init__(self, work, sdk, assembler, compat=None, toolchain='/opt/llvm-t800',
-                 jobs=4, host_sdk=None, offline=False, root=sources.ROOT):
+                 jobs=4, host_sdk=None, offline=False, root=sources.ROOT, cpu='t800'):
         self.root = Path(root).resolve(); self.work = Path(work).resolve()
         self.sdk = Path(sdk).resolve(); self.assembler = Path(assembler).resolve()
         self.compat = Path(compat).resolve() if compat else None
         self.toolchain = Path(toolchain).resolve(); self.jobs = jobs
         self.host_sdk = Path(host_sdk).resolve() if host_sdk else None
+        if cpu not in ('generic', 't425', 't800'):
+            raise ValueError('Unsupported CPU: ' + cpu)
+        self.cpu = cpu
         self.offline = offline; self.completed = {}; self.active = set()
         self.work.mkdir(parents=True, exist_ok=True)
 
@@ -71,6 +74,7 @@ class Builder:
     def fingerprint(self, name):
         config = self.config(name)
         result = {'configuration': sources.identity(config, self.root),
+                  'cpu': self.cpu,
                   'engine': sources.tree_hash(self.root/'tools'),
                   'entry_point': sources.sha(self.root/'ports.py'),
                   'sdk': sources.tree_hash(self.sdk/'include')+sources.tree_hash(self.sdk/'lib'),
@@ -165,10 +169,11 @@ class Builder:
         flags = self.expand(group.get('flags',[])+entry.get('flags',[]), local)
         if group.get('compiler','clang') == 'hcc':
             includes = self.expand(group['includes'], local)
-            command = [context['hcc'], *flags, '-i,'+','.join(p+'/' for p in includes),
+            cpu_flag = {'generic': '-t4', 't425': '-t5', 't800': '-t8'}[self.cpu]
+            command = [context['hcc'], *flags, cpu_flag, '-i,'+','.join(p+'/' for p in includes),
                        '-j'+','.join(p+'/' for p in includes), str(source), '-s'+str(out.with_suffix('.s'))]
         else:
-            command = [context['clang'], '--target=t800-helios', '-mcpu=t800', '--sysroot='+context['sdk'],
+            command = [context['clang'], '--target=t800-helios', '-mcpu='+self.cpu, '--sysroot='+context['sdk'],
                        '-Os', *flags, '-S', str(source), '-o', str(out.with_suffix('.s'))]
         stamp = out.with_suffix('.sha256')
         key = hashlib.sha256((identity+json.dumps(command)+sources.sha(source)).encode()).hexdigest()

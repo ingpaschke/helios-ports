@@ -48,7 +48,7 @@
         "command": [
           "env",
           "PATH=${asm_dir}:/usr/bin:/bin",
-          "CC=${clang} --target=t800-helios --sysroot=${sdk}",
+          "CC=${clang} --target=t800-helios -mcpu=${cpu} --sysroot=${sdk}",
           "CFLAGS=-Os -DICANON=ICANNON -Dssize_t=int -I${compat}/include/helios-unix",
           "LIBS=-lbsd",
           "BUILD_CC=gcc",

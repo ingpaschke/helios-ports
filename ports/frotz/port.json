@@ -28,7 +28,7 @@
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "dae68e9055617165d4cf67803b61b123853c67faa28b331dbbe24e87e00cf609",
+  "patched_tree_sha256": "e58e111fd95af034a6cb767934c04cc1d50b831fa7200a9b811286cbe6a71036",
   "dependencies": [
     "ncurses"
   ],
@@ -45,6 +45,7 @@
           "Makefile.helios",
           "-j${jobs}",
           "CLANG=${clang}",
+          "CPU=${cpu}",
           "SYSROOT=${sdk}",
           "HASMDIR=${asm_dir}",
           "NCURSES=${dep:ncurses}/stage/local",

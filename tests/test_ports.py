@@ -237,5 +237,17 @@ class PortsTest(unittest.TestCase):
         self.assertFalse((work/'include').is_symlink())
         self.assertEqual((work/'include/hello.txt').read_text(), 'upstream\n')
 
+    def test_cpu_change_rebuilds_cached_port(self):
+        self.builder().build('one')
+        target = Builder(self.work, self.sdk, self.assembler,
+                         toolchain=self.toolchain, root=self.root,
+                         offline=True, cpu='t425')
+        with self.assertRaisesRegex(RuntimeError, 'stale'):
+            target.validate('one')
+        target.build('one')
+        target.validate('one')
+        with self.assertRaisesRegex(RuntimeError, 'stale'):
+            self.builder().validate('one')
+
 
 if __name__ == '__main__': unittest.main()
