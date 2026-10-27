@@ -1,0 +1,20 @@
+Subject: Use Atari-compatible configuration file names
+
+diff --git a/src/curses/ux_frotz.h b/src/curses/ux_frotz.h
+index b12d4c64cf14a2fdddb0733dee97a164cd49ff62..565a635b35b54a434f3973123a1a244f38b050fe 100644
+--- a/src/curses/ux_frotz.h
++++ b/src/curses/ux_frotz.h
+@@ -15,8 +15,13 @@
+ #include "../blorb/blorblow.h"
+ #include "ux_setup.h"
+ 
++#ifdef HELIOS_PORT
++#define MASTER_CONFIG "frotz.cnf"
++#define USER_CONFIG "frotz.cnf"
++#else
+ #define MASTER_CONFIG		"frotz.conf"
+ #define USER_CONFIG		".frotzrc"
++#endif
+ #define ASCII_DEF		1
+ #define ATTRIB_ASSIG_DEF	0
+ #define ATTRIB_TEST_DEF		0

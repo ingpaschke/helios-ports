@@ -1,0 +1,28 @@
+Subject: Use Atari-compatible data directory names
+
+diff --git a/src/main.cc b/src/main.cc
+index 66335ee13f475e9cb96177dd664b686ec7083021..29aeb5775b7f610ae28098a9e59d384a07ea146d 100644
+--- a/src/main.cc
++++ b/src/main.cc
+@@ -218,10 +218,10 @@ print_config_list(const char *config_dir)
+ 		   ".gif", dir);
+   closedir(dir);
+ 
+-  sprintf(buf, "%s/backgrounds", config_dir);
++  sprintf(buf, "%s/backgrou", config_dir);
+   dir = opendir(buf);
+   if (dir == 0) config_error("can't find any background images!");
+-  print_config_dir("Background images in `%s/backgrounds'",
++  print_config_dir("Background images in `%s/backgrou'",
+ 		   config_dir, ".gif", dir);
+   closedir(dir);
+ 
+@@ -479,7 +479,7 @@ load_background(const char *background_name, const char *config_dir,
+   char *buf = new char[len];
+   Gif_Stream *gfs;
+   
+-  sprintf(buf, "%s/backgrounds/%s.gif", config_dir, background_name);
++  sprintf(buf, "%s/backgrou/%s.gif", config_dir, background_name);
+   FILE *normal_f = fopen(buf, "rb");
+   if (!normal_f)
+     normal_f = fopen(background_name, "rb");

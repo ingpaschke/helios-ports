@@ -70,7 +70,7 @@
 #undef PACKAGE_VERSION
 
 /* Define to the pathname of the --pkgdatadir directory. */
-#define PKGDATADIR "/helios/local/share/xmahjongg"
+#define PKGDATADIR "/helios/local/share/xmahjong"
 
 /* The size of a `unsigned int', as computed by sizeof. */
 #define SIZEOF_UNSIGNED_INT 4

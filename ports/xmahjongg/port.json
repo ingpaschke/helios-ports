@@ -15,10 +15,15 @@
       "file": "01-helios.patch",
       "description": "Adapt event timing, configuration and diagnostics to native Helios X11",
       "sha256": "7a9abe4791138e628b4a1ce61533d675955e9fe123c3e81bcf2b9ab393cee756"
+    },
+    {
+      "file": "02-short-paths.patch",
+      "sha256": "a134dce8fa36822e3fcfa93b64d35cd7b5b36561ba69d9d9dd47422bba31893e",
+      "description": "Use Atari-compatible data directory names"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "554ee9f76e6c4136c1fe8e747322c644b40fc077f8efb1173b85e98737c64a5a",
+  "patched_tree_sha256": "f320a045f735e5f73cd9101893369e0baa558fd23c4e559b34eeb2b2c7c2a515",
   "dependencies": [
     "x11"
   ],
@@ -111,7 +116,7 @@
         ],
         "output": "${stage}/bin/x11/xmahjongg",
         "stack": 131072,
-        "heap": 524288,
+        "heap": 65536,
         "start": "${tools}/lib/cxx0.o"
       }
     ],
@@ -123,33 +128,43 @@
       },
       {
         "type": "copy",
-        "source": "${src}/share",
-        "destination": "${stage}/local/share/xmahjongg"
+        "source": "${src}/share/layouts",
+        "destination": "${stage}/local/share/xmahjong/layouts"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/share/tiles",
+        "destination": "${stage}/local/share/xmahjong/tiles"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/share/backgrounds",
+        "destination": "${stage}/local/share/xmahjong/backgrou"
       },
       {
         "type": "copy",
         "source": "${src}/README",
-        "destination": "${stage}/local/share/xmahjongg/README"
+        "destination": "${stage}/local/share/xmahjong/README"
       },
       {
         "type": "copy",
         "source": "${src}/NEWS",
-        "destination": "${stage}/local/share/xmahjongg/NEWS"
+        "destination": "${stage}/local/share/xmahjong/NEWS"
       },
       {
         "type": "copy",
         "source": "${src}/COPYING",
-        "destination": "${stage}/local/share/xmahjongg/COPYING"
+        "destination": "${stage}/local/share/xmahjong/COPYING"
       },
       {
         "type": "copy",
         "source": "${src}/xmahjongg.6",
-        "destination": "${stage}/local/share/xmahjongg/xmahjongg.6"
+        "destination": "${stage}/local/share/xmahjong/xmahjongg.6"
       },
       {
         "type": "copy",
         "source": "${src}/helios/README.helios",
-        "destination": "${stage}/local/share/xmahjongg/README.helios"
+        "destination": "${stage}/local/share/xmahjong/README.helios"
       }
     ]
   }

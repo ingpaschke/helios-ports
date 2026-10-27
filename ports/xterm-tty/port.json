@@ -144,6 +144,11 @@
         "type": "copy",
         "source": "${work}/ssh-tty",
         "destination": "${stage}/lib/ssh-tty"
+      },
+      {
+        "type": "copy",
+        "source": "${work}/xterm-ttyserv",
+        "destination": "${stage}/lib/xttyserv"
       }
     ]
   }

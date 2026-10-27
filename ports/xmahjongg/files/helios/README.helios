@@ -14,12 +14,15 @@ Arrow keys and Space also allow keyboard play.
 Use --number 42 for a repeatable board; --list lists the available layouts,
 tilesets and backgrounds. Select them with --layout and --tileset.
 The --tileset small option is useful on smaller displays.
-Data files live in /helios/local/share/xmahjongg.
+Data files live in /helios/local/share/xmahjong.
 DISPLAY and XAUTHORITY are inherited from the desktop.
 
-This is a native T800 C++ build, including GIF decoding, using the LLVM
+This is a native Transputer C++ build, including GIF decoding, using the LLVM
 Helios C++ runtime and rebuilt X11R4 Xlib. The port uses the shared C++-compatible R4 headers and Helios's select descriptor
 representation, and includes errno.h directly.
 
 The source bundle, documentation and build recipe accompany the installed
 port. Upstream copyright and licence notices remain in the source.
+
+The initial C heap is 64 KiB and grows as needed. The stack remains 128 KiB.
+This avoids reserving a large contiguous block before the game starts.

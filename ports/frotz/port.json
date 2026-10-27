@@ -25,10 +25,15 @@
       "file": "03-status-line.patch",
       "sha256": "940b993d7f75aa93271dc7c7e56d3e9397b1e794ccbda06f7f3b19f4ff9bc484",
       "description": "Preserve the V1-V3 status line when resizing"
+    },
+    {
+      "file": "04-short-config.patch",
+      "sha256": "2a78202adae218ef9f0a52073738a495f75705eb7f85863079cf162c47bbc242",
+      "description": "Use Atari-compatible configuration file names"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "e58e111fd95af034a6cb767934c04cc1d50b831fa7200a9b811286cbe6a71036",
+  "patched_tree_sha256": "5a51dcf60330494d9438deea348fe9d70c1a74d63599aca72dc26e3db04c7d83",
   "dependencies": [
     "ncurses"
   ],
