@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
@@ -76,7 +77,7 @@ int helios_pty_open(int columns,int rows)
     if(hu_channel(pipefd)<0) return -1;
     hu_spawn_actions_init(&actions);
     error=hu_spawn_adddup2(&actions,pipefd[1],1);
-    if(!error)error=hu_spawn(&pid,"/helios/lib/xterm-ttyserv",
+    if(!error)error=hu_spawn(&pid,"/helios/lib/xttyserv",
                              &actions,&attr,args,NULL);
     hu_spawn_actions_destroy(&actions);
     close(pipefd[1]);
@@ -99,7 +100,7 @@ int helios_pty_open(int columns,int rows)
         if(master_fd>=0)break;
         Delay(OneSec/10);
     }
-    if(master_fd<0 || master_fd>=32) {
+    if(master_fd<0 || master_fd>=FD_SETSIZE) {
         fprintf(stderr,"xterm: cannot use master terminal %s\n",master);
         helios_pty_close();return -1;
     }
@@ -169,7 +170,9 @@ int helios_pty_spawn(char **command,unsigned long window,char *display,char *ter
         signal(SIGINT,SIG_DFL);signal(SIGQUIT,SIG_DFL);signal(SIGTERM,SIG_DFL);
         signal(SIGHUP,SIG_DFL);signal(SIGCHLD,SIG_DFL);
         execvp(command[0],command);
-        fprintf(stderr,"xterm: cannot execute %s: %s\n",command[0],strerror(errno));
+        /* vfork shares the parent's stdio state and heap until exec/_exit. */
+        write(2,"xterm: cannot execute requested program\n",
+              sizeof("xterm: cannot execute requested program\n")-1);
         _exit(127);
     }
     environ=old_environ;free(copy);

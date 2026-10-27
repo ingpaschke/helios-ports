@@ -44,4 +44,5 @@ int helios_set_winsize(int,const struct helios_winsize *);
 #define TTYSIZE_COLS(data) data.ws_col
 #define TTYSIZE_ROWS(data) data.ws_row
 #include "helios-pty.h"
+#include "font.h"
 #endif

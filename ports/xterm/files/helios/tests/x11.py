@@ -50,7 +50,7 @@ class Display:
             self.key('Return' if ch in '\r\n' else ch)
             time.sleep(.03)
     def resize(self,w,width,height):self.x.XResizeWindow(self.d,w,width,height);self.x.XSync(self.d,0)
-    def screenshot(self,path,width=1000,height=700):
+    def image(self,width=1000,height=700,window=None):
         from PIL import Image
         class XImage(C.Structure):
             _fields_=[('width',C.c_int),('height',C.c_int),('xoffset',C.c_int),('format',C.c_int),('data',C.c_void_p),
@@ -58,11 +58,14 @@ class Display:
                       ('depth',C.c_int),('bytes_per_line',C.c_int),('bits_per_pixel',C.c_int)]
         self.x.XGetImage.argtypes=[C.c_void_p,C.c_ulong,C.c_int,C.c_int,C.c_uint,C.c_uint,C.c_ulong,C.c_int]
         self.x.XGetImage.restype=C.POINTER(XImage)
-        p=self.x.XGetImage(self.d,self.root,0,0,width,height,C.c_ulong(-1),2);assert p
+        p=self.x.XGetImage(self.d,self.root if window is None else window,0,0,width,height,C.c_ulong(-1),2);assert p
         v=p.contents;assert v.bits_per_pixel==32
         data=C.string_at(v.data,v.bytes_per_line*v.height)
-        Image.frombytes('RGB',(v.width,v.height),data,'raw','BGRX',v.bytes_per_line).save(path)
+        result=Image.frombytes('RGB',(v.width,v.height),data,'raw','BGRX',v.bytes_per_line)
         self.x.XDestroyImage.argtypes=[C.POINTER(XImage)];self.x.XDestroyImage(p)
+        return result
+    def screenshot(self,path,width=1000,height=700):
+        self.image(width,height).save(path)
 
 class Attributes(C.Structure):
     _fields_=[('x',C.c_int),('y',C.c_int),('width',C.c_int),('height',C.c_int),

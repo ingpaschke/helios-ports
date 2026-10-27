@@ -11,7 +11,7 @@
 *VT100.utf8Fonts.wideBoldFont: -misc-fixed-medium-r-normal-ja-18-120-100-100-c-180-iso10646-1
 *VT100.foreground: #182c30
 *VT100.background: #ffffed
-*VT100.saveLines: 1000
+*VT100.saveLines: 0
 *VT100.scrollBar: true
 *VT100.metaSendsEscape: true
 *VT100.altSendsEscape: true

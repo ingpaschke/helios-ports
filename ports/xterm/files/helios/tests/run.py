@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 from pathlib import Path
-import os,subprocess,tempfile,time
+import os,subprocess,tempfile,time,statistics,json
 import pexpect,ctypes as C
 from PIL import Image
 import argparse,shutil,signal
@@ -9,16 +9,18 @@ from x11 import Desktop as Display,wait_for
 ap=argparse.ArgumentParser(description="Test xterm in an isolated Helios image and Xvfb")
 for name in ('image','template','ioserver','binary','probe','defaults','output'):
     ap.add_argument('--'+name,type=Path,required=True)
+ap.add_argument('--font-check',type=Path,help='native font comparison; defaults beside the built terminal-check')
 ap.add_argument('--t4',default='t4');ap.add_argument('--xvfb',default='Xvfb')
 ap.add_argument('--cpu',choices=('s4','s8'),default='s8')
 ap.add_argument('--display',type=int,default=84)
 a=ap.parse_args()
 for name in ('image','template','ioserver','binary','probe','defaults','output'):
     setattr(a,name,getattr(a,name).resolve())
+a.font_check=(a.font_check or a.probe.parent/'font-check').resolve()
 out=a.output;out.mkdir(parents=True,exist_ok=True)
 assert not Path('/tmp/.X11-unix/X'+str(a.display)).exists(),'Test display is already in use'
 folder=Path(tempfile.mkdtemp(prefix='xterm412-',dir=a.image/'tmp'))
-for source,name in ((a.binary,'xterm412'),(a.probe,'terminal-check'),(a.defaults,'XTerm412')):
+for source,name in ((a.binary,'xterm412'),(a.probe,'terminal-check'),(a.defaults,'XTerm412'),(a.font_check,'font-check')):
     shutil.copy2(source,folder/name)
 native='/helios/tmp/'+folder.name
 log=folder/'terminal.log'
@@ -49,8 +51,10 @@ try:
  tlog=open(out/'t4.log','w');t4=subprocess.Popen([a.t4,'-'+a.cpu,'-sm','24','-se','-sh','unix:'+str(sock)],stdout=tlog,stderr=tlog,start_new_session=True)
  srv=pexpect.spawn(str(a.ioserver),['-C',str(con)],env=dict(os.environ,TERM='xterm'),encoding='latin1',timeout=30,dimensions=(40,120));trace=open(out/'console.log','w');srv.logfile_read=trace
  srv.expect('login:');srv.sendline('root');srv.expect('% ')
+ srv.sendline(native+'/font-check 127.0.0.1:'+str(a.display));srv.expect('PASS font ownership',timeout=120);srv.expect('% ')
+ print('PASS exact font metrics, widths, font errors and ownership',flush=True)
  srv.sendline('setenv XENVIRONMENT '+native+'/XTerm412');srv.expect('% ')
- srv.sendline(native+'/xterm412 -display 127.0.0.1:'+str(a.display)+' -geometry 80x25+20+20 -title Xterm412-check +sb &');srv.expect('% ')
+ srv.sendline(native+'/xterm412 -display 127.0.0.1:'+str(a.display)+' -geometry 80x25+20+20 -title Xterm412-check -xrm "*cursorBlink: false" +sb &');srv.expect('% ')
  for _ in range(100):
   w=d.find('Xterm412-check')
   if w:break
@@ -60,11 +64,26 @@ try:
  d.screenshot(str(out/'first.png'))
  if not w:raise AssertionError('No window')
  wait_for(lambda:d.attrs(w).map_state==2)
- d.focus(w);d.type(native+'/terminal-check '+native+'/terminal.log\n')
+ d.focus(w)
+ # Measure actual key-to-render time. Empty Xt polls used to add several
+ # 10 ms Helios select waits to each character, even on an idle display.
+ d.type('echo ');time.sleep(.3);latency=[]
+ for key in 'abcdefghijkl':
+  before=d.image(400,120,w).tobytes();start=time.monotonic();d.key(key)
+  while d.image(400,120,w).tobytes()==before:
+   assert time.monotonic()-start<2,'No visible keyboard echo'
+   time.sleep(.002)
+  latency.append((time.monotonic()-start)*1000);time.sleep(.15)
+ (out/'latency.json').write_text(json.dumps(latency,indent=2)+'\n')
+ assert statistics.median(latency[1:])<50,latency
+ print('PASS keyboard echo: median %.1f ms'%statistics.median(latency[1:]),flush=True)
+ d.key('Return');time.sleep(.3)
+ d.type(native+'/terminal-check '+native+'/terminal.log\n')
  deadline=time.monotonic()+30
  while time.monotonic()<deadline:
   text=log.read_text() if log.exists() else ''
-  if 'native-csi-utf8:' in text:break
+  # Finish every cursor reply before resizing: SIGWINCH can interrupt Read.
+  if 'latin1-restored:' in text:break
   time.sleep(.1)
  print('queries:',text,flush=True)
  assert 'utf8:' in text

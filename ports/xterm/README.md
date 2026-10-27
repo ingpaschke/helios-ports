@@ -14,6 +14,7 @@ can be installed alongside the X11R4 terminal.
 `TERM=xterm-256color`; install the ncurses port's terminfo files too.
 For legacy termcap applications, append `local/share/xterm/helios.tc` to
 `/helios/etc/termcap`, or start the terminal with `-tn xterm`.
+Scrollback is disabled by default; use `-sl 256` to keep 256 lines.
 Resizing updates the native terminal attributes and signals its foreground
 application through the terminal service.
 
@@ -25,6 +26,12 @@ Include `/usr/share/fonts/X11/misc` in the X server's font path. Missing glyphs
 are limited by the selected font, including characters outside its repertoire.
 Use `-u8` to start in UTF-8 mode, or `+u8` to select eight-bit mode explicitly.
 Applications can switch with ESC % G (UTF-8) and ESC % @ (eight-bit).
+Terminal fonts use a private, lossless metrics cache. The QueryFont reply is
+read in pages of 256 glyphs; empty pages need no allocation and other pages
+use common metrics, indexed palettes or raw data. Missing glyphs, bearings,
+widths, attributes and combining-character metrics retain their exact values.
+The public Xlib structures and other applications are unchanged.
+
 The Helios SSH client enables UTF-8 for interactive connections and restores
 the terminal's previous encoding on exit. No character conversion is applied
 to redirected SSH output.
@@ -62,6 +69,18 @@ including UTF-8 continuation bytes that overlap native C1 controls. It
 then records resize events and keyboard bytes until Ctrl-D. The host test
 runner under `helios/tests/` drives an isolated emulated Helios and a private
 X server, including real menu callbacks under Caps Lock and Num Lock.
+It also measures key-to-screen echo to catch delays from empty event polls.
+The native `work/xterm/tests/font-check` compares every font metric, font
+properties and text widths against unmodified Xlib, including wide and
+proportional fonts, missing fonts and repeated load/free cycles. The runner
+invokes it before opening the terminal.
+
+The build runs the host cache test, including allocation failures. To repeat
+it with ASan/UBSan, run:
+
+```sh
+python3 work/xterm/src/helios/tests/font-cache.py --sanitize
+```
 For example, after building the port:
 
 ```sh

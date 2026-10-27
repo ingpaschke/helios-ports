@@ -19,10 +19,15 @@
       "file": "02-x11r4.patch",
       "description": "Adapt X11R4 mouse translations and selection introspection",
       "sha256": "d8e0bce5021a57ad259d63ec6b61674f885ba79cd7499b572b05868882d4193b"
+    },
+    {
+      "file": "03-font-cache.patch",
+      "sha256": "fa4db3416acf5d7c4a3a8343a0e19559b877024dafe813bd4b37f83790cbccd4",
+      "description": "Read font metrics through a compact lossless cache in the Helios terminal"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "776f15a66ef080dcbf6c1e8111eab29aafe51bf6251869c72f5838399d46f2aa",
+  "patched_tree_sha256": "91791000a1b98e6d6cc9ee1d1d3d9343a9f2a95fe6b846f34cb5ca1ca392723a",
   "dependencies": [
     "x11",
     "xterm-tty",
@@ -101,6 +106,26 @@
         "flags": [
           "-DObject=HeliosObject"
         ]
+      },
+      {
+        "name": "font-cache",
+        "sources": [
+          "${src}/helios/font-cache.c",
+          "${src}/helios/font.c"
+        ],
+        "flags": [
+          "-I${src:x11}/lib/X"
+        ]
+      },
+      {
+        "name": "font-check",
+        "sources": [
+          "${src}/helios/tests/font-check.c"
+        ],
+        "flags": [
+          "-DHELIOS_FONT_NO_REMAP",
+          "-I${src}/helios"
+        ]
       }
     ],
     "link": {
@@ -128,7 +153,8 @@
         "name": "xterm412",
         "type": "executable",
         "groups": [
-          "xterm"
+          "xterm",
+          "font-cache"
         ],
         "output": "${work}/bin/xterm412"
       },
@@ -145,6 +171,15 @@
           "${sdk}/lib/helios.lib",
           "${runtime}"
         ]
+      },
+      {
+        "name": "font-check",
+        "type": "executable",
+        "groups": [
+          "font-check",
+          "font-cache"
+        ],
+        "output": "${work}/tests/font-check"
       }
     ],
     "install": [
@@ -175,6 +210,15 @@
         "command": [
           "${python}",
           "helios/prepare.py"
+        ]
+      },
+      {
+        "type": "run",
+        "command": [
+          "${python}",
+          "helios/tests/font-cache.py",
+          "--headers",
+          "${dep:x11}/include"
         ]
       }
     ]

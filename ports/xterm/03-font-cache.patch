@@ -1,0 +1,107 @@
+Subject: Read font metrics through a compact lossless cache in the Helios terminal
+
+diff --git a/fontutils.c b/fontutils.c
+index c4ab947cebfa90295c23fec419b4d61b52c91e98..7543232fc8ac09c08b2b0421b05dcf15b3ef74ee 100644
+--- a/fontutils.c
++++ b/fontutils.c
+@@ -76,10 +76,10 @@
+ { \
+     cs = NULL; \
+     if (col >= fs->min_char_or_byte2 && col <= fs->max_char_or_byte2) { \
+-	if (fs->per_char == NULL) { \
++	if (!FontHasCharMetrics(fs)) { \
+ 	    cs = &fs->min_bounds; \
+ 	} else { \
+-	    cs = &fs->per_char[(col - fs->min_char_or_byte2)]; \
++	    cs = FontCharMetric(fs, (col - fs->min_char_or_byte2)); \
+ 	} \
+ 	if (CI_NONEXISTCHAR(cs)) cs = NULL; \
+     } \
+@@ -90,13 +90,13 @@
+     cs = NULL; \
+     if (row >= fs->min_byte1 && row <= fs->max_byte1 && \
+ 	col >= fs->min_char_or_byte2 && col <= fs->max_char_or_byte2) { \
+-	if (fs->per_char == NULL) { \
++	if (!FontHasCharMetrics(fs)) { \
+ 	    cs = &fs->min_bounds; \
+ 	} else { \
+-	    cs = &fs->per_char[((row - fs->min_byte1) * \
++	    cs = FontCharMetric(fs, ((row - fs->min_byte1) * \
+ 				(fs->max_char_or_byte2 - \
+ 				 fs->min_char_or_byte2 + 1)) + \
+-			       (col - fs->min_char_or_byte2)]; \
++			       (col - fs->min_char_or_byte2)); \
+ 	} \
+ 	if (CI_NONEXISTCHAR(cs)) cs = NULL; \
+     } \
+@@ -812,8 +812,8 @@ comparable_metrics(const XFontStruct *normal, const XFontStruct *bold)
+ 	} else {
+ 	    TRACE((DATA "all chars exist in normal font, but not in bold\n"));
+ 	}
+-    } else if (normal->per_char != NULL) {
+-	if (bold->per_char != NULL) {
++    } else if (FontHasCharMetrics(normal)) {
++	if (FontHasCharMetrics(bold)) {
+ 	    result = 1;
+ 	} else {
+ 	    TRACE((DATA "normal font has per-char metrics, but not bold\n"));
+@@ -1236,9 +1236,7 @@ compareXCharStruct(const char *tag,
+ static void
+ reportXPerChar(XFontStruct *fs)
+ {
+-    XCharStruct *cs = fs->per_char;
+-
+-    if (cs != NULL) {
++    if (FontHasCharMetrics(fs)) {
+ 	XCharStruct min_bounds;
+ 	XCharStruct max_bounds;
+ 	int valid = 0;
+@@ -1259,7 +1257,7 @@ reportXPerChar(XFontStruct *fs)
+ 	fillXCharStruct(&min_bounds, 32767);
+ 	TRACE2(("\t\tCells: %d..%d\n", first_char, last_char));
+ 	for (ch = first_char; ch < last_char; ++ch) {
+-	    XCharStruct *item = cs + ch - first_char;
++	    XCharStruct *item = FontCharMetric(fs, ch - first_char);
+ 	    ++total;
+ 	    if (!CI_NONEXISTCHAR(item)) {
+ 		++valid;
+diff --git a/fontutils.h b/fontutils.h
+index 90d1caf432c2f0b6d6ffb2e5d6692dc8b5817c7f..de2bedd9911a207262c038390024ea822f6b960c 100644
+--- a/fontutils.h
++++ b/fontutils.h
+@@ -89,13 +89,21 @@ extern void xtermUpdateFontInfo (XtermWidget /* xw */, Bool /* doresize */);
+ extern char *xtermSpecialFont (XTermDraw * /* params */);
+ #endif
+ 
++#ifdef helios
++#define FontHasCharMetrics(fs) helios_font_has_metrics(fs)
++#define FontCharMetric(fs,n) ((XCharStruct *)(void *)helios_font_char(fs,n))
++#else
++#define FontHasCharMetrics(fs) ((fs)->per_char != NULL)
++#define FontCharMetric(fs,n) (&(fs)->per_char[n])
++#endif
++
+ #define FontLacksMetrics(font) \
+ 	((font)->fs != NULL \
+-	 && ((font)->fs->per_char == NULL))
++	 && (!FontHasCharMetrics((font)->fs)))
+ 
+ #define FontIsIncomplete(font) \
+ 	((font)->fs != NULL \
+-	 && (font)->fs->per_char != NULL \
++	 && FontHasCharMetrics((font)->fs) \
+ 	 && !(font)->fs->all_chars_exist)
+ 
+ #if OPT_BOX_CHARS
+@@ -135,9 +143,9 @@ extern void xtermDrawBoxChar (XTermDraw * /* params */, unsigned /* ch */, GC /*
+ #define XTermFontsRef(fontList, which) \
+ 	(((which) != fNorm && \
+ 	  ((fontList)[(which)].fs == NULL || \
+-	   (fontList)[(which)].fs->per_char == NULL) && \
++	   !FontHasCharMetrics((fontList)[(which)].fs)) && \
+ 	  ((fontList)[fNorm].fs != NULL && \
+-	  (fontList)[fNorm].fs->per_char != NULL)) \
++	  FontHasCharMetrics((fontList)[fNorm].fs))) \
+ 	 ? &((fontList)[fNorm]) \
+ 	 : &((fontList)[(which)]))
+ #endif
