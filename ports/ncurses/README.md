@@ -53,6 +53,10 @@ screen, screen-256color, xterm-256color and Sun console entries are compiled fro
 upstream database and require the installed files. Additional descriptions can be compiled
 on the host with `tic -o destination descriptions.src` and copied to Helios.
 
+The ANSI entry also works through the vintage Helios ttyserv. It omits
+scrolling regions, reverse index and cursor visibility controls, which that
+server does not implement. Use `TERM=ansi` with the vintage Atari xterm.
+
 `TERM` must describe the actual terminal. The X11R4 xterm is monochrome;
 a modern xterm description advertising colors cannot add color support to it.
 This port does not change existing users' `TERM` settings.

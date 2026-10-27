@@ -22,7 +22,7 @@
       "description": "Recognize native Helios terminal-server key sequences"
     }
   ],
-  "patched_tree_sha256": "114cc00d881c67d9b15c3b6296ecf4f19d8bd6c6e5cdf49f3ea44026012a6a65",
+  "patched_tree_sha256": "5f1b4fb64ba55d866eb65fc525ed5289cd5da7c61f0f6cc222e533f24710555a",
   "dependencies": [],
   "requires_compat": true,
   "host_tools": [
