@@ -198,6 +198,40 @@ class PortsTest(unittest.TestCase):
         (stage/'hello').chmod(0o755)
         with self.assertRaisesRegex(RuntimeError, 'Modified port output'): self.builder().validate('one')
 
+    def test_cpu_change_rebuilds_cached_port(self):
+        self.builder().build('one')
+        target = Builder(self.work, self.sdk, self.assembler,
+                         toolchain=self.toolchain, root=self.root,
+                         offline=True, cpu='t425')
+        with self.assertRaisesRegex(RuntimeError, 'stale'):
+            target.validate('one')
+        target.build('one')
+        target.validate('one')
+        with self.assertRaisesRegex(RuntimeError, 'stale'):
+            self.builder().validate('one')
+
+    def test_linkage_change_rebuilds_cached_port(self):
+        self.builder().build('one')
+        target = Builder(self.work, self.sdk, self.assembler, toolchain=self.toolchain,
+                         root=self.root, offline=True, linkage='static')
+        with self.assertRaisesRegex(RuntimeError, 'stale'): target.validate('one')
+        target.build('one'); target.validate('one')
+
+    def test_conditional_install_does_not_keep_previous_variant_files(self):
+        config = sources.configuration('one', self.root)
+        config['build']['install'] = [
+            {'type': 'copy', 'source': '${src}/hello.txt', 'destination': '${stage}/shared',
+             'when': {'linkage': 'shared'}},
+            {'type': 'copy', 'source': '${src}/hello.txt', 'destination': '${stage}/static',
+             'when': {'linkage': 'static'}}]
+        self.save('one', config); self.builder().build('one')
+        self.assertTrue((self.work/'one/stage/shared').is_file())
+        target = Builder(self.work, self.sdk, self.assembler, toolchain=self.toolchain,
+                         root=self.root, offline=True, linkage='static')
+        target.build('one')
+        self.assertFalse((self.work/'one/stage/shared').exists())
+        self.assertTrue((self.work/'one/stage/static').is_file())
+
     def test_stale_dependency_and_cycle_are_detected(self):
         self.add_port('two', ['one'])
         self.builder().build('two')
@@ -236,18 +270,6 @@ class PortsTest(unittest.TestCase):
         self.builder().build('one')
         self.assertFalse((work/'include').is_symlink())
         self.assertEqual((work/'include/hello.txt').read_text(), 'upstream\n')
-
-    def test_cpu_change_rebuilds_cached_port(self):
-        self.builder().build('one')
-        target = Builder(self.work, self.sdk, self.assembler,
-                         toolchain=self.toolchain, root=self.root,
-                         offline=True, cpu='t425')
-        with self.assertRaisesRegex(RuntimeError, 'stale'):
-            target.validate('one')
-        target.build('one')
-        target.validate('one')
-        with self.assertRaisesRegex(RuntimeError, 'stale'):
-            self.builder().validate('one')
 
 
 if __name__ == '__main__': unittest.main()

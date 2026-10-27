@@ -22,6 +22,7 @@ def main():
     parser.add_argument('--compat',type=Path)
     parser.add_argument('--toolchain',type=Path,default=Path('/opt/llvm-t800'))
     parser.add_argument('--cpu', choices=['generic', 't425', 't800'], default='t800')
+    parser.add_argument('--linkage', choices=['static', 'shared'], default='shared')
     parser.add_argument('--host-sdk',type=Path)
     parser.add_argument('--jobs',type=int,default=4)
     parser.add_argument('--offline',action='store_true')
@@ -62,7 +63,7 @@ def main():
         return
     if not args.sdk or not args.asm:parser.error('build/verify require --sdk and --asm')
     if args.jobs<1:parser.error('--jobs must be positive')
-    builder=Builder(args.work,args.sdk,args.asm,args.compat,args.toolchain,args.jobs,args.host_sdk,args.offline,cpu=args.cpu)
+    builder=Builder(args.work,args.sdk,args.asm,args.compat,args.toolchain,args.jobs,args.host_sdk,args.offline,cpu=args.cpu,linkage=args.linkage)
     for name in selected:
         if args.command=='build':builder.build(name,args.force)
         else:builder.validate(name);print(name+': verified')

@@ -74,6 +74,9 @@ covered by these fields with `build_inputs`.
 | `${asm}`, `${asm_dir}` | Assembler executable and its directory |
 | `${toolchain}`, `${tools}` | llvm-t800 root and its `sysroots/helios` |
 | `${clang}`, `${hcc}`, `${runtime}` | Compilers and `llvmrt-generic.lib` |
+| `${static_lib}` | Static archive output directory, relative to the selected library mode |
+| `${linkage}` | Selected library mode (`static` or `shared`) |
+| `${cpu}` | Selected CPU (`t800` by default; `--cpu t425` or `--cpu generic`) |
 | `${compat}`, `${host_sdk}` | Selected compatibility stage and host SDK |
 | `${python}`, `${jobs}` | Host Python and compilation parallelism |
 | `${dep:name}` | Direct dependency's build directory |
@@ -113,7 +116,12 @@ are prepended to each group's own lists, followed by per-source flags. Other
 settings (such as `compiler`) are defaults that a group can replace. This keeps
 common platform and include flags in one place.
 
-Targets have `name`, `type` (`archive` or `executable`), `output` and `groups`.
+Actions and targets can include `"when": {"linkage": "shared"}` (or `static`)
+or a CPU condition, such as `"when": {"cpu": ["t425", "t800"]}`. Skipped
+steps produce no outputs. CPU and linkage are included in the fingerprint.
+Unknown condition keys are rejected.
+
+Targets have `name`, `type` (`archive`, `executable` or `shared`), `output` and `groups`.
 Executable targets can specify `stack`, `heap`, `start` (default
 `${sdk}/lib/c0.o`), extra `objects` and `libraries` in link order. The assembler
 packs archives and links executables. The latter receive executable mode.
@@ -130,3 +138,32 @@ the build. Successful records are written only after all steps finish.
 Use unique `--work` directories for concurrent independent builds. Logs are
 under each port's `logs` and `obj` directories. A failed command reports the log
 path and its final lines.
+
+## Native shared libraries
+
+A `shared` target composes ordinary Helios C groups into one resident module.
+It supplies `interface` (a JSON file), `runtime` (the staged module path),
+`output` (the import library), and `libraries` (resident dependencies and SDK
+libraries). Optional `exclude_sources` leaves selected group files out of this
+target; ordinary archive targets are unchanged. `aliases` can give the same
+import library another name. See the X11R4 recipe for examples.
+
+An interface has `name`, `slot`, `version`, `function_capacity`, an ordered
+`functions` list and a `data` mapping from public names to sizes in words.
+The builder checks these against compiled exports. Function capacity reserves
+slots before public data, allowing functions to be appended without shifting
+data offsets. Preserve existing slot/data order and sizes; an incompatible
+interface requires a new ABI. Use distinct resident module slots.
+
+The builder preserves normal C's canonical function-pointer handling and
+initializers while replacing per-file module headers with the common resident
+header. Private symbols from separate C files remain distinct. All writable
+data is allocated for each task by Helios. Runtime files must contain exactly
+one ordinary module; static helper dependencies must also become resident
+libraries rather than hidden, uninitialized modules inside another library.
+
+Each import library gets a generated `.requires.json` containing resident
+link dependencies. Executable and resident links follow this closure once,
+including aliases. Install the runtime modules, not these build-path metadata
+files. For manual linking outside this builder, include every dependency's
+import library and the usual SDK C/Helios libraries.

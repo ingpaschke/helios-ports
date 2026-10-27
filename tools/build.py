@@ -14,7 +14,7 @@ import sources
 
 class Builder:
     def __init__(self, work, sdk, assembler, compat=None, toolchain='/opt/llvm-t800',
-                 jobs=4, host_sdk=None, offline=False, root=sources.ROOT, cpu='t800'):
+                 jobs=4, host_sdk=None, offline=False, root=sources.ROOT, cpu='t800', linkage='shared'):
         self.root = Path(root).resolve(); self.work = Path(work).resolve()
         self.sdk = Path(sdk).resolve(); self.assembler = Path(assembler).resolve()
         self.compat = Path(compat).resolve() if compat else None
@@ -23,6 +23,9 @@ class Builder:
         if cpu not in ('generic', 't425', 't800'):
             raise ValueError('Unsupported CPU: ' + cpu)
         self.cpu = cpu
+        if linkage not in ('static', 'shared'):
+            raise ValueError('Unsupported linkage: ' + linkage)
+        self.linkage = linkage
         self.offline = offline; self.completed = {}; self.active = set()
         self.work.mkdir(parents=True, exist_ok=True)
 
@@ -39,6 +42,8 @@ class Builder:
                    'clang': str(self.toolchain/'bin/clang'), 'hcc': str(self.toolchain/'bin/hcc'),
                    'runtime': str(self.toolchain/'sysroots/helios/lib/llvmrt-generic.lib'),
                    'python': sys.executable, 'jobs': str(self.jobs),
+                   'cpu': self.cpu, 'linkage': self.linkage, 'port': name,
+                   'static_lib': str(self.work/name/('lib/static' if self.linkage=='shared' else 'lib')),
                    'compat': str(self.compat or ''), 'host_sdk': str(self.host_sdk or '')}
         for dependency in config['dependencies']:
             context['dep:'+dependency] = str(self.work/dependency)
@@ -71,11 +76,30 @@ class Builder:
         if result.returncode or re.search(r'undefined reference|undefined symbol|Fatal Error', diagnostics, re.I):
             raise RuntimeError(str(log)+'\n'+'\n'.join(text.splitlines()[-15:]))
 
+    @staticmethod
+    def link_libraries(libraries):
+        """Add resident dependencies once, keeping ordinary archive ordering."""
+        result=[];seen=set()
+        def visit(library):
+            key=str(Path(library).resolve())
+            if key in seen: return
+            seen.add(key);result.append(library)
+            manifest=Path(key+'.requires.json')
+            if manifest.is_file():
+                for dependency in json.loads(manifest.read_text())['dependencies']:
+                    visit(dependency)
+        for library in libraries: visit(library)
+        return result
+
     def fingerprint(self, name):
         config = self.config(name)
+        engine = sources.inventory(self.root/'tools')
+        # Runtime packaging rules cannot change compiled objects.
+        engine.pop('release.py', None)
         result = {'configuration': sources.identity(config, self.root),
                   'cpu': self.cpu,
-                  'engine': sources.tree_hash(self.root/'tools'),
+                  'linkage': self.linkage,
+                  'engine': hashlib.sha256(json.dumps(engine, sort_keys=True).encode()).hexdigest(),
                   'entry_point': sources.sha(self.root/'ports.py'),
                   'sdk': sources.tree_hash(self.sdk/'include')+sources.tree_hash(self.sdk/'lib'),
                   'assembler': sources.sha(self.assembler),
@@ -123,6 +147,7 @@ class Builder:
 
     def actions(self, actions, context, label):
         for number, action in enumerate(actions):
+            if not self.enabled(action): continue
             kind = action['type']; expand = lambda x: self.expand(x, context)
             if kind == 'run':
                 self.run(expand(action['command']), Path(context['work'])/'logs'/f'{label}-{number}.log',
@@ -158,6 +183,14 @@ class Builder:
                     for old,new in action.get('replace', {}).items(): text = text.replace(old,new)
                     destination.write_text(text)
             else: raise ValueError('Unknown build action: '+kind)
+
+    def enabled(self, item):
+        for key, value in item.get('when', {}).items():
+            if key not in ('cpu', 'linkage'):
+                raise ValueError('Unknown build condition: ' + key)
+            if getattr(self, key) not in (value if isinstance(value, list) else [value]):
+                return False
+        return True
 
     def compile(self, name, group, entry, context, identity):
         if isinstance(entry, str): entry = {'file': entry}
@@ -220,9 +253,22 @@ class Builder:
                 objects[group['name']]=[f.result() for f in futures]
         outputs=[]
         for target in spec.get('targets',[]):
+            if not self.enabled(target): continue
             if target['type'] != 'archive': target = dict(spec.get('link', {}), **target)
             output=Path(self.expand(target['output'],context));output.parent.mkdir(parents=True,exist_ok=True)
             obj=[p for group in target.get('groups',[]) for p in objects[group]]
+            if target['type']=='shared':
+                import shared
+                obj=[]
+                excluded=set(self.expand(target.get('exclude_sources',[]),context))
+                for group in spec.get('groups',[]):
+                    if group['name'] not in target['groups']: continue
+                    for entry,path in zip(group['sources'],objects[group['name']]):
+                        source=entry if isinstance(entry,str) else entry['file']
+                        if self.expand(source,context) not in excluded:
+                            obj.append(path)
+                outputs += shared.build(self,target,context,obj)
+                continue
             if target['type']=='archive': command=[self.assembler,'-p','-o',output,*obj]
             else:
                 command=[self.assembler,'-n'+target['name'],'-o',output]
@@ -230,7 +276,7 @@ class Builder:
                     if setting in target:command.append(flag+str(target[setting]))
                 command += [self.expand(target.get('start','${sdk}/lib/c0.o'),context),*obj]
                 command += self.expand(target.get('objects',[]),context)
-                command += ['-l'+x for x in self.expand(target.get('libraries',[]),context)]
+                command += ['-l'+x for x in self.link_libraries(self.expand(target.get('libraries',[]),context))]
             self.run(command,work/'logs'/(target['name']+'.link.log'))
             if target['type']!='archive':output.chmod(0o755)
             outputs.append(output)
