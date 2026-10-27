@@ -1,0 +1,11 @@
+! Native Atari X server bitmap fonts; no Linux font server is required.
+*VT100.utf8: 0
+*VT100.utf8Fonts: false
+*VT100.font: fixed
+*VT100.boldFont: fixed
+*VT100.foreground: #182c30
+*VT100.background: #ffffed
+*VT100.saveLines: 0
+*VT100.scrollBar: true
+*VT100.metaSendsEscape: true
+*VT100.altSendsEscape: true

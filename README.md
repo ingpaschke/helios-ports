@@ -15,7 +15,8 @@ writing your own recipe.
 
 | Port | Version | Contents |
 | --- | --- | --- |
-| [x11](ports/x11/port.json) | X11R4, patch level 18 | X libraries, clients and demos |
+| [x11](ports/x11/README.md) | X11R4, patch level 18 | Native shared X libraries, VT-only terminal, clients and demos |
+| [x11-support](ports/x11-support/README.md) | Helios BSD | Shared support module for X11R4 |
 | [xterm](ports/xterm/README.md) | 412 | UTF-8 and 256-colour terminal, installed as xterm412 |
 | [fvwm](ports/fvwm/port.json) | 1.24r | Window manager, GoodStuff and FvwmPager |
 | [irssi](ports/irssi/port.json), [glib](ports/glib/port.json) | 0.8.10 / 1.2.10 | IRC client and support library |
@@ -36,8 +37,9 @@ writing your own recipe.
 ## Build
 
 The host needs Python 3.12 or newer, Git, llvm-t800, a built Helios-NG SP2 SDK
-and its assembler. Network clients and the desktop also need a built helios-unix
-installation stage. The current recipes target T800 processors. X11 needs Bison
+and its assembler and AMPP tools. Network clients and the desktop also need a built helios-unix
+installation stage. Builds default to T800; use `--cpu t425` for T425-compatible
+code or `--cpu generic` for the generic Transputer target. X11 needs Bison
 and Flex to generate twm's parser. NetHack additionally uses GCC, qemu-i386 and
 an i386 musl host SDK for its ILP32 data generators. Frotz needs `make`; ncurses also needs GCC, Awk,
 `tic` and `infocmp`.
@@ -74,6 +76,50 @@ Verification checks the recipes, tools, SDK, dependencies and output contents. A
 normal build reuses verified results and rebuilds stale components. `--force`
 reruns preparation, linking and installation, while unchanged compiled objects
 may still be reused. Use a new `--work` directory for a completely clean build.
+
+## CPU and runtime releases
+
+Use `--cpu t425` or `--cpu t800` and `--linkage static` or `--linkage shared`.
+Shared is the default. Both choices are part of build reuse checks; keep
+independent work directories when retaining several variants.
+
+Profiles in `profiles/` select applications, CPU, linkage and installation
+names. `atari-minimal` uses static libraries on T425; `atari-expanded` uses
+shared libraries and adds the modern terminal. `ktm` selects T800 and shared
+libraries. Boot maps, menus, user configuration and host services belong to
+the distribution, rather than the ports archives.
+
+```sh
+python3 ports.py build --profile atari-minimal --work work/atari \
+  --sdk /path/to/sdk/prod/TRAN --asm /path/to/sdk/host/bin/asm \
+  --compat /path/to/helios-unix-t425/stage
+python3 ports.py package --profile atari-minimal --work work/atari \
+  --sdk /path/to/sdk/prod/TRAN --asm /path/to/sdk/host/bin/asm \
+  --compat /path/to/helios-unix-t425/stage \
+  --release 2026.10 --output release/hp425.zip
+```
+
+The KTM profile additionally needs `--host-sdk` for NetHack's data generators.
+Use the same build arguments for `package`; it verifies existing builds and
+never silently rebuilds them. Supplying port names packages that selection
+and its dependencies instead of the full profile.
+
+Archives contain a `helios/` runtime tree, `ports.jsn`, `sha256.txt` and install
+instructions. On Atari copy `helios/` contents into the physical system folder
+selected by your launcher. Paths are checked for 8.3 compatibility and case
+collisions; known asset names are shortened with collisions rejected.
+KTM archives use tar.gz and retain the normal Helios names. The expanded
+Atari profile supplies XTerm412 resources for native bitmap fonts; the
+configuration file is explicit under profiles/atari/. Symlinks to host
+build files are materialized. Headers, import archives, regression programs
+and source bundles are excluded from runtime releases; they remain in the
+source checkout and build stages. Shared-module IDs and ABI versions must
+match their clients, and missing port libraries reject packaging.
+
+Build helios-unix with its own `build.py` for the same CPU before building the
+ports. Network applications require `/internet`; the Atari minimal selection
+uses local X and FIFO services. TLS and SSH additionally require a suitable
+provider. Each port retains its upstream licence and included notices.
 
 ## Change or add a port
 

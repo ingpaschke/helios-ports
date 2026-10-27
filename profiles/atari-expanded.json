@@ -1,0 +1,36 @@
+{
+  "format": 1,
+  "name": "atari-expanded",
+  "cpu": "t425",
+  "linkage": "shared",
+  "short_names": true,
+  "ports": [
+    "frotz",
+    "xmahjongg",
+    "fvwm",
+    "xterm"
+  ],
+  "terminfo": [
+    "ansi",
+    "xterm"
+  ],
+  "aliases": {
+    "bin/x11/xmahjongg": "bin/x11/xmahjong",
+    "bin/x11/xshanghai": null,
+    "bin/x11/xlsclients": "bin/x11/xlsclien",
+    "bin/x11/helios-backdrop": "bin/x11/hback",
+    "lib/xterm-ttyserv": null,
+    "lib/fvwm/GoodStuff": "lib/fvwm/GoodStuf",
+    "lib/fvwm/FvwmPager": "lib/fvwm/FvwmPage",
+    "lib/fvwm/icons/calculator.xbm": "lib/fvwm/icons/calc.xbm",
+    "local/share/xterm/helios.tc": "local/share/xterm/helios.tc",
+    "bin/x11/fvwm-session": null,
+    "bin/x11/helios-place": null
+  },
+  "shorten_assets": [
+    "local/share/xmahjong"
+  ],
+  "resources": {
+    "lib/x11/app-defa/XTerm412": "atari/XTerm412"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "name": "ktm",
+  "cpu": "t800",
+  "linkage": "shared",
+  "short_names": false,
+  "ports": [
+    "frotz",
+    "xmahjongg",
+    "fvwm",
+    "xterm",
+    "irssi",
+    "links",
+    "slrn",
+    "olwm",
+    "xview",
+    "xv",
+    "nethack5",
+    "telnet"
+  ]
+}
