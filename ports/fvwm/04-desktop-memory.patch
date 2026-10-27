@@ -1,0 +1,39 @@
+Subject: Host the Helios desktop renderer in the window manager event loop
+
+diff --git a/fvwm/events.c b/fvwm/events.c
+index c23b872447e54746ce1a12ea1b579dfbbf4b83fa..1daf0fdada869ed20b3830f5ed653cb5f37ae8fa 100644
+--- a/fvwm/events.c
++++ b/fvwm/events.c
+@@ -100,6 +100,8 @@ void DispatchEvent()
+ {
+   Window w = Event.xany.window;
+ 
++  if (helios_desktop_event(&Event)) return;
++
+   StashEventTime(&Event);
+ 
+   if (XFindContext (dpy, w, FvwmContext, (caddr_t *) &Tmp_win) == XCNOENT)
+diff --git a/fvwm/fvwm.c b/fvwm/fvwm.c
+index 9a198da73850a023b32242eea34476c16903d1f4..6d8035ac3620fc47cfcdf79952d169575528d61e 100644
+--- a/fvwm/fvwm.c
++++ b/fvwm/fvwm.c
+@@ -447,6 +447,9 @@ void main(int argc, char **argv)
+     XUngrabServer(dpy);
+     MoveResizeViewPortIndicator();
+     fd_width = GetFdWidth();
++    if (getenv("FVWM_BACKDROP") && !strcmp(getenv("FVWM_BACKDROP"),"1"))
++      if (helios_desktop_open(dpy,Scr.StdFont.font))
++        ktm_set_idle_hook(helios_desktop_tick);
+ 
+   
+     if(Restarting)
+@@ -865,6 +868,9 @@ void Done(int restart, char *command)
+   MoveViewport(0,0,False);
+ #endif
+ 
++  ktm_set_idle_hook(NULL);
++  helios_desktop_close();
++
+   /* Close all my pipes */
+   ClosePipes();
+ 

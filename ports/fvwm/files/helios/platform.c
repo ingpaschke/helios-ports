@@ -1,11 +1,38 @@
 #include "platform.h"
 #include <stdio.h>
+#include <syslib.h>
+#include <gsp.h>
+#include "command.h"
+extern Stream *fdstream(int);
+
+static int (*idle_hook)(void);
+void ktm_set_idle_hook(int (*hook)(void)) { idle_hook=hook; }
 
 int ktm_select(int width,fd_set *in,fd_set *out,fd_set *except,struct timeval *tv)
 {
     struct hu_pollfd fds[FD_SETSIZE];
+    struct timeval idle_timeout;
     int i,n=0,result,found=0,timeout=-1;
     if(width<0 || width>FD_SETSIZE){errno=EINVAL;return -1;}
+    if (idle_hook) {
+        int ms=idle_hook();
+        if (ms>=0 && (!tv || tv->tv_sec>ms/1000 ||
+            (tv->tv_sec==ms/1000 && tv->tv_usec>(ms%1000)*1000))) {
+            idle_timeout.tv_sec=ms/1000;idle_timeout.tv_usec=(ms%1000)*1000;
+            tv=&idle_timeout;
+        }
+    }
+    /* Native X connections become Helios pipes after Connect. They have
+     * ordinary SelectStream readiness, without the extended socket/FIFO
+     * status used by hu_poll. Select the whole set together in that case. */
+    for(i=0;i<width;i++) {
+        Stream *s;
+        if(!((in&&FD_ISSET(i,in)) || (out&&FD_ISSET(i,out)) ||
+             (except&&FD_ISSET(i,except))))continue;
+        s=fdstream(i);
+        if(s && (s->Type & ~Type_Flags)==(Type_Pipe & ~Type_Flags))
+            return select(width,in,out,except,tv);
+    }
     if(tv)timeout=tv->tv_sec*1000+(tv->tv_usec+999)/1000;
     for(i=0;i<width;i++) {
         int events=0;
@@ -103,13 +130,27 @@ int ktm_write_full(int fd, const void *buffer, unsigned size)
 void ktm_exec(const char *command)
 {
     struct hu_spawn_attr attr={HU_SPAWN_DEFAULT,0,0,3};
-    char *args[5];
+    char *args[64],*copy=malloc(strlen(command)+1);
     pid_t pid;
-    int error;
-    args[0]="/helios/bin/shell"; args[1]="-f"; args[2]="-c";
-    args[3]=(char *)command; args[4]=0;
+    int count,error;
+    if (!copy) { errno=ENOMEM;perror("fvwm: launch");return; }
+    strcpy(copy,command);
+    count=helios_command_split(copy,args,64);
+    if (count==0) { free(copy);return; }
+    /* Absolute/relative executable paths avoid shell builtins and aliases.
+     * Keep shell interpretation for expansions, pipelines and scripts. */
+    if (count>0 && strchr(args[0],'/')) {
+        error=hu_spawnp(&pid,args[0],0,&attr,args,0);
+        if (!error) { free(copy);return; }
+        if (error!=ENOEXEC) {
+            free(copy);errno=error;perror("fvwm: launch");return;
+        }
+    }
+    free(copy);
+    args[0]="/helios/bin/shell";args[1]="-f";args[2]="-c";
+    args[3]=(char *)command;args[4]=0;
     error=hu_spawn(&pid,args[0],0,&attr,args,0);
-    if (error) { errno=error; perror("fvwm: launch"); }
+    if (error) { errno=error;perror("fvwm: launch"); }
 }
 void ktm_restart(const char *command, char **args)
 {
@@ -117,8 +158,10 @@ void ktm_restart(const char *command, char **args)
     pid_t pid;
     int status, error=hu_spawnp(&pid,command,0,&attr,args,0);
     if (error) { errno=error; return; }
-    /* Native exec reports the old task's exit. Keep XDM's original desktop
-     * task alive until the replacement WM finishes instead. */
-    while (waitpid(pid,&status,0)<0 && errno==EINTR) {}
+    /* A login manager may be waiting for this exact desktop task. Console
+     * desktops already have a persistent shell/TFM and can release the old
+     * manager's memory instead of keeping a waiter on every restart. */
+    if (!getenv("FVWM_RESTART_WAIT") || strcmp(getenv("FVWM_RESTART_WAIT"),"0"))
+        while (waitpid(pid,&status,0)<0 && errno==EINTR) {}
     exit(0);
 }

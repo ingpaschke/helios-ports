@@ -8,6 +8,8 @@
 #include <helios/unix/channel.h>
 #include <helios/unix/poll.h>
 #include <X11/Xlib.h>
+#include "desktop.h"
+void ktm_set_idle_hook(int (*)(void));
 #define O_NDELAY O_NONBLOCK
 struct itimerval { struct timeval it_interval, it_value; };
 int ktm_read_full(int, void *, unsigned);

@@ -19,10 +19,20 @@
       "file": "02-module-ipc.patch",
       "description": "Use native local channels for FVWM modules and check their protocol",
       "sha256": "903001a66126c9e24d4e3eea05a52c49a217bbc23c5df95e72f16e378471e917"
+    },
+    {
+      "file": "03-native-select.patch",
+      "sha256": "7cb38a4a2437dd19c01dd69386cb30c8bd1bd20c0dbb67efe8f12147563cb49e",
+      "description": "Wait for native X pipes and module channels together"
+    },
+    {
+      "file": "04-desktop-memory.patch",
+      "sha256": "7d14d8fc6073a9d8bf59c139eb8f321c0c0ac6c76d6241737d36221f8e1ec310",
+      "description": "Host the Helios desktop renderer in the window manager event loop"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "fd91ba2a4d04546f686d3f8dd3e957be683d55611b4df592a2cd96381ad365fb",
+  "patched_tree_sha256": "532e593f18e48f5cabe4746ac804490408f688ef4bee9e47b94669e49fe18a2f",
   "dependencies": [
     "x11"
   ],
@@ -78,7 +88,8 @@
           "${src}/libs/CopyString.c",
           "${src}/libs/mygetostype.c",
           "${src}/libs/GetFdWidth.c",
-          "${src}/helios/platform.c"
+          "${src}/helios/platform.c",
+          "${src}/helios/command.c"
         ]
       },
       {
@@ -101,7 +112,8 @@
           "${src}/fvwm/decorations.c",
           "${src}/fvwm/colormaps.c",
           "${src}/fvwm/misc.c",
-          "${src}/fvwm/style.c"
+          "${src}/fvwm/style.c",
+          "${src}/helios/desktop.c"
         ]
       },
       {
@@ -121,7 +133,8 @@
       {
         "name": "helios-backdrop",
         "sources": [
-          "${src}/helios/backdrop.c"
+          "${src}/helios/backdrop.c",
+          "${src}/helios/desktop.c"
         ]
       },
       {
@@ -155,7 +168,7 @@
         "${runtime}"
       ],
       "stack": 65536,
-      "heap": 131072
+      "heap": 32768
     },
     "targets": [
       {
@@ -233,6 +246,14 @@
         "type": "copy",
         "source": "${src}/fvwm/fvwm.man",
         "destination": "${stage}/local/share/fvwm/fvwm.1"
+      },
+      {
+        "type": "run",
+        "command": [
+          "${python}",
+          "${src}/helios/notices.py",
+          "${stage}/local/share/fvwm/copying"
+        ]
       }
     ]
   }
