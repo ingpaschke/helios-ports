@@ -23,7 +23,7 @@ consult individual source and asset notices.
 | Xmahjongg | `COPYING`, `README`; X11 headers come from the shared X11 port |
 | ncurses | `COPYING`; new native key adapter and regression probes carry MIT notices |
 | OLWM, OLGX, XView | Sun `LEGAL_NOTICE`, GPLv3 for later upstream patches (`COPYING.GPL3`); new native adapters carry MIT notices |
-| regexp | Henry Spencer / University of Toronto notice in `regexp.c` and `LICENCE` |
+| XView's SDK regexp library | Henry Spencer / University of Toronto notice in `local/share/xview/regexp.txt` |
 | Frotz | `COPYING` |
 | NetHack | `dat/license`, `sys/share/random.c` |
 | NetHack 5 | `dat/license`, `nhlua/`, `sys/amiga/regex/COPYRIGHT` |

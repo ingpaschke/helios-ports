@@ -26,7 +26,7 @@ commands = [
     [args.asm, '-nadapters', '-s65536', '-h131072', '-o', out/'adapters',
      sdk/'lib/c0.o', out/'adapters.o',
      '-l'+str(work/'xview/stage/local/lib/xview.lib'),
-     '-l'+str(work/'regexp/stage/local/lib/regexp.lib'),
+     '-l'+str(sdk/'lib/regexp.lib'),
      '-l'+str(work/'olgx/stage/local/lib/olgx.lib'),
      '-l'+str(work/'x11/lib/libXext.a'), '-l'+str(work/'x11/lib/libX11.a'),
      '-l'+str(args.compat.resolve()/'lib/helios-unix.lib'),

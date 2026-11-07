@@ -26,7 +26,6 @@ writing your own recipe.
 | [ncurses](ports/ncurses/README.md) | 6.6 | Curses, terminfo, menu, panel and form libraries |
 | [olwm](ports/olwm/README.md), [olgx](ports/olgx/README.md) | 3.2p1.4 | Open Look window manager and graphics library |
 | [xview](ports/xview/README.md) | 3.2p1.4 | XView toolkit, Open Look clock, editor and terminals |
-| [regexp](ports/regexp/README.md) | Helios implementation | Regular expressions for XView file chooser filters |
 | [frotz](ports/frotz/port.json) | 2.55 | Z-machine interpreter |
 | [nethack](ports/nethack/port.json) | 3.1.3 | NetHack with the X11 interface |
 | [nethack5](ports/nethack5/README.md) | 5.0.1 snapshot | NetHack with terminal and X11 tile interfaces |

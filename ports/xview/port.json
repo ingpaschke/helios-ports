@@ -128,7 +128,6 @@
   "dependencies": [
     "x11",
     "olgx",
-    "regexp",
     "ncurses"
   ],
   "build": {
@@ -153,8 +152,7 @@
         "-I${dep:olgx}/stage/local/include",
         "-I${compat}/include/helios-unix",
         "-I${src}/helios",
-        "-I${src}",
-        "-I${dep:regexp}/stage/local/include"
+        "-I${src}"
       ]
     },
     "prepare": [
@@ -707,7 +705,7 @@
         ],
         "libraries": [
           "${stage}/local/lib/xview.lib",
-          "${dep:regexp}/stage/local/lib/regexp.lib",
+          "${sdk}/lib/regexp.lib",
           "${dep:olgx}/stage/local/lib/olgx.lib",
           "${dep:x11}/lib/libXext.a",
           "${dep:x11}/lib/libX11.a",
@@ -730,7 +728,7 @@
         ],
         "libraries": [
           "${stage}/local/lib/xview.lib",
-          "${dep:regexp}/stage/local/lib/regexp.lib",
+          "${sdk}/lib/regexp.lib",
           "${dep:olgx}/stage/local/lib/olgx.lib",
           "${dep:x11}/lib/libXext.a",
           "${dep:x11}/lib/libX11.a",
@@ -753,7 +751,7 @@
         ],
         "libraries": [
           "${stage}/local/lib/xview.lib",
-          "${dep:regexp}/stage/local/lib/regexp.lib",
+          "${sdk}/lib/regexp.lib",
           "${dep:olgx}/stage/local/lib/olgx.lib",
           "${dep:x11}/lib/libXext.a",
           "${dep:x11}/lib/libX11.a",
@@ -776,7 +774,7 @@
         ],
         "libraries": [
           "${stage}/local/lib/xview.lib",
-          "${dep:regexp}/stage/local/lib/regexp.lib",
+          "${sdk}/lib/regexp.lib",
           "${dep:olgx}/stage/local/lib/olgx.lib",
           "${dep:x11}/lib/libXext.a",
           "${dep:x11}/lib/libX11.a",
@@ -807,6 +805,11 @@
         "type": "copy",
         "source": "${src}/COPYING.GPL3",
         "destination": "${stage}/local/share/xview/COPYING.GPL3"
+      },
+      {
+        "type": "copy",
+        "source": "${sdk}/etc/regexp.txt",
+        "destination": "${stage}/local/share/xview/regexp.txt"
       },
       {
         "type": "copy",
@@ -857,6 +860,9 @@
     ]
   },
   "requires_compat": true,
+  "build_inputs": [
+    "${sdk}/etc/regexp.txt"
+  ],
   "files": "files",
   "host_tools": [
     "infocmp"

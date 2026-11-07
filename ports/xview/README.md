@@ -24,8 +24,10 @@ python3 ports.py build xview --sdk /path/to/sdk/prod/TRAN \
 
 Install `work/xview/stage` and its dependency stages below `/helios`. Programs
 are in `/helios/bin/x11`. Public headers and `xview.lib` are under
-`/helios/local/include` and `/helios/local/lib`. `regexp.lib` supplies file
-chooser filters. The ncurses dependency supplies the Sun terminfo entry.
+`/helios/local/include` and `/helios/local/lib`. The Helios-NG SDK must include
+`include/regexp.h` and `lib/regexp.lib` for file chooser filters. Its usage and
+licence are in the SDK's `etc/regexp.txt`; a copy is installed under
+`/helios/local/share/xview`. The ncurses dependency supplies the Sun terminfo entry.
 `local/share/xview/sun.tc` can be appended to a distribution's `/helios/etc/termcap`
 for older applications that use termcap.
 
