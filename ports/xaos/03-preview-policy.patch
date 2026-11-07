@@ -1,0 +1,57 @@
+Subject: Keep adaptive previews while moving and finish stationary images without preview deadlines
+
+diff --git a/src/engine/zoom.c b/src/engine/zoom.c
+index aada59e847ea4417ebe19bf98c8f26a4cb644d80..671b8c024cda49051bdab1f5156030c55fe9bee2 100644
+--- a/src/engine/zoom.c
++++ b/src/engine/zoom.c
+@@ -1699,7 +1699,8 @@ static int do_fractal_impl(struct filter *f, int flags, int /*@unused@ */ time)
+     cfilter.pass = "Starting calculation";
+     callwait();
+     xth_sync();
+-    if (hx_parallel_enabled() && helios_calculate_changed()) {
++    if (hx_parallel_enabled() && !(flags & INTERRUPTIBLE) &&
++        helios_calculate_changed()) {
+         /* completed by native workers */
+     } else if (flags & INTERRUPTIBLE)
+ 	calculatenewinterruptible();
+diff --git a/src/ui-hlp/ui_helper.c b/src/ui-hlp/ui_helper.c
+index 2e94e257cf1d0ad5c75f327d105727a6d36e12f6..54f4fcecf7422fc2166bdae01eafe0ff4fa1e8e3 100644
+--- a/src/ui-hlp/ui_helper.c
++++ b/src/ui-hlp/ui_helper.c
+@@ -25,6 +25,7 @@
+ #include <fconfig.h>
+ #include <filter.h>
+ #include <ui_helper.h>
++#include "parallel.h"
+ #include <plane.h>
+ #include "../include/timers.h"
+ #include <zoom.h>
+@@ -942,6 +943,13 @@ void uih_do_fractal(uih_context * c)
+ 	c->interruptiblemode = 1;
+     else
+ 	c->interruptiblemode = 0;
++    /* An unfinished image also sets inanimation. Once real movement stops,
++     * finish it without repeatedly expiring the preview deadline. */
++    if (hx_parallel_enabled() && !c->lastbuttons && c->step == 0 &&
++        !c->play && !c->autopilot && !c->fastanimation &&
++        c->rotatemode != ROTATE_CONTINUOUS) {
++        c->interruptiblemode = 0;
++    }
+     if (!c->interruptiblemode && c->recalculatemode > UIH_ANIMATION) {
+ 	if (c->longwait != NULL)
+ 	    c->longwait(c);
+diff --git a/src/ui/ui.c b/src/ui/ui.c
+index 2328fdebe7ac08f866af71aeae93621711ea55ac..e77c9f0bd47118b78b80a03b2e46735afa35b57a 100644
+--- a/src/ui/ui.c
++++ b/src/ui/ui.c
+@@ -326,6 +326,10 @@ ui_passfunc(struct uih_context *c, int display, const char *text,
+     ui_mouse(x, y, b, k);
+     CHECKPROCESSEVENTS(b, k);
+     if (!uih->play) {
++        /* A new mouse gesture may interrupt the full-resolution finish. */
++        if (hx_parallel_enabled() && b && !c->interruptiblemode) {
++            uih_interrupt(c);
++        }
+         if (uih->display)
+             ui_display(), display = 1;
+         if (!c->interruptiblemode && !uih->play) {

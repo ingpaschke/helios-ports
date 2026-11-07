@@ -1,0 +1,241 @@
+Subject: Recover from X11 image-buffer allocation failures and defer resizes during rendering
+
+diff --git a/src/ui/ui-drv/x11/ui_x11.c b/src/ui/ui-drv/x11/ui_x11.c
+index bc1f8f575e2326233a8f6d8402efe60fbce21d2e..a918ea9c3809ba9df1f779217134ac21b6750e9a 100644
+--- a/src/ui/ui-drv/x11/ui_x11.c
++++ b/src/ui/ui-drv/x11/ui_x11.c
+@@ -40,6 +40,7 @@
+ xlibparam xparams = { 0, 0, 0, 0, NULL, -1 };
+ 
+ static int allocated;
++static int retry_previous_size;
+ Cursor normal, xwait, replay;
+ 
+ struct ui_driver x11_driver;
+@@ -144,10 +145,22 @@ static int x11_alloc_buffers(char **b1, char **b2, void **data)
+ {
+     if (!allocated) {
+ 	XSync(d->display, 0);
+-	allocated = 1;
+-	if (!alloc_image(d)) {
+-	    return (0);
+-	}
++        if (!alloc_image(d)) {
++            /* The old pixels have been released, but their dimensions
++             * remain available for restoring a resize that does not fit. */
++            if (d->bwidth != 0 && d->bheight != 0) {
++                fprintf(stderr, "XaoS: cannot allocate %ux%u image buffers; "
++                        "restoring %ux%u\n", d->width, d->height,
++                        d->bwidth, d->bheight);
++                d->width = d->bwidth;
++                d->height = d->bheight;
++                retry_previous_size = 1;
++                XResizeWindow(d->display, d->window, d->width, d->height);
++                XSync(d->display, 0);
++            }
++            return 0;
++        }
++        allocated = 1;
+ 	xflip_buffers(d);
+     }
+     *b1 = d->vbuff;
+@@ -164,7 +177,13 @@ static int x11_alloc_buffers(char **b1, char **b2, void **data)
+ static void x11_getsize(int *w, int *h)
+ {
+     XSync(d->display, 0);
+-    xupdate_size(d);
++    if (retry_previous_size) {
++        /* The window manager may not have applied the rollback yet.
++         * Report the saved dimensions for the image-allocation retry. */
++        retry_previous_size = 0;
++    } else {
++        xupdate_size(d);
++    }
+     *w = d->width;
+     *h = d->height;
+ }
+diff --git a/src/ui/ui-drv/x11/xlib.c b/src/ui/ui-drv/x11/xlib.c
+index 87308b8c14d21191b887f1f441fdfc5e40b4c7b0..768cd7944ecb738ae6ca2f73df77435d0f3119c1 100644
+--- a/src/ui/ui-drv/x11/xlib.c
++++ b/src/ui/ui-drv/x11/xlib.c
+@@ -179,10 +179,10 @@ void free_shm_image(xdisplay * d)
+ int alloc_image(xdisplay * d)
+ {
+     int i;
+-    d->bwidth = d->width;
+-    d->bheight = d->height;
+ #ifdef MITSHM
+     if (!d->params->nomitshm && d->depth != 1 && alloc_shm_image(d)) {
++        d->bwidth = d->width;
++        d->bheight = d->height;
+ 	return 1;
+     }
+ #endif
+@@ -192,16 +192,18 @@ int alloc_image(xdisplay * d)
+ 	    XCreateImage(d->display, d->visual, d->depth,
+ 			 d->depth == 1 ? XYBitmap : ZPixmap, 0, NULL,
+ 			 d->width, d->height, 32, 0);
+-	if (d->image[i] == NULL) {
+-	    printf("Out of memory for image..exiting\n");
+-	    exit(-1);
+-	}
+-	d->image[i]->data =
+-	    malloc(d->image[i]->bytes_per_line * d->height);
+-	if (d->image[i]->data == NULL) {
+-	    printf("Out of memory for image buffers..exiting\n");
+-	    exit(-1);
+-	}
++        if (d->image[i] == NULL) {
++            goto failed;
++        }
++        if (d->image[i]->bytes_per_line <= 0 || d->height == 0 ||
++            d->height > (size_t) -1 / d->image[i]->bytes_per_line) {
++            goto failed;
++        }
++        d->image[i]->data =
++            malloc((size_t) d->image[i]->bytes_per_line * d->height);
++        if (d->image[i]->data == NULL) {
++            goto failed;
++        }
+ 	{
+ 	    unsigned char c[4];
+ 	    int byteexact = 0;
+@@ -237,20 +239,35 @@ int alloc_image(xdisplay * d)
+ 	d->data[i] = d->vbuffs[i] = (char *) d->image[i]->data;
+ 	d->linewidth = d->image[i]->bytes_per_line;
+     }
++    d->bwidth = d->width;
++    d->bheight = d->height;
+     xflip_buffers(d);
+     return 1;
++
++failed:
++    free_image(d);
++    return 0;
+ }
+ 
+ void free_image(xdisplay * d)
+ {
++    int i;
+ #ifdef MITSHM
+     if (d->SharedMemFlag) {
+ 	free_shm_image(d);
+ 	return;
+     }
+ #endif
+-    XDestroyImage(d->image[0]);
+-    XDestroyImage(d->image[1]);
++    for (i = 0; i < 2; i++) {
++        if (d->image[i] != NULL) {
++            XDestroyImage(d->image[i]);
++            d->image[i] = NULL;
++        }
++        d->data[i] = NULL;
++        d->vbuffs[i] = NULL;
++    }
++    d->vbuff = NULL;
++    d->back = NULL;
+ }
+ 
+ #define MAX(x,y) ((x)>(y)?(x):(y))
+diff --git a/src/ui/ui.c b/src/ui/ui.c
+index e77c9f0bd47118b78b80a03b2e46735afa35b57a..3f278673035c158522b547b43a7623a579690715 100644
+--- a/src/ui/ui.c
++++ b/src/ui/ui.c
+@@ -103,6 +103,7 @@ static void ui_mouse(int mousex, int mousey, int mousebuttons,
+ xio_pathdata configfile;
+ static void ui_unregistermenus(void);
+ static void ui_mkimages(int, int);
++static int ui_try_mkimages(int, int);
+ static void ui_mainloop(int loop);
+ 
+ int prog_argc;
+@@ -1565,14 +1566,14 @@ int MAIN_FUNCTION(int argc, char **argv)
+     return 0;
+ }
+ 
+-static void ui_mkimages(int w, int h)
++static int ui_try_mkimages(int w, int h)
+ {
+     struct palette *palette;
+     int scanline;
+     int width, height;
+     union paletteinfo info;
+     char *b1, *b2;
+-    void *data;
++    void *data = NULL;
+     width = w;
+     height = h;
+     if (resizeregistered && !(driver->flags & RESIZE_COMMAND)) {
+@@ -1584,11 +1585,9 @@ static void ui_mkimages(int w, int h)
+             resizeregistered = 1;
+         }
+     }
+-    if (!(scanline = driver->alloc_buffers(&b1, &b2, &data))) {
+-        driver->uninit();
+-        x_error(gettext("Can not allocate buffers"));
+-        ui_outofmem();
+-        exit_xaos(-1);
++    scanline = driver->alloc_buffers(&b1, &b2, &data);
++    if (!scanline) {
++        return 0;
+     }
+     info.truec.rmask = driver->rmask;
+     info.truec.gmask = driver->gmask;
+@@ -1622,18 +1621,30 @@ static void ui_mkimages(int w, int h)
+     }
+     image->data = data;
+     image->driver = driver->image_driver;
++    return 1;
++}
++
++static void ui_mkimages(int w, int h)
++{
++    if (!ui_try_mkimages(w, h)) {
++        driver->uninit();
++        x_error(gettext("Can not allocate buffers"));
++        ui_outofmem();
++        exit_xaos(-1);
++    }
+ }
+ 
+ void ui_resize(void)
+ {
+     int w, h;
++    int rejected = 0;
+ 
+     /* Prevent crash on startup for Mac OS X */
+     if (!uih)
+         return;
+ 
+     if (uih->incalculation) {
+-        uih_interrupt(uih);
++        ui_call_resize();
+         return;
+     }
+     ui_closemenus();
+@@ -1651,7 +1662,13 @@ void ui_resize(void)
+         driver->free_buffers(NULL, NULL);
+         destroy_image(uih->image);
+         destroypalette(uih->palette);
+-        ui_mkimages(w, h);
++        if (!ui_try_mkimages(w, h)) {
++            /* A driver may restore the previous window size when the new
++             * buffers do not fit. Rebuild the image at that reported size. */
++            driver->getsize(&w, &h);
++            ui_mkimages(w, h);
++            rejected = 1;
++        }
+         if (!uih_updateimage(uih, image)) {
+             driver->uninit();
+             x_error(gettext("Can not allocate tables"));
+@@ -1665,6 +1682,9 @@ void ui_resize(void)
+     }
+     uih_newimage(uih);
+     uih_restorepalette(uih);
++    if (rejected) {
++        uih_error(uih, gettext("Not enough memory for the requested window size"));
++    }
+     /*uih_mkdefaultpalette(uih); */
+     uih->display = 1;;
+     uih_cycling_continue(uih);

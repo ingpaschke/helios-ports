@@ -1,0 +1,198 @@
+{
+  "format": 1,
+  "name": "xaos",
+  "version": "3.6",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/xaos-project/XaoS.git",
+    "revision": "24f838b3e36d927415226b883dba67573a73f16b",
+    "subdirectory": "",
+    "tree_sha256": "9180da612d432fa41125fd0f33d01b58da108aef87889754db6f72039eda17f6"
+  },
+  "patches": [
+    {
+      "file": "01-native-runtime.patch",
+      "description": "Connect Helios task startup and configuration paths",
+      "sha256": "9c82d5c4b60bcca6bddc2df3d9577d46176666959b1d23a553b7a5af5547c0fb"
+    },
+    {
+      "file": "02-distributed-render.patch",
+      "description": "Keep the incremental zoom cache and distribute missing pixels over native channels",
+      "sha256": "4d050014a95ac8dc779885a8074872f3c557d895a56ff49a6d6f316afecb6ffb"
+    },
+    {
+      "file": "03-preview-policy.patch",
+      "sha256": "52b47be37f1ab64042d2ce0dbf1a34b661f2ab7bd7330ab6f5e711981e501f70",
+      "description": "Keep adaptive previews while moving and finish stationary images without preview deadlines"
+    },
+    {
+      "file": "04-resize-memory.patch",
+      "sha256": "6853a87bc2fcd25fdcf609d74352435dae417c3d1c7c1c3e3a732d2f91ff03cb",
+      "description": "Recover from X11 image-buffer allocation failures and defer resizes during rendering"
+    }
+  ],
+  "files": "files",
+  "dependencies": [
+    "x11"
+  ],
+  "requires_compat": true,
+  "patched_tree_sha256": "9542cb5b65befeb812309ee55a1db3cc421597409c38e47787d65c2aa477a1d4",
+  "build": {
+    "prepare": [
+      {
+        "type": "copy",
+        "source": "${src}/helios/aconfig.h",
+        "destination": "${src}/src/include/aconfig.h"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/src/include/config/config.autoconf",
+        "destination": "${src}/src/include/config.h"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/helios/version.h",
+        "destination": "${src}/src/include/version.h"
+      }
+    ],
+    "compile": {
+      "flags": [
+        "-std=gnu99",
+        "-Dhelios",
+        "-D_BSD",
+        "-DNeedFunctionPrototypes=1",
+        "-DNeedWidePrototypes=1",
+        "-Wno-error=implicit-function-declaration",
+        "-Wno-error=int-conversion",
+        "-Wno-error=incompatible-pointer-types",
+        "-I${src}/helios",
+        "-I${src}/src/include",
+        "-I${dep:x11}/include",
+        "-I${compat}/include/helios-unix",
+        "-include",
+        "${src}/helios/platform.h"
+      ]
+    },
+    "groups": [
+      {
+        "name": "xaos",
+        "sources": [
+          "${src}/src/engine/formulas.c",
+          "${src}/src/engine/fractal.c",
+          "${src}/src/engine/btrace.c",
+          "${src}/src/engine/palettef.c",
+          "${src}/src/engine/emboss.c",
+          "${src}/src/engine/star.c",
+          "${src}/src/engine/anti.c",
+          "${src}/src/engine/dither.c",
+          "${src}/src/engine/edge.c",
+          "${src}/src/engine/edge2.c",
+          "${src}/src/engine/rotate.c",
+          "${src}/src/engine/zoom.c",
+          "${src}/src/engine/blur.c",
+          "${src}/src/engine/interlace.c",
+          "${src}/src/engine/itersmall.c",
+          "${src}/src/engine/stereogram.c",
+          "${src}/src/engine/3d.c",
+          "${src}/src/engine/subwindow.c",
+          "${src}/src/engine/plane.c",
+          "${src}/src/engine/julia.c",
+          "${src}/src/engine/i386.c",
+          "${src}/src/filter/image.c",
+          "${src}/src/filter/palette.c",
+          "${src}/src/filter/random.c",
+          "${src}/src/filter/grlib.c",
+          "${src}/src/filter/font.c",
+          "${src}/src/filter/filter.c",
+          "${src}/src/ui/drivers.c",
+          "${src}/src/ui/ui.c",
+          "${src}/src/ui/uihelp.c",
+          "${src}/src/ui/param.c",
+          "${src}/src/ui/fparams.c",
+          "${src}/src/ui/filesel.c",
+          "${src}/src/ui/uimenu.c",
+          "${src}/src/ui/pipecmd.c",
+          "${src}/src/ui/dialog.c",
+          "${src}/src/ui-hlp/autopilot.c",
+          "${src}/src/ui-hlp/ui_helper.c",
+          "${src}/src/ui-hlp/menu.c",
+          "${src}/src/ui-hlp/play.c",
+          "${src}/src/ui-hlp/messg.c",
+          "${src}/src/ui-hlp/render.c",
+          "${src}/src/ui-hlp/playtext.c",
+          "${src}/src/ui-hlp/save.c",
+          "${src}/src/ui-hlp/wstack.c",
+          "${src}/src/util/png.c",
+          "${src}/src/util/catalog.c",
+          "${src}/src/util/thread.c",
+          "${src}/src/util/xstring.c",
+          "${src}/src/util/help.c",
+          "${src}/src/util/xerror.c",
+          "${src}/src/util/xshl.c",
+          "${src}/src/util/xldio.c",
+          "${src}/src/util/xstdio.c",
+          "${src}/src/util/xmenu.c",
+          "${src}/src/util/timers.c",
+          "${src}/src/ui/ui-drv/x11/xlib.c",
+          "${src}/src/ui/ui-drv/x11/ui_x11.c",
+          "${src}/helios/platform.c",
+          "${src}/helios/parallel.c"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "xaos",
+        "type": "executable",
+        "groups": [
+          "xaos"
+        ],
+        "libraries": [
+          "${sdk}/lib/RmLib.def",
+          "${dep:x11}/lib/libX11.a",
+          "${compat}/lib/helios-unix.lib",
+          "${sdk}/lib/netutils.lib",
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${stage}/bin/x11/xaos",
+        "stack": 131072,
+        "heap": 524288
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/COPYING",
+        "destination": "${stage}/local/share/xaos/COPYING"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/tutorial",
+        "destination": "${stage}/local/share/xaos/tutorial"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/examples",
+        "destination": "${stage}/local/share/xaos/examples"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/catalogs",
+        "destination": "${stage}/local/share/xaos/catalogs"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/help/xaos.hlp",
+        "destination": "${stage}/local/share/xaos/help/xaos.hlp"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/helios/xaos.6",
+        "destination": "${stage}/local/share/xaos/xaos.6"
+      }
+    ]
+  }
+}

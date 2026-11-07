@@ -1,0 +1,32 @@
+Subject: Connect native task startup and use an Atari-compatible configuration filename
+
+--- a/src/ui/ui.c
++++ b/src/ui/ui.c
+@@ -55,6 +55,7 @@
+ #include <filter.h>
+ #include <ui_helper.h>
+ #include <ui.h>
++#include "parallel.h"
+ #include <param.h>
+ #include <version.h>
+ #include <timers.h>
+@@ -1551,6 +1552,8 @@
+ #endif
+ int MAIN_FUNCTION(int argc, char **argv)
+ {
++    int helios_action = hx_entry(&argc, argv);
++    if (helios_action) return helios_action - 1;
+     ui_init(argc, argv);
+     ui_mainloop(1);
+     ui_quit();
+--- a/src/include/config/config.autoconf
++++ b/src/include/config/config.autoconf
+@@ -15,7 +15,7 @@
+ #ifdef _WIN32
+ #define CONFIGFILE "XaoS.cfg"
+ #else
+-#define CONFIGFILE ".XaoSrc"
++#define CONFIGFILE "xaos.cfg"
+ #endif
+ 
+ /*For compilers that don't support nameless unions, do a

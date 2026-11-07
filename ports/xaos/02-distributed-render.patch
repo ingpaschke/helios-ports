@@ -1,0 +1,150 @@
+Subject: Distribute missing pixels while preserving the incremental zoom cache
+
+--- a/src/engine/zoom.c
++++ b/src/engine/zoom.c
+@@ -55,6 +55,7 @@
+ #define SLARGEITER
+ #include <filter.h>
+ #include <zoom.h>
++#include "parallel.h"
+ #include <archaccel.h>
+ #include <complex.h>		/*for myabs */
+ #include <plane.h>
+@@ -1534,7 +1535,58 @@
+ 		    cfractalc.rs.mi, cursymetry.ysym, tmpdata1);
+ }
+ 
+-static int do_fractal(struct filter *f, int flags, int /*@unused@ */ time)
++
++/* Helios nodes do not share pointers or pixels. Keep the incremental move
++ * tables locally and distribute just the union of changed rows/columns. */
++static int helios_render_idle(void)
++{
++    if (hx_preview_ready()) cfilter.readyforinterrupt = 1;
++    callwait();
++    return cfilter.interrupt;
++}
++static int helios_calculate_changed(void)
++{
++    int x, y, result;
++    number_t *xp = malloc(cimage.width * sizeof(*xp));
++    number_t *yp = malloc(cimage.height * sizeof(*yp));
++    unsigned char *dx = malloc(cimage.width), *dy = malloc(cimage.height);
++    if (!xp || !yp || !dx || !dy) {
++        free(xp); free(yp); free(dx); free(dy); return 0;
++    }
++    for (x = 0; x < cimage.width; x++) {
++        xp[x] = czoomc.reallocx[x].possition;
++        dx[x] = czoomc.reallocx[x].dirty || czoomc.reallocx[x].recalculate;
++    }
++    for (y = 0; y < cimage.height; y++) {
++        yp[y] = czoomc.reallocy[y].possition;
++        dy[y] = czoomc.reallocy[y].dirty || czoomc.reallocy[y].recalculate;
++    }
++    cfilter.pass = "Rendering on Helios processors";
++    cfilter.incalculation = 1;
++    result = hx_render(xp, yp, dx, dy, helios_render_idle);
++    cfilter.incalculation = 0;
++    if (result) {
++        int remaining = 0;
++        for (x = 0; x < cimage.width; x++) {
++            czoomc.reallocx[x].dirty = czoomc.reallocx[x].recalculate = dx[x];
++            remaining += dx[x] != 0;
++        }
++        for (y = 0; y < cimage.height; y++) {
++            czoomc.reallocy[y].dirty = czoomc.reallocy[y].recalculate = dy[y];
++            remaining += dy[y] != 0;
++        }
++        nsymetrized = 0;
++        getzcontext(&cfilter)->uncomplette = remaining;
++        setchanged(1);
++        /* Keep XaoS's normal time-limited preview and nearest-line fill.
++         * Dirty reallocation entries are refined by subsequent frames. */
++        if (remaining) fill();
++    }
++    free(xp); free(yp); free(dx); free(dy);
++    return result;
++}
++
++static int do_fractal_impl(struct filter *f, int flags, int /*@unused@ */ time)
+ {
+     number_t *posptr;
+     int maxres;
+@@ -1558,7 +1610,7 @@
+ 	getzcontext(f)->forversion = getfcontext(f)->version;
+ 	getzcontext(f)->forpversion = f->image->palette->version;
+ 	czoomc = *getzcontext(f);
+-	if (BTRACEOK && !(flags & INTERRUPTIBLE)) {
++	if (!hx_parallel_enabled() && BTRACEOK && !(flags & INTERRUPTIBLE)) {
+ 	    boundarytraceall(czoomc.xpos, czoomc.ypos);
+ 	    f->flags &= ~ZOOMMASK;
+ 	    return CHANGED | (cfilter.interrupt ? UNCOMPLETTE : 0);
+@@ -1647,7 +1699,9 @@
+     cfilter.pass = "Starting calculation";
+     callwait();
+     xth_sync();
+-    if (flags & INTERRUPTIBLE)
++    if (hx_parallel_enabled() && helios_calculate_changed()) {
++        /* completed by native workers */
++    } else if (flags & INTERRUPTIBLE)
+ 	calculatenewinterruptible();
+     else {
+ 	xth_function(calculatenew, NULL, 1);
+@@ -1706,6 +1760,16 @@
+ }
+ 
+ 
++static int do_fractal(struct filter *f, int flags, int time)
++{
++    long begin = hx_profile_enabled() ? hx_milliseconds() : 0;
++    int result = do_fractal_impl(f, flags, time);
++    if (hx_profile_enabled())
++        fprintf(stderr, "XaoS profile engine: %lu ms, %d processors, result %d\n",
++                (unsigned long)(hx_milliseconds()-begin), hx_processor_count(), result);
++    return result;
++}
++
+ static struct filter *getinstance(const struct filteraction *a)
+ {
+     struct filter *f = createfilter(a);
+--- a/src/ui/ui-drv/x11/ui_x11.c
++++ b/src/ui/ui-drv/x11/ui_x11.c
+@@ -36,6 +36,7 @@
+ #endif
+ #include <fconfig.h>
+ #include <ui.h>
++#include "parallel.h"
+ xlibparam xparams = { 0, 0, 0, 0, NULL, -1 };
+ 
+ static int allocated;
+@@ -85,6 +86,15 @@
+ static int flipped = 0;
+ static void x11_display(void)
+ {
++    long profile_start = hx_profile_enabled() ? hx_milliseconds() : 0;
++    static int last_processors = -1;
++    int processors = hx_processor_count();
++    if (processors != last_processors) {
++        char title[96];
++        sprintf(title, "XaoS - Helios: %d render processors", processors);
++        XStoreName(d->display, d->window, title);
++        last_processors = processors;
++    }
+     XFlush(d->display);
+ #ifdef MITSHM
+     if (d->SharedMemFlag) {
+@@ -101,6 +111,14 @@
+     if (flipped)
+ 	xflip_buffers(d), flipped = 0;
+     draw_screen(d);
++    if (hx_profile_enabled()) {
++        /* Include draining Xlib and the remote server, not just enqueueing. */
++        XSync(d->display, 0);
++        fprintf(stderr, "XaoS profile display: %dx%d, %lu bytes, %lu ms\n",
++                d->bwidth, d->bheight,
++                (unsigned long)d->image[d->current]->bytes_per_line*d->bheight,
++                (unsigned long)(hx_milliseconds()-profile_start));
++    }
+ #ifdef MITSHM
+     if (d->SharedMemFlag) {
+ 	XSync(d->display, 0);

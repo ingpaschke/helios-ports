@@ -28,6 +28,7 @@ consult individual source and asset notices.
 | NetHack | `dat/license`, `sys/share/random.c` |
 | NetHack 5 | `dat/license`, `nhlua/`, `sys/amiga/regex/COPYRIGHT` |
 | XV 3.10a | Shareware terms in `copyright.h` and `README`; bundled JPEG `jpeg/README`, TIFF notices in `tiff/tiff.h` |
+| XaoS | `COPYING` and individual source notices |
 | Telnet | Berkeley notices in `telnet.c` and other sources |
 | xterm-tty | Parsytec notices in `tty.c` and other sources |
 

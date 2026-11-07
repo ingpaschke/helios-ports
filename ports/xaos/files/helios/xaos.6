@@ -1,0 +1,71 @@
+.TH XAOS 6 "October 2026" "XaoS 3.6" "Helios Games"
+.SH NAME
+xaos \- interactive fractal explorer with distributed Helios rendering
+.SH SYNOPSIS
+.B xaos
+.RB [ \-size " widthxheight"]
+.RB [ \-display " display"]
+.RB [ \-processors " all|count"]
+.SH DESCRIPTION
+XaoS displays and animates Mandelbrot, Julia and other fractals using X11.
+Hold the left mouse button to zoom in, the right button to zoom out,
+and the middle button to move the view.
+Use the menu bar for formulas, colours, filters, tutorials and help.
+.SH OPTIONS
+.TP
+.BI \-processors " all|count"
+Select the number of render processors, including the caller.
+The default is
+.BR all .
+Available T800/T805 processors are obtained through the session's
+Taskforce Manager. The system processor is excluded.
+The window title shows the live count.
+A count of 1 selects the original serial renderer.
+.TP
+.BI \-size " widthxheight"
+Set the initial window size, for example 640x480.
+Smaller images require less calculation and link traffic.
+.TP
+.BI \-display " display"
+Select an X server instead of DISPLAY.
+.TP
+.B \-helios-profile
+Report calculation and synchronized X11 transfer timings on standard error.
+.TP
+.B \-help
+List the available XaoS options.
+.SH PROCESSORS
+Worker tasks have separate memory and exchange jobs through native Helios
+channels. The coordinator preserves XaoS's incremental zoom cache.
+Distributed workers calculate missing pixels exactly; the serial renderer
+can also use boundary tracing and solid guessing.
+.PP
+Interactive zooming uses the original adaptive preview renderer in both axes.
+Once movement and zoom coasting stop, the workers finish the missing pixels
+without the preview time limit. Input is still processed; a new mouse gesture
+or resize can interrupt that final pass.
+.PP
+Worker reservations last until XaoS exits.
+Obtaining every spare processor may prevent a new login from obtaining one.
+Use a smaller count when additional sessions need to start.
+An unresponsive worker is dropped after a 30-second job timeout and its
+pending work is calculated locally.
+.SH PERFORMANCE
+Every displayed frame is sent to the X server.
+A 640x480 image at 32 bits per pixel contains 1,228,800 bytes.
+More render processors do not reduce this display traffic.
+.PP
+Two full-size pixel buffers remain on the calling processor.
+Workers do not pool their RAM.
+If a resize cannot allocate these buffers, the previous window size is restored.
+.SH FILES
+.TP
+.B ~/xaos.cfg
+User configuration, saved through the XaoS menus.
+.TP
+.B /helios/local/share/xaos
+Tutorials, examples, help and catalogue files.
+.SH LIMITATIONS
+PNG export and the optional custom-formula parser are not included.
+.SH SEE ALSO
+.BR X (1)

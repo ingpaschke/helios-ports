@@ -30,6 +30,7 @@ writing your own recipe.
 | [nethack](ports/nethack/port.json) | 3.1.3 | NetHack with the X11 interface |
 | [nethack5](ports/nethack5/README.md) | 5.0.1 snapshot | NetHack with terminal and X11 tile interfaces |
 | [xv](ports/xv/README.md) | 3.10a | Image viewer with JPEG, TIFF and classic bitmap formats |
+| [xaos](ports/xaos/README.md) | 3.6 | X11 fractal explorer with rendering across T800/T805 processors |
 | [telnet](ports/telnet/port.json) | Helios port | Telnet client with terminal and window-size translation |
 | [xterm-tty](ports/xterm-tty/port.json) | Helios terminal server | Native terminal service for xterm |
 
