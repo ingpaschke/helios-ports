@@ -94,7 +94,20 @@
           "HELIOS_ASM=${asm}",
           "HELIOS_RTLIB=${runtime}",
           "all"
-        ]
+        ],
+        "library_variables": {
+          "HELIOS_X11LIBS": [
+            "${dep:x11}/lib/libXaw.a",
+            "${dep:x11}/lib/libXmu.a",
+            "${dep:x11}/lib/libXt.a",
+            "${dep:x11}/lib/libXext.a",
+            "${dep:x11}/lib/libX11.a",
+            "${dep:x11}/lib/libXau.a",
+            "${sdk}/lib/bsd.lib",
+            "${sdk}/lib/fplib.def",
+            "${compat}/lib/helios-unix.lib"
+          ]
+        }
       },
       {
         "type": "run",

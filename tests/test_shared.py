@@ -1,6 +1,7 @@
 """Native resident-library assembly and dependency-closure regressions."""
 from pathlib import Path
 import json
+import shlex
 import sys
 import tempfile
 import unittest
@@ -11,6 +12,33 @@ from shared import exports, module_body, private_symbols
 
 
 class Shared(unittest.TestCase):
+    def test_makefile_links_include_resident_dependencies(self):
+        with tempfile.TemporaryDirectory(prefix='resident libraries ') as work:
+            root = Path(work)
+            xlib = root / 'xlib.def'
+            support = root / 'support.def'
+            for library in (xlib, support):
+                library.touch()
+            Path(str(xlib) + '.requires.json').write_text(json.dumps(
+                {'format': 1, 'dependencies': [str(support)]}))
+            result = root / 'linked.json'
+            capture = root / 'capture.py'
+            capture.write_text(
+                'import json, sys\n'
+                'from pathlib import Path\n'
+                'Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]))\n')
+            makefile = root / 'Makefile'
+            makefile.write_text('all:\n\t' + shlex.join(
+                [sys.executable, str(capture), str(result)]) + ' $(LDLIBS)\n')
+            builder = Builder(root / 'work', root / 'sdk', root / 'asm')
+            builder.actions([{
+                'type': 'run',
+                'command': ['make', '-f', str(makefile)],
+                'library_variables': {'LDLIBS': ['${xlib}']}
+            }], {'src': str(root), 'work': str(root), 'xlib': str(xlib)}, 'link')
+            self.assertEqual(json.loads(result.read_text()),
+                             ['-l' + str(xlib), '-l' + str(support)])
+
     def test_private_names_do_not_alias_between_c_files(self):
         source = '''.public:
  call .local

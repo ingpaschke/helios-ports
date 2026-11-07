@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -150,7 +151,14 @@ class Builder:
             if not self.enabled(action): continue
             kind = action['type']; expand = lambda x: self.expand(x, context)
             if kind == 'run':
-                self.run(expand(action['command']), Path(context['work'])/'logs'/f'{label}-{number}.log',
+                command = expand(action['command'])
+                for variable, libraries in action.get('library_variables', {}).items():
+                    # Custom Makefiles need the same resident dependency
+                    # closure as targets linked directly by this builder.
+                    libraries = self.link_libraries(expand(libraries))
+                    flags = shlex.join(['-l' + library for library in libraries])
+                    command.append(variable + '=' + flags)
+                self.run(command, Path(context['work'])/'logs'/f'{label}-{number}.log',
                          cwd=expand(action.get('cwd','${src}')),
                          stdout=expand(action['stdout']) if 'stdout' in action else None)
             elif kind == 'copy':

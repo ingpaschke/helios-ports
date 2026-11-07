@@ -96,6 +96,11 @@ Actions in `prepare` and `install` support:
 
 - `run`: `command` array and optional `cwd` (default `${src}`). Optional `stdout`
   writes generated output to a file; diagnostics remain in the build log.
+  For a custom Makefile, `library_variables` maps variable names to library
+  lists. The builder includes their resident dependencies and appends quoted
+  `NAME=-l...` assignments to the command. For example,
+  `"library_variables": {"LDLIBS": ["${dep:x11}/lib/libX11.a"]}` also links
+  Xlib's support library. Use this when the Makefile performs the final link.
 - `copy`: `source` file or directory and `destination`.
 - `glob-copy` / `glob-link`: `source` directory, `pattern`, `destination` directory.
 - `symlink`: `source` link text and `destination` link path.
