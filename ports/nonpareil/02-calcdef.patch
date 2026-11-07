@@ -1,0 +1,70 @@
+Subject: Read calculator definitions through the small Expat adapter
+
+--- a/src/calcdef.c
++++ b/src/calcdef.c
+@@ -25,11 +25,17 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
++#ifdef NP_SINGLE_THREAD
++#include "xml_reader.h"
++#else
+ #include <libxml/SAX.h>
+ #include <libxml/xmlwriter.h>
++#endif
+ 
+ #include "util.h"
++#ifndef NP_SINGLE_THREAD
+ #include "xmlutil.h"
++#endif
+ #include "display.h"
+ #include "keyboard.h"
+ #include "chip.h"
+@@ -45,7 +51,11 @@
+ #include "crc.h"
+ 
+ 
++#ifdef NP_SINGLE_THREAD
++static np_xml_handlers_t sax_handler;
++#else
+ static xmlSAXHandler sax_handler;
++#endif
+ 
+ 
+ typedef struct calcdef_mem_t
+@@ -1099,6 +1109,13 @@
+ }
+ 
+ 
++#ifdef NP_SINGLE_THREAD
++static np_xml_handlers_t sax_handler =
++{
++  .startElement = sax_start_element,
++  .endElement = sax_end_element
++};
++#else
+ static xmlSAXHandler sax_handler =
+ {
+   .getEntity     = sax_get_entity,
+@@ -1109,6 +1126,7 @@
+   .error         = sax_error,
+   .fatalError    = sax_fatal_error,
+ };
++#endif
+ 
+ 
+ calcdef_t *calcdef_load (sim_t *sim, char *ncd_fn)
+@@ -1119,9 +1137,13 @@
+ 
+   calcdef->sim = sim;
+ 
++#ifdef NP_SINGLE_THREAD
++  np_xml_read (&sax_handler, calcdef, ncd_fn);
++#else
+   xmlSAXUserParseFile (& sax_handler,
+ 		       calcdef,
+ 		       ncd_fn);
++#endif
+ 
+   return calcdef;
+ }

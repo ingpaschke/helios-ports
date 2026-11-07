@@ -1,0 +1,18 @@
+Nonpareil 0.79
+https://github.com/brouhaha/nonpareil
+
+The simulator, calculator definitions and artwork retain their original
+copyrights and licences. See COPYING, CREDITS, the model's info.txt and the
+notices in the corresponding source files. The native X11 front end uses
+the original Voyager artwork and calculator ROMs. The build converts PNG
+artwork into PPM faces and XBM segment masks and expands the ROM records
+into the calculator-definition XML.
+
+Licence filenames are shortened for Atari filesystems:
+  GPL-2.txt                 -> LICENSES/GPL2.TXT
+  GPL-3.0.txt               -> LICENSES/GPL3.TXT
+  CC-BY-SA-3.0.txt          -> LICENSES/CC-BY-SA.TXT
+  CC-BY-NC-ND-3.0.txt       -> LICENSES/CC-NC-ND.TXT
+
+The statically linked Expat library is MIT licensed; see expat.txt.
+The statically linked nanoprintf library uses its 0BSD licence; see npf.txt.

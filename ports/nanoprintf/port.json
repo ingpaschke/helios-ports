@@ -1,0 +1,49 @@
+{
+  "format": 1,
+  "name": "nanoprintf",
+  "version": "0.8.1",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/charlesnicholson/nanoprintf.git",
+    "revision": "bebaecbeaf430e36a2d30d31a2fed4e098388c93",
+    "subdirectory": "",
+    "tree_sha256": "465baf9f7dbcdaec059e921aba7fc45c0c9433f21b4b5ac38056d4162410bd29"
+  },
+  "patches": [],
+  "files": "files",
+  "patched_tree_sha256": "551c0425d1e818f7d7da2948e17f98ef9280766bfd70c85d24e6db12710dc90b",
+  "dependencies": [],
+  "build": {
+    "compile": {
+      "flags": [
+        "-std=gnu99",
+        "-I${src}"
+      ]
+    },
+    "groups": [
+      {
+        "name": "printf",
+        "sources": [
+          "${src}/helios/printf.c"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "nanoprintf",
+        "type": "archive",
+        "groups": [
+          "printf"
+        ],
+        "output": "${work}/lib/libnpf.a"
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/nanoprintf.h",
+        "destination": "${work}/include/nanoprintf.h"
+      }
+    ]
+  }
+}

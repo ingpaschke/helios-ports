@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "name": "expat",
+  "version": "2.7.3",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/libexpat/libexpat.git",
+    "revision": "4575e52f83e0d6d7bd24939eab8952bbc7bc358f",
+    "subdirectory": "",
+    "tree_sha256": "6d839ec4384e6c1898a299a2e740ccd17238a2b704450b286ec6c02ad358564e"
+  },
+  "patches": [],
+  "files": "files",
+  "patched_tree_sha256": "299d8e16b8c0adff3270a36df996a6691967dc2fc04bb7e5507ba252b358c9ae",
+  "dependencies": [],
+  "build": {
+    "compile": {
+      "flags": [
+        "-std=gnu99",
+        "-D_BSD",
+        "-DHAVE_EXPAT_CONFIG_H",
+        "-DXML_STATIC",
+        "-Disnan=__builtin_isnan",
+        "-I${src}/helios",
+        "-I${src}/expat/lib"
+      ]
+    },
+    "groups": [
+      {
+        "name": "expat",
+        "sources": [
+          "${src}/expat/lib/xmlparse.c",
+          "${src}/expat/lib/xmlrole.c",
+          "${src}/expat/lib/xmltok.c"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "expat",
+        "type": "archive",
+        "groups": [
+          "expat"
+        ],
+        "output": "${work}/lib/libexpat.a"
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/expat/lib/expat.h",
+        "destination": "${work}/include/expat.h"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/expat/lib/expat_external.h",
+        "destination": "${work}/include/expat_external.h"
+      }
+    ]
+  }
+}

@@ -1,0 +1,69 @@
+.TH NONPAR 1
+.SH NAME
+nonpar \- Nonpareil HP Voyager calculator simulator
+.SH SYNOPSIS
+.B nonpar
+.RI [ model ]
+.RB [ \-display " display" ]
+.RB [ \-data " directory" ]
+.RB [ \-state " file" | \-nostate ]
+.SH DESCRIPTION
+Nonpareil runs the original calculator ROM on a simulated Nut processor.
+The native X11 interface supplies the original calculator face, mouse keys,
+keyboard bindings, LCD segments and annunciators.
+.PP
+Supported models are HP-10C, HP-11C, HP-12C, HP-15C and HP-16C.
+The default is HP-15C. For example:
+.PP
+.nf
+nonpar
+nonpar 12c
+nonpar 16c -display 192.168.178.36:24
+.fi
+.SH CONTROLS
+Press calculator keys with the left mouse button. Keyboard digits, arithmetic
+operators, decimal point, Enter, Backspace and the numeric keypad also work.
+The f and g keys select the calculator's shift functions. Escape operates ON.
+F10 or the window manager's close command exits the simulator.
+.PP
+These are RPN calculators: to add 2 and 3, type 2, Enter, 3, +.
+Keyboard shortcuts follow the upstream model's bindings. Function keys can
+always be pressed on the calculator face.
+.SH OPTIONS
+.TP
+.BI \-display " display"
+Use the specified X display instead of DISPLAY.
+.TP
+.BI \-data " directory"
+Read model directories below this directory.
+.TP
+.BI \-state " file"
+Load continuous memory from this file, and save it on a normal exit.
+.TP
+.B \-nostate
+Start with cleared memory and do not save state.
+.TP
+.B \-test
+Run a ROM arithmetic check without opening an X window. Saved state is ignored;
+an explicitly supplied state file receives the result of a successful check.
+.TP
+.B \-help
+Show usage and keyboard controls.
+.SH FILES
+.TP
+.B /helios/local/share/nonpar
+Calculator definitions, ROMs, original artwork and keyboard layouts.
+.TP
+.BI $HOME/np model .nst
+Continuous memory, including registers, stored values and programs.
+Each model has its own file, such as np15c.nst.
+Two instances of one model should use separate state files when their
+memories need to be kept separately; otherwise the last normal exit wins.
+.SH LIMITATIONS
+The GTK menus, other calculator families, plug-in modules, printer,
+card-reader and sound interfaces are not included in this front end.
+State files are readable text and are specific to this port; they are not
+interchangeable with upstream Nonpareil's XML state files.
+.SH AUTHORS
+Nonpareil and its calculator simulators are by Eric Smith and contributors.
+Artwork credits and licence notices accompany the installed data.

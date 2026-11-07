@@ -29,6 +29,9 @@ consult individual source and asset notices.
 | NetHack 5 | `dat/license`, `nhlua/`, `sys/amiga/regex/COPYRIGHT` |
 | XV 3.10a | Shareware terms in `copyright.h` and `README`; bundled JPEG `jpeg/README`, TIFF notices in `tiff/tiff.h` |
 | XaoS | `COPYING` and individual source notices |
+| Nonpareil | `COPYING`, `CREDITS`, `LICENSES` and per-file notices; native front end GPL-2.0-only, host asset converter MIT |
+| Expat | MIT, `expat/COPYING` |
+| nanoprintf | 0BSD / Unlicense, `LICENSE`; this build uses 0BSD |
 | Telnet | Berkeley notices in `telnet.c` and other sources |
 | xterm-tty | Parsytec notices in `tty.c` and other sources |
 

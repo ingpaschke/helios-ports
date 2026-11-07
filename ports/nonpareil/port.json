@@ -1,0 +1,195 @@
+{
+  "format": 1,
+  "name": "nonpareil",
+  "version": "0.79",
+  "upstream": {
+    "kind": "git",
+    "url": "https://github.com/brouhaha/nonpareil.git",
+    "revision": "c347bc1ab20170c253512042f7aac0d952f304ea",
+    "subdirectory": "",
+    "tree_sha256": "19d32ff2238739abda885ebb1666555b34604284747b61e064cde583d409c47e"
+  },
+  "patches": [
+    {
+      "file": "01-proc.patch",
+      "description": "Run simulator commands and display callbacks in the native event loop",
+      "sha256": "c0742391c132776d9d202ce7d5c61a7ab9ffed82608b78403b4d7cfcd7c5fcc9"
+    },
+    {
+      "file": "02-calcdef.patch",
+      "description": "Read calculator definitions through the small Expat adapter",
+      "sha256": "1473835afa7a5a87998976eaeb7925cc1e450d016c83d6e6c92727fb0ff585e2"
+    }
+  ],
+  "files": "files",
+  "patched_tree_sha256": "c658f634e2bf56ceae5fe8e4d0a1aaa5e581d30494dc2d5839aa0dca196e8d98",
+  "dependencies": [
+    "expat",
+    "nanoprintf",
+    "x11"
+  ],
+  "requires_compat": true,
+  "host_tools": [
+    "python3"
+  ],
+  "build": {
+    "prepare": [
+      {
+        "type": "run",
+        "command": [
+          "${python}",
+          "${src}/helios/assets.py",
+          "${src}",
+          "${stage}/local/share/nonpar"
+        ]
+      }
+    ],
+    "compile": {
+      "flags": [
+        "-std=gnu99",
+        "-D__HELIOS",
+        "-Uhelios",
+        "-fno-builtin-strlcpy",
+        "-include",
+        "${src}/helios/platform.h",
+        "-D_BSD",
+        "-DNP_SINGLE_THREAD",
+        "-DNeedFunctionPrototypes=1",
+        "-DNeedWidePrototypes=1",
+        "-iquote",
+        "${src}/src",
+        "-I${src}/helios",
+        "-I${dep:expat}/include",
+        "-I${dep:nanoprintf}/include",
+        "-I${dep:x11}/include"
+      ]
+    },
+    "groups": [
+      {
+        "name": "core",
+        "sources": [
+          "${src}/src/util.c",
+          "${src}/src/arch.c",
+          "${src}/src/platform.c",
+          "${src}/src/calcdef.c",
+          "${src}/src/chip.c",
+          "${src}/src/proc.c",
+          "${src}/src/digit_ops.c",
+          "${src}/src/proc_classic.c",
+          "${src}/src/proc_woodstock.c",
+          "${src}/src/crc.c",
+          "${src}/src/pick.c",
+          "${src}/src/proc_nut.c",
+          "${src}/src/coconut_lcd.c",
+          "${src}/src/phineas.c",
+          "${src}/src/helios.c",
+          "${src}/src/helios_chargen.c",
+          "${src}/src/hepax.c",
+          "${src}/src/voyager_lcd.c",
+          "${src}/src/mod1_file.c",
+          "${src}/src/dis_woodstock.c",
+          "${src}/src/dis_nut.c"
+        ]
+      },
+      {
+        "name": "x11",
+        "sources": [
+          "${src}/helios/main.c",
+          "${src}/helios/skin.c",
+          "${src}/helios/xml_reader.c",
+          "${src}/helios/peripherals.c",
+          "${src}/helios/clock.c",
+          "${src}/helios/numbers.c",
+          "${src}/helios/state.c",
+          "${src}/helios/keys.c"
+        ]
+      }
+    ],
+    "targets": [
+      {
+        "name": "nonpar",
+        "type": "executable",
+        "groups": [
+          "core",
+          "x11"
+        ],
+        "libraries": [
+          "${dep:expat}/lib/libexpat.a",
+          "${dep:nanoprintf}/lib/libnpf.a",
+          "${dep:x11}/lib/libX11.a",
+          "${compat}/lib/helios-unix.lib",
+          "${sdk}/lib/netutils.lib",
+          "${sdk}/lib/bsd.lib",
+          "${sdk}/lib/c.lib",
+          "${sdk}/lib/helios.lib",
+          "${runtime}"
+        ],
+        "output": "${stage}/bin/x11/nonpar",
+        "stack": 65536,
+        "heap": 65536
+      }
+    ],
+    "install": [
+      {
+        "type": "copy",
+        "source": "${src}/LICENSES/GPL-2.txt",
+        "destination": "${stage}/local/share/nonpar/LICENSES/GPL2.TXT"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/LICENSES/GPL-3.0.txt",
+        "destination": "${stage}/local/share/nonpar/LICENSES/GPL3.TXT"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/LICENSES/CC-BY-SA-3.0.txt",
+        "destination": "${stage}/local/share/nonpar/LICENSES/CC-BY-SA.TXT"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/LICENSES/CC-BY-NC-ND-3.0.txt",
+        "destination": "${stage}/local/share/nonpar/LICENSES/CC-NC-ND.TXT"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/LICENSES/deeds.css",
+        "destination": "${stage}/local/share/nonpar/LICENSES/deeds.css"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/LICENSES/logo_code.gif",
+        "destination": "${stage}/local/share/nonpar/LICENSES/logocode.gif"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/COPYING",
+        "destination": "${stage}/local/share/nonpar/COPYING"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/CREDITS",
+        "destination": "${stage}/local/share/nonpar/CREDITS"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/helios/nonpar.1",
+        "destination": "${stage}/local/share/nonpar/nonpar.1"
+      },
+      {
+        "type": "copy",
+        "source": "${src}/helios/NOTICE",
+        "destination": "${stage}/local/share/nonpar/NOTICE"
+      },
+      {
+        "type": "copy",
+        "source": "${src:expat}/expat/COPYING",
+        "destination": "${stage}/local/share/nonpar/expat.txt"
+      },
+      {
+        "type": "copy",
+        "source": "${src:nanoprintf}/LICENSE",
+        "destination": "${stage}/local/share/nonpar/npf.txt"
+      }
+    ]
+  }
+}

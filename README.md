@@ -31,6 +31,8 @@ writing your own recipe.
 | [nethack5](ports/nethack5/README.md) | 5.0.1 snapshot | NetHack with terminal and X11 tile interfaces |
 | [xv](ports/xv/README.md) | 3.10a | Image viewer with JPEG, TIFF and classic bitmap formats |
 | [xaos](ports/xaos/README.md) | 3.6 | X11 fractal explorer with rendering across T800/T805 processors |
+| [nonpareil](ports/nonpareil/README.md) | 0.79 | HP Voyager calculators with a native X11 front end |
+| [expat](ports/expat/README.md), [nanoprintf](ports/nanoprintf/README.md) | 2.7.3 / 0.8.1 | XML parsing and bounded formatting support |
 | [telnet](ports/telnet/port.json) | Helios port | Telnet client with terminal and window-size translation |
 | [xterm-tty](ports/xterm-tty/port.json) | Helios terminal server | Native terminal service for xterm |
 

@@ -1,0 +1,223 @@
+Subject: Run simulator commands and display callbacks in the native event loop
+
+--- a/src/proc.c
++++ b/src/proc.c
+@@ -27,9 +27,11 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
++#ifndef NP_SINGLE_THREAD
+ #include <glib.h>
+-
+-#include <libxml/SAX.h>
++#else
++typedef void *gpointer;
++#endif
+ 
+ #include "util.h"
+ #include "display.h"
+@@ -41,7 +43,9 @@
+ #include "platform.h"
+ #include "mod1_file.h"
+ #include "proc_int.h"
++#ifndef NP_SINGLE_THREAD
+ #include "glib_async_queue_source.h"
++#endif
+ #include "elapsed_time_us.h"
+ #include "helios.h"
+ #include "phineas.h"
+@@ -166,6 +170,7 @@
+ 
+ struct sim_thread_vars_t
+ {
++#ifndef NP_SINGLE_THREAD
+   GThread  *gthread;
+ 
+   // The cmd_q and reply_q are simulator thread specific.
+@@ -179,6 +184,7 @@
+ 
+   GAsyncQueueSource *gui_cmd_q_source;
+ 
++#endif
+   uint64_t last_run_time_us;
+ };
+ 
+@@ -188,7 +194,9 @@
+ 				    addr_t addr,
+ 				    rom_word_t data)
+ {
+-  if (! sim_write_rom (sim, bank, addr, & data))
++  rom_word_t word = data;
++
++  if (! sim_write_rom (sim, bank, addr, & word))
+     {
+       fprintf (stderr, "Can't load ROM word at bank %d address %o\n", bank, addr);
+       return false;
+@@ -673,13 +681,19 @@
+ 
+ // Sends a command from the GUI thread to the sim thread, and waits
+ // for a reply.
++static void handle_sim_cmd (sim_t *sim, sim_msg_t *msg);
++
+ static void send_cmd_to_sim_thread (sim_t *sim, gpointer msg)
+ {
++#ifdef NP_SINGLE_THREAD
++  handle_sim_cmd (sim, msg);
++#else
+   gpointer msg2;
+   g_async_queue_push (sim->thread_vars->cmd_q, msg);
+   msg2 = g_async_queue_pop (sim->thread_vars->reply_q);
+   if (msg2 != msg)
+     fatal (2, "async reply != msg\n");
++#endif
+ }
+ 
+ 
+@@ -979,7 +993,9 @@
+     default:
+       msg->reply = BAD_CMD;
+     }
++#ifndef NP_SINGLE_THREAD
+   g_async_queue_push (sim->thread_vars->reply_q, msg);
++#endif
+   current_sim_cmd = CMD_NONE;
+ }
+ 
+@@ -1010,6 +1026,7 @@
+ }
+ 
+ 
++#ifndef NP_SINGLE_THREAD
+ gpointer sim_thread_func (gpointer data)
+ {
+   sim_t *sim = (sim_t *) data;
+@@ -1093,6 +1110,8 @@
+ }
+ 
+ 
++#endif
++
+ // Called by GUI thread to create a simulator thread
+ // $$$ Some of the initialization here should be moved into
+ // the thread function.
+@@ -1109,6 +1128,7 @@
+   sim = alloc (sizeof (sim_t));
+   sim->thread_vars = alloc (sizeof (sim_thread_vars_t));
+ 
++#ifndef NP_SINGLE_THREAD
+   sim->thread_vars->cmd_q = g_async_queue_new ();
+   sim->thread_vars->reply_q = g_async_queue_new ();
+   sim->thread_vars->gui_cmd_q = g_async_queue_new ();
+@@ -1122,6 +1142,8 @@
+ 								 NULL,  // use main context
+ 								 gui_cmd_callback);
+ 
++#endif
++
+   // save display callback info
+   sim->display_update_callback = display_update_callback;
+   sim->display_update_callback_ref = display_update_callback_ref;
+@@ -1145,7 +1167,9 @@
+ 
+   // $$$ sim->source = alloc (sim->proc->max_bank * sim->proc->max_rom * sizeof (char *));
+ 
++#ifndef NP_SINGLE_THREAD
+   sim->thread_vars->gthread = g_thread_create (sim_thread_func, sim, TRUE, NULL);
++#endif
+ 
+   calcdef_init_chips (sim->calcdef);
+ 
+@@ -1756,6 +1780,10 @@
+ 
+ void sim_send_display_update_to_gui (sim_t *sim)
+ {
++#ifdef NP_SINGLE_THREAD
++  sim->display_update_callback (sim->display_update_callback_ref,
++                                sim->display_digits, sim->display_segments);
++#else
+   gui_msg_t *msg;
+ 
+   msg = g_async_queue_try_pop (sim->thread_vars->gui_cmd_free_q);
+@@ -1768,6 +1796,7 @@
+   memcpy (msg->display_segments, sim->display_segments, sizeof (sim->display_segments));
+ 
+   g_async_queue_source_push (sim->thread_vars->gui_cmd_q_source, msg);
++#endif
+ }
+ 
+ 
+@@ -1775,6 +1804,12 @@
+ 			       chip_t *chip,
+ 			       void   *data)
+ {
++#ifdef NP_SINGLE_THREAD
++  if (chip->callback_fn)
++    {
++      chip->callback_fn (sim, chip, chip->callback_ref, data);
++    }
++#else
+   gui_msg_t *msg;
+ 
+   msg = g_async_queue_try_pop (sim->thread_vars->gui_cmd_free_q);
+@@ -1787,6 +1822,7 @@
+   msg->data = data;
+ 
+   g_async_queue_source_push (sim->thread_vars->gui_cmd_q_source, msg);
++#endif
+ }
+ 
+ 
+@@ -2116,6 +2152,7 @@
+ 			      char         *buf,
+ 			      int          len)
+ {
++  bank_t current_bank = bank;
+   bool stat;
+   bool carry_known_clear = ! carry;
+   bank_t target_bank;
+@@ -2127,7 +2164,7 @@
+ 
+   stat = sim_disassemble (sim,
+ 			  flags,
+-			  & bank,
++			  & current_bank,
+ 			  & addr,
+ 			  & inst_state,
+ 			  & carry_known_clear,
+@@ -2148,7 +2185,7 @@
+       snprintf (buf, len, buf1, target_str);
+     }
+   else
+-    snprintf (buf, len, buf1);
++    snprintf (buf, len, "%s", buf1);
+ 
+   return true;
+ }
+@@ -2184,6 +2221,20 @@
+ 
+ void log_send (sim_t *sim)
+ {
++#ifdef NP_SINGLE_THREAD
++  if (sim->log_msg)
++    {
++      if (sim->debug_trace_callback)
++        {
++          sim->debug_trace_callback (sim->debug_trace_callback_ref, sim->log_msg);
++        }
++      else
++        {
++          free (sim->log_msg);
++        }
++      sim->log_msg = NULL;
++    }
++#else
+   gui_msg_t *msg;
+ 
+   if (! sim->log_msg)
+@@ -2200,4 +2251,5 @@
+   g_async_queue_source_push (sim->thread_vars->gui_cmd_q_source, msg);
+ 
+   sim->log_msg = NULL;
+-}
++#endif
++}
