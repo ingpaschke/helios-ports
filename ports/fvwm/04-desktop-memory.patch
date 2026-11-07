@@ -17,17 +17,22 @@ diff --git a/fvwm/fvwm.c b/fvwm/fvwm.c
 index 9a198da73850a023b32242eea34476c16903d1f4..6d8035ac3620fc47cfcdf79952d169575528d61e 100644
 --- a/fvwm/fvwm.c
 +++ b/fvwm/fvwm.c
-@@ -447,6 +447,9 @@ void main(int argc, char **argv)
+@@ -447,6 +447,14 @@ void main(int argc, char **argv)
      XUngrabServer(dpy);
      MoveResizeViewPortIndicator();
      fd_width = GetFdWidth();
-+    if (getenv("FVWM_BACKDROP") && !strcmp(getenv("FVWM_BACKDROP"),"1"))
-+      if (helios_desktop_open(dpy,Scr.StdFont.font))
++    if (getenv("FVWM_BACKDROP") && !strcmp(getenv("FVWM_BACKDROP"),"1")) {
++      const char *cache_setting = getenv("FVWM_BACKDROP_CACHE");
++      int use_cache = cache_setting && !strcmp(cache_setting,"1");
++
++      if (helios_desktop_open(dpy,Scr.StdFont.font,use_cache)) {
 +        ktm_set_idle_hook(helios_desktop_tick);
++      }
++    }
  
    
      if(Restarting)
-@@ -865,6 +868,9 @@ void Done(int restart, char *command)
+@@ -865,6 +873,9 @@ void Done(int restart, char *command)
    MoveViewport(0,0,False);
  #endif
  

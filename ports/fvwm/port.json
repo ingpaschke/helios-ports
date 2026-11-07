@@ -27,12 +27,12 @@
     },
     {
       "file": "04-desktop-memory.patch",
-      "sha256": "7d14d8fc6073a9d8bf59c139eb8f321c0c0ac6c76d6241737d36221f8e1ec310",
+      "sha256": "cbf6ce21268cf5a18f5a6b61882a65143d1a90c73d55aa3c104aba32ed49a90d",
       "description": "Host the Helios desktop renderer in the window manager event loop"
     }
   ],
   "files": "files",
-  "patched_tree_sha256": "532e593f18e48f5cabe4746ac804490408f688ef4bee9e47b94669e49fe18a2f",
+  "patched_tree_sha256": "bfca36627f3ab51f99888e5f23aee8328e4314b3b0e3a2bf98776295080066a3",
   "dependencies": [
     "x11"
   ],

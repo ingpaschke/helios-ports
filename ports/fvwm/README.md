@@ -30,10 +30,29 @@ needed. Stack sizes remain 64 KiB.
 
 Set `FVWM_BACKDROP=1` before starting FVWM to draw the Helios logo, clock
 and background in the manager's event loop. Omit standalone backdrop `Exec`
-commands in that configuration. The renderer uses a solid root background,
-redraws its arcs on exposure, and paints the logo/clock in a small header
-window; it allocates no screen-sized pixmap. `helios-backdrop` remains
-available as a standalone entry point to the same renderer.
+commands in that configuration. `helios-backdrop` runs the same renderer as a
+standalone program. By default it repaints only exposed regions of the solid
+background and small logo/clock header, without storing a background pixmap.
+This mode suits an Atari X server with limited memory.
+
+For an X server with more memory, use `helios-backdrop -cache`, or set
+`FVWM_BACKDROP_CACHE=1` with the integrated renderer. The X server then stores
+the header and bottom-right decoration in pixmaps and restores them when
+windows move. No drawing requests or exposure events need to travel to the
+standalone renderer during a drag. Only a clock change repaints its small
+rectangle. The pixmaps occupy about 1.6 MiB on a 1920x1080, 32-bit X server,
+with no corresponding pixel buffer on the Transputer. Allocation failure
+falls back to the low-memory renderer. Neither mode uses a screen-sized
+pixmap.
+
+To test exposure handling against a separate X server:
+
+```
+python3 ports/fvwm/tests/run_desktop.py --display :25
+```
+
+This moves a test window without moving the pointer. Use a dedicated test
+display; the test replaces its background.
 
 Commands with a literal executable path and arguments use native spawning
 directly, including quoted and empty arguments. Shell expansion, operators,
